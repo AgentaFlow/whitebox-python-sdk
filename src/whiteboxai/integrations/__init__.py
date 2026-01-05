@@ -1,0 +1,62 @@
+"""Framework integrations for WhiteBoxAI SDK."""
+
+# Scikit-learn integration
+try:
+    from .sklearn import SklearnMonitor, SklearnWrapper
+    __all__ = ['SklearnMonitor', 'SklearnWrapper']
+except ImportError:
+    pass
+
+# PyTorch integration
+try:
+    from .pytorch import TorchMonitor, TorchWrapper
+    if '__all__' in dir():
+        __all__.extend(['TorchMonitor', 'TorchWrapper'])
+    else:
+        __all__ = ['TorchMonitor', 'TorchWrapper']
+except ImportError:
+    pass
+
+# TensorFlow/Keras integration
+try:
+    from .tensorflow import KerasMonitor, WhiteBoxAICallback, wrap_keras_model
+    if '__all__' in dir():
+        __all__.extend(['KerasMonitor', 'WhiteBoxAICallback', 'wrap_keras_model'])
+    else:
+        __all__ = ['KerasMonitor', 'WhiteBoxAICallback', 'wrap_keras_model']
+except ImportError:
+    pass
+
+# Hugging Face Transformers integration
+try:
+    from .transformers import TransformersMonitor, TransformersPipelineWrapper, wrap_transformers_pipeline
+    if '__all__' in dir():
+        __all__.extend(['TransformersMonitor', 'TransformersPipelineWrapper', 'wrap_transformers_pipeline'])
+    else:
+        __all__ = ['TransformersMonitor', 'TransformersPipelineWrapper', 'wrap_transformers_pipeline']
+except ImportError:
+    pass
+
+# LangChain integration
+try:
+    from .langchain import LangChainMonitor, WhiteBoxAICallbackHandler, wrap_langchain_chain
+    if '__all__' in dir():
+        __all__.extend(['LangChainMonitor', 'WhiteBoxAICallbackHandler', 'wrap_langchain_chain'])
+    else:
+        __all__ = ['LangChainMonitor', 'WhiteBoxAICallbackHandler', 'wrap_langchain_chain']
+except ImportError:
+    pass
+
+# XGBoost/LightGBM integration
+try:
+    from .boosting import XGBoostMonitor, LightGBMMonitor, wrap_xgboost_model, wrap_lightgbm_model
+    if '__all__' in dir():
+        __all__.extend(['XGBoostMonitor', 'LightGBMMonitor', 'wrap_xgboost_model', 'wrap_lightgbm_model'])
+    else:
+        __all__ = ['XGBoostMonitor', 'LightGBMMonitor', 'wrap_xgboost_model', 'wrap_lightgbm_model']
+except ImportError:
+    pass
+
+# Ensure __all__ exists even if all imports fail
+if '__all__' not in dir():
+    __all__ = []
