@@ -11,7 +11,7 @@ Example:
 
     >>> import xgboost as xgb
     >>> from whiteboxai import WhiteBoxAI
-    >>> from explainai.integrations.boosting import XGBoostMonitor
+    >>> from whiteboxai.integrations.boosting import XGBoostMonitor
     >>>
     >>> client = WhiteBoxAI(api_key="your-api-key")
     >>> monitor = XGBoostMonitor(client=client, model_name="fraud_detector")
@@ -25,7 +25,7 @@ Example:
     LightGBM monitoring:
 
     >>> import lightgbm as lgb
-    >>> from explainai.integrations.boosting import LightGBMMonitor
+    >>> from whiteboxai.integrations.boosting import LightGBMMonitor
     >>>
     >>> monitor = LightGBMMonitor(client=client, model_name="churn_predictor")
     >>>
@@ -37,7 +37,7 @@ Example:
 """
 
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 

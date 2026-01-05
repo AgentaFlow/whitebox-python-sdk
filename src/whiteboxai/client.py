@@ -6,18 +6,18 @@ Main client class for interacting with the WhiteBoxAI API.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import httpx
-from explainai.config import Config
-from explainai.exceptions import (
+from whiteboxai.config import Config
+from whiteboxai.exceptions import (
     APIError,
     AuthenticationError,
     RateLimitError,
     ValidationError,
 )
-from explainai.resources import (
+from whiteboxai.resources import (
     AlertsResource,
     DriftResource,
     ExplanationsResource,
@@ -92,7 +92,7 @@ class WhiteBoxAI:
         # Initialize offline mode
         self._offline_manager = None
         if enable_offline:
-            from explainai.offline import OfflineManager
+            from whiteboxai.offline import OfflineManager
             self._offline_manager = OfflineManager(
                 offline_dir=offline_dir,
                 max_queue_size=offline_max_queue_size,

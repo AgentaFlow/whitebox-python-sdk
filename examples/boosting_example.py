@@ -32,9 +32,9 @@ def example_xgboost_classification():
     """
     Example: XGBoost binary classification with monitoring.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 1: XGBoost Binary Classification")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import xgboost as xgb
@@ -96,22 +96,22 @@ def example_xgboost_classification():
     # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Predictions logged to WhiteBoxAI")
+    print("Predictions logged to WhiteBoxAI")
 
     # Get feature importance
     importance = model.feature_importances_
     top_features = np.argsort(importance)[-5:][::-1]
     print(f"\nTop 5 features: {top_features.tolist()}")
-    print(f"Feature importance tracked in metadata")
+    print("Feature importance tracked in metadata")
 
 
 def example_xgboost_regression():
     """
     Example: XGBoost regression with automatic wrapper.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 2: XGBoost Regression with Wrapper")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import xgboost as xgb
@@ -168,16 +168,16 @@ def example_xgboost_regression():
     r2 = r2_score(y_test, predictions)
     print(f"MSE: {mse:.4f}")
     print(f"R² Score: {r2:.4f}")
-    print(f"Predictions automatically logged via wrapper")
+    print("Predictions automatically logged via wrapper")
 
 
 def example_lightgbm_classification():
     """
     Example: LightGBM binary classification with monitoring.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 3: LightGBM Binary Classification")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import lightgbm as lgb
@@ -236,13 +236,11 @@ def example_lightgbm_classification():
     print("\nMaking predictions...")
     predictions = monitor.predict(model, X_test, y_test)
 
-    # Get probabilities
+    # Get probabilities and calculate metrics
     probabilities = model.predict_proba(X_test)
-
-    # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Predictions logged with probabilities")
+    print(f"Predictions logged with {len(probabilities)} probability estimates")
 
     # Feature importance
     importance = model.feature_importances_
@@ -254,9 +252,9 @@ def example_lightgbm_regression():
     """
     Example: LightGBM regression with automatic wrapper.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 4: LightGBM Regression with Wrapper")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import lightgbm as lgb
@@ -313,16 +311,16 @@ def example_lightgbm_regression():
     r2 = r2_score(y_test, predictions)
     print(f"MSE: {mse:.4f}")
     print(f"R² Score: {r2:.4f}")
-    print(f"Predictions automatically logged via wrapper")
+    print("Predictions automatically logged via wrapper")
 
 
 def example_feature_importance_tracking():
     """
     Example: Detailed feature importance tracking.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 5: Feature Importance Tracking")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import xgboost as xgb
@@ -409,9 +407,9 @@ def example_model_comparison():
     """
     Example: Compare XGBoost and LightGBM models.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("Example 6: Model Comparison (XGBoost vs LightGBM)")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     try:
         import xgboost as xgb
@@ -471,9 +469,9 @@ def example_model_comparison():
     lgb_accuracy = accuracy_score(y_test, lgb_preds)
 
     # Compare results
-    print("\n" + "-"*60)
+    print("\n" + "-" * 60)
     print("Model Comparison Results")
-    print("-"*60)
+    print("-" * 60)
     print(f"XGBoost Accuracy:  {xgb_accuracy:.4f}")
     print(f"LightGBM Accuracy: {lgb_accuracy:.4f}")
     print(f"\nBetter model: {'XGBoost' if xgb_accuracy > lgb_accuracy else 'LightGBM'}")
@@ -481,9 +479,9 @@ def example_model_comparison():
 
 
 if __name__ == "__main__":
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("WhiteBoxAI - Gradient Boosting Integration Examples")
-    print("="*60)
+    print("=" * 60)
 
     # Run examples
     example_xgboost_classification()
@@ -493,6 +491,6 @@ if __name__ == "__main__":
     example_feature_importance_tracking()
     example_model_comparison()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("All examples completed!")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")

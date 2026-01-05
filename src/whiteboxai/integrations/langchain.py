@@ -4,10 +4,9 @@ LangChain Integration
 Integration for monitoring LangChain applications including chains, agents, and RAG pipelines.
 """
 
-from typing import Any, Dict, Optional, List, Union, Callable
+from typing import Any, Dict, Optional, List
 import warnings
 import time
-import json
 
 try:
     from langchain.callbacks.base import BaseCallbackHandler

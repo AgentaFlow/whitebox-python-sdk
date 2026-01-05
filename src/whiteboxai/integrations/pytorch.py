@@ -4,7 +4,7 @@ PyTorch Integration
 Integration for monitoring PyTorch models.
 """
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 try:
     import torch
@@ -16,8 +16,7 @@ except ImportError:
     nn = object
     torch = None
 
-import numpy as np
-from explainai.monitor import ModelMonitor
+from whiteboxai.monitor import ModelMonitor
 
 
 class TorchMonitor(ModelMonitor):

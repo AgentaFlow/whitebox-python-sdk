@@ -1,0 +1,32 @@
+# Include requirements files in source distribution
+include README.md
+include LICENSE
+include CHANGELOG.md
+
+# Include configuration files
+include pyproject.toml
+include setup.py
+include pytest.ini
+include .gitignore
+
+# Include GitHub workflows and documentation
+recursive-include .github *.md *.yml *.yaml
+
+# Include documentation
+recursive-include docs *.md *.rst *.txt
+
+# Include examples
+recursive-include examples *.py
+
+# Include tests
+recursive-include tests *.py
+
+# Include source package data
+recursive-include src *.py
+
+# Exclude compiled files
+global-exclude *.py[cod]
+global-exclude __pycache__
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info

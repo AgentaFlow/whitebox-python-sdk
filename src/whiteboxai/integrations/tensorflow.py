@@ -4,7 +4,7 @@ TensorFlow/Keras Integration
 Integration for monitoring TensorFlow and Keras models.
 """
 
-from typing import Any, Dict, Optional, List, Union
+from typing import Any, Dict, Optional, Union
 import warnings
 
 try:
@@ -390,7 +390,7 @@ class WhiteBoxAICallback(keras.callbacks.Callback):
         # Log final metrics
         self.monitor.log_custom_metric("training_complete", {
             "final_metrics": {k: float(v) if v is not None else None
-                            for k, v in logs.items()},
+                              for k, v in logs.items()},
         })
 
 

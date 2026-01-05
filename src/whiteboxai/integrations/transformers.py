@@ -4,7 +4,7 @@ Hugging Face Transformers Integration
 Integration for monitoring Hugging Face Transformers models.
 """
 
-from typing import Any, Dict, Optional, List, Union, Callable
+from typing import Any, Dict, Optional, List, Union
 import warnings
 
 try:
@@ -13,7 +13,6 @@ try:
         PreTrainedModel,
         PreTrainedTokenizer,
         Pipeline,
-        pipeline,
     )
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
@@ -22,8 +21,7 @@ except ImportError:
     PreTrainedTokenizer = object
     Pipeline = object
 
-import numpy as np
-from explainai.monitor import ModelMonitor
+from whiteboxai.monitor import ModelMonitor
 
 
 class TransformersMonitor(ModelMonitor):
