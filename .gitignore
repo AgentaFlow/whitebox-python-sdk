@@ -206,3 +206,4 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 CHANGELOG.md
+MIGRATION_SUMMARY.md
