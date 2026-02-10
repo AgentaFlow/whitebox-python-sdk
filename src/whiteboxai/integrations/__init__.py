@@ -57,6 +57,38 @@ try:
 except ImportError:
     pass
 
+# CrewAI integration
+try:
+    from .crewai_monitor import CrewAIMonitor, monitor_crew
+    if '__all__' in dir():
+        __all__.extend(['CrewAIMonitor', 'monitor_crew'])
+    else:
+        __all__ = ['CrewAIMonitor', 'monitor_crew']
+except ImportError:
+    pass
+
+# LangChain Multi-Agent integration
+try:
+    from .langchain_agents import (
+        MultiAgentCallbackHandler,
+        LangGraphMultiAgentMonitor,
+        monitor_langchain_agent
+    )
+    if '__all__' in dir():
+        __all__.extend([
+            'MultiAgentCallbackHandler',
+            'LangGraphMultiAgentMonitor',
+            'monitor_langchain_agent'
+        ])
+    else:
+        __all__ = [
+            'MultiAgentCallbackHandler',
+            'LangGraphMultiAgentMonitor',
+            'monitor_langchain_agent'
+        ]
+except ImportError:
+    pass
+
 # Ensure __all__ exists even if all imports fail
 if '__all__' not in dir():
     __all__ = []
