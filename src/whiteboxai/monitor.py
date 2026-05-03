@@ -4,7 +4,6 @@ Model Monitoring
 Simplified monitoring interface for ML models.
 """
 
-import time
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import numpy as np

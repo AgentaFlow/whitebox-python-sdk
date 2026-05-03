@@ -38,7 +38,7 @@ def example_1_basic_offline_mode():
 
     # Check offline status
     status = client.get_offline_status()
-    print(f"\nOffline Status:")
+    print("\nOffline Status:")
     print(f"  Queue size: {status['queue_size']}")
     print(f"  Statistics: {status['statistics']}")
 
@@ -95,7 +95,7 @@ def example_2_manual_sync():
     # Manually trigger sync when connection is available
     print("\nTriggering manual sync...")
     result = client.sync_offline_queue(batch_size=50)
-    print(f"Sync result:")
+    print("Sync result:")
     print(f"  Synced: {result['synced']}")
     print(f"  Failed: {result['failed']}")
     print(f"  Pending: {result['pending']}")
@@ -176,7 +176,7 @@ def example_4_queue_management():
 
     # Get queue statistics
     status = client.get_offline_status()
-    print(f"\nInitial Queue Status:")
+    print("\nInitial Queue Status:")
     print(f"  Total: {status['statistics']['total']}")
     print(f"  Pending: {status['statistics']['pending']}")
     print(f"  Completed: {status['statistics']['completed']}")
@@ -239,7 +239,7 @@ def example_5_ml_model_with_offline():
 
     # Check queue status
     status = client.get_offline_status()
-    print(f"\nQueue Status:")
+    print("\nQueue Status:")
     print(f"  Pending operations: {status['statistics']['pending']}")
     print(f"  Completed: {status['statistics']['completed']}")
 
@@ -315,7 +315,7 @@ def example_7_context_manager():
         offline_auto_sync=True,
         offline_sync_interval=60,
     ) as client:
-        print(f"\n✓ Client initialized with offline mode")
+        print("\n✓ Client initialized with offline mode")
         print(f"  Auto-sync running: {client._offline_manager._sync_running}")
 
         status = client.get_offline_status()

@@ -116,7 +116,7 @@ def example_sequential_chain():
     print("\nRunning sequential chain...")
     result = wrapped_chain({"subject": "artificial intelligence"})
 
-    print(f"\n  Subject: artificial intelligence")
+    print("\n  Subject: artificial intelligence")
     print(f"  Topic: {result['topic'].strip()}")
     print(f"  Paragraph: {result['paragraph'].strip()[:100]}...")
 
@@ -127,7 +127,6 @@ def example_agent():
     """Example using an agent with tools."""
     from langchain.agents import AgentType, Tool, initialize_agent
     from langchain.llms import OpenAI
-    from langchain.utilities import SerpAPIWrapper
 
     print("\n" + "=" * 60)
     print("Agent Example")
@@ -157,7 +156,7 @@ def example_agent():
         """Mock calculator tool."""
         try:
             return str(eval(expression))
-        except:
+        except Exception:
             return "Invalid expression"
 
     tools = [
