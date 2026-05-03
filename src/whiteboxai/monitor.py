@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import numpy as np
 
 if TYPE_CHECKING:
-    from explainai.client import WhiteBoxAI
+    from whiteboxai.client import WhiteBoxAI
 
 
 class ModelMonitor:

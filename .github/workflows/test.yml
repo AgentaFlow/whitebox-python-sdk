@@ -135,4 +135,4 @@ jobs:
 
     - name: Run e2e tests
       run: |
-        pytest tests/e2e -v
+        pytest tests/e2e -v; CODE=$?; if [ $CODE -eq 5 ]; then echo "No e2e tests collected - skipping"; else exit $CODE; fi

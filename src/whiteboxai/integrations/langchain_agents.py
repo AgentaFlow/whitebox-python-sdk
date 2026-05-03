@@ -41,7 +41,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         workflow_id = client.agent_workflows.create(
             name="Research Workflow",
             framework="langchain"
-        ).id
+        ).get("id")
 
         # Start workflow
         client.agent_workflows.start(workflow_id)

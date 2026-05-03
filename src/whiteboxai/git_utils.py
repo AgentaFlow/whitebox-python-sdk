@@ -7,7 +7,6 @@ for model registration.
 
 import logging
 import os
-from pathlib import Path
 from typing import Dict, Optional
 import subprocess
 
