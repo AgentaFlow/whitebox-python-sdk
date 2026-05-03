@@ -30,11 +30,7 @@ class TestSklearnIntegration:
 
     def test_sklearn_monitor_creation(self, client, trained_model):
         """Test SklearnMonitor can be created."""
-        monitor = SklearnMonitor(
-            client=client,
-            model=trained_model,
-            model_name="test_model"
-        )
+        monitor = SklearnMonitor(client=client, model=trained_model, model_name="test_model")
         assert monitor is not None
 
     def test_model_wrapping(self, client, trained_model, sample_data):
@@ -42,7 +38,7 @@ class TestSklearnIntegration:
         X, _ = sample_data
         monitor = SklearnMonitor(client=client, model=trained_model)
         wrapped_model = monitor.wrap_model(trained_model)
-        
+
         # Should be able to make predictions
         predictions = wrapped_model.predict(X[:10])
         assert predictions is not None

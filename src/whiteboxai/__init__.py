@@ -10,8 +10,8 @@ __license__ = "MIT"
 
 from whiteboxai.client import WhiteBoxAI
 from whiteboxai.decorators import monitor_model, monitor_prediction
-from whiteboxai.monitor import ModelMonitor
 from whiteboxai.git_utils import GitContext, detect_git_context, validate_git_context
+from whiteboxai.monitor import ModelMonitor
 
 __all__ = [
     "WhiteBoxAI",

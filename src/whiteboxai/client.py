@@ -10,13 +10,10 @@ from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import httpx
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from whiteboxai.config import Config
-from whiteboxai.exceptions import (
-    APIError,
-    AuthenticationError,
-    RateLimitError,
-    ValidationError,
-)
+from whiteboxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
 from whiteboxai.resources import (
     AgentWorkflowsResource,
     AlertsResource,
@@ -25,7 +22,6 @@ from whiteboxai.resources import (
     ModelsResource,
     PredictionsResource,
 )
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +90,12 @@ class WhiteBoxAI:
         self._offline_manager = None
         if enable_offline:
             from whiteboxai.offline import OfflineManager
+
             self._offline_manager = OfflineManager(
                 offline_dir=offline_dir,
                 max_queue_size=offline_max_queue_size,
                 auto_sync=offline_auto_sync,
-                sync_interval=offline_sync_interval
+                sync_interval=offline_sync_interval,
             )
             self._offline_manager.set_client(self)
             logger.info("Offline mode enabled")

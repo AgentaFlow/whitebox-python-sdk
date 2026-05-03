@@ -245,9 +245,9 @@ class ModelMonitor:
 
         return self.client.drift.detect(
             model_id=self.model_id,
-            reference_data=self._baseline_data.tolist()
-            if self._baseline_data is not None
-            else None,
+            reference_data=(
+                self._baseline_data.tolist() if self._baseline_data is not None else None
+            ),
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )
@@ -263,9 +263,9 @@ class ModelMonitor:
 
         return await self.client.drift.adetect(
             model_id=self.model_id,
-            reference_data=self._baseline_data.tolist()
-            if self._baseline_data is not None
-            else None,
+            reference_data=(
+                self._baseline_data.tolist() if self._baseline_data is not None else None
+            ),
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )
@@ -276,9 +276,7 @@ class ModelMonitor:
             return True
         return np.random.random() < self.sampling_rate
 
-    def _sample_predictions(
-        self, predictions: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _sample_predictions(self, predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Sample predictions based on sampling rate."""
         n_samples = int(len(predictions) * self.sampling_rate)
         if n_samples == 0:

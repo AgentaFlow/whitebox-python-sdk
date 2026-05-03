@@ -5,8 +5,9 @@ This example demonstrates zero-code-change monitoring using decorators.
 """
 
 import numpy as np
-from whiteboxai import WhiteBoxAI, ModelMonitor, monitor_model, monitor_prediction
 from sklearn.ensemble import RandomForestClassifier
+
+from whiteboxai import ModelMonitor, WhiteBoxAI, monitor_model, monitor_prediction
 
 # Global monitor instance
 client = WhiteBoxAI(api_key="your-api-key")
@@ -69,9 +70,7 @@ def main():
     print("\n=== Custom Extractors ===")
 
     # Custom input/output extraction
-    result = score_transaction(
-        data={"amount": 100.0, "velocity": 5.0, "location_risk": 0.3}
-    )
+    result = score_transaction(data={"amount": 100.0, "velocity": 5.0, "location_risk": 0.3})
     print(f"Transaction score: {result}")
 
     print("\n=== Class Method Decorator ===")

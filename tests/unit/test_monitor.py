@@ -1,6 +1,7 @@
 """Unit tests for ModelMonitor."""
 
 import pytest
+
 from whiteboxai import ModelMonitor
 
 

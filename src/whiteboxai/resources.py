@@ -93,9 +93,7 @@ class ModelsResource(BaseResource):
 
     async def aupdate(self, model_id: int, **kwargs: Any) -> Dict[str, Any]:
         """Async version of update()."""
-        return await self.client.arequest(
-            "PUT", f"/api/v1/models/{model_id}", data=kwargs
-        )
+        return await self.client.arequest("PUT", f"/api/v1/models/{model_id}", data=kwargs)
 
 
 class PredictionsResource(BaseResource):
@@ -174,9 +172,7 @@ class PredictionsResource(BaseResource):
     ) -> Dict[str, Any]:
         """Async version of log_batch()."""
         data = {"model_id": model_id, "predictions": predictions}
-        return await self.client.arequest(
-            "POST", "/api/v1/predictions/log/batch", data=data
-        )
+        return await self.client.arequest("POST", "/api/v1/predictions/log/batch", data=data)
 
 
 class ExplanationsResource(BaseResource):
@@ -210,9 +206,7 @@ class ExplanationsResource(BaseResource):
     ) -> Dict[str, Any]:
         """Async version of generate()."""
         data = {"prediction_id": prediction_id, "method": method, **kwargs}
-        return await self.client.arequest(
-            "POST", "/api/v1/explanations/generate", data=data
-        )
+        return await self.client.arequest("POST", "/api/v1/explanations/generate", data=data)
 
     def get(self, explanation_id: int) -> Dict[str, Any]:
         """Get explanation by ID."""
@@ -220,9 +214,7 @@ class ExplanationsResource(BaseResource):
 
     async def aget(self, explanation_id: int) -> Dict[str, Any]:
         """Async version of get()."""
-        return await self.client.arequest(
-            "GET", f"/api/v1/explanations/{explanation_id}"
-        )
+        return await self.client.arequest("GET", f"/api/v1/explanations/{explanation_id}")
 
 
 class DriftResource(BaseResource):
@@ -273,9 +265,7 @@ class DriftResource(BaseResource):
 
     def get_report(self, model_id: int, report_id: int) -> Dict[str, Any]:
         """Get drift report."""
-        return self.client.request(
-            "GET", f"/api/v1/drift/models/{model_id}/reports/{report_id}"
-        )
+        return self.client.request("GET", f"/api/v1/drift/models/{model_id}/reports/{report_id}")
 
     async def aget_report(self, model_id: int, report_id: int) -> Dict[str, Any]:
         """Async version of get_report()."""

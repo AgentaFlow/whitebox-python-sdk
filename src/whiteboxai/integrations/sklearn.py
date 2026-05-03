@@ -16,7 +16,8 @@ except ImportError:
     BaseEstimator = object
 
 import numpy as np
-from explainai.monitor import ModelMonitor
+
+from whiteboxai.monitor import ModelMonitor
 
 
 class SklearnMonitor(ModelMonitor):
@@ -27,7 +28,7 @@ class SklearnMonitor(ModelMonitor):
         ```python
         from sklearn.ensemble import RandomForestClassifier
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.sklearn import SklearnMonitor
+        from whiteboxai.integrations.sklearn import SklearnMonitor
 
         # Train model
         model = RandomForestClassifier()
@@ -201,12 +202,8 @@ class SklearnWrapper:
         predictions = []
         for i in range(len(inputs)):
             pred = {
-                "inputs": inputs[i].tolist()
-                if isinstance(inputs[i], np.ndarray)
-                else inputs[i],
-                "output": outputs[i].tolist()
-                if isinstance(outputs[i], np.ndarray)
-                else outputs[i],
+                "inputs": inputs[i].tolist() if isinstance(inputs[i], np.ndarray) else inputs[i],
+                "output": outputs[i].tolist() if isinstance(outputs[i], np.ndarray) else outputs[i],
             }
             predictions.append(pred)
 

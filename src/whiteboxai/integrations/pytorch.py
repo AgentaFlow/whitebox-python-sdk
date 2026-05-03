@@ -28,7 +28,7 @@ class TorchMonitor(ModelMonitor):
         import torch
         import torch.nn as nn
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.pytorch import TorchMonitor
+        from whiteboxai.integrations.pytorch import TorchMonitor
 
         # Define model
         model = nn.Sequential(
@@ -53,9 +53,7 @@ class TorchMonitor(ModelMonitor):
     def __init__(self, client, model: Optional[nn.Module] = None, **kwargs):
         """Initialize PyTorch monitor."""
         if not TORCH_AVAILABLE:
-            raise ImportError(
-                "PyTorch is not installed. Install with: pip install torch"
-            )
+            raise ImportError("PyTorch is not installed. Install with: pip install torch")
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -144,9 +142,7 @@ class TorchMonitor(ModelMonitor):
 
         # Count parameters
         total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
         metadata["total_parameters"] = total_params
         metadata["trainable_parameters"] = trainable_params
@@ -188,9 +184,7 @@ class TorchWrapper(nn.Module):
 
         return output
 
-    def _log_batch_predictions(
-        self, inputs: torch.Tensor, outputs: torch.Tensor
-    ) -> None:
+    def _log_batch_predictions(self, inputs: torch.Tensor, outputs: torch.Tensor) -> None:
         """Log batch of predictions."""
         # Convert to numpy/lists
         inputs_np = inputs.detach().cpu().numpy()
@@ -231,7 +225,7 @@ def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] =
     Example:
         ```python
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.pytorch import TorchMonitor, monitor_forward
+        from whiteboxai.integrations.pytorch import TorchMonitor, monitor_forward
 
         client = WhiteBoxAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model_id=123)

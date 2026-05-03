@@ -8,8 +8,9 @@ Enhanced callback handler for monitoring multi-agent LangChain workflows includi
 - Agent-to-agent communication
 """
 
-from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
+
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import AgentAction, AgentFinish, LLMResult
 
@@ -90,8 +91,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         """
         if WhiteBoxAI is None:
             raise ImportError(
-                "whiteboxai package not installed. "
-                "Install with: pip install whiteboxai"
+                "whiteboxai package not installed. " "Install with: pip install whiteboxai"
             )
 
         self.client = client
@@ -111,10 +111,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         self.execution_inputs: Optional[Dict[str, Any]] = None
 
     def on_chain_start(
-        self,
-        serialized: Dict[str, Any],
-        inputs: Dict[str, Any],
-        **kwargs: Any
+        self, serialized: Dict[str, Any], inputs: Dict[str, Any], **kwargs: Any
     ) -> None:
         """Run when chain starts."""
         # Start agent execution
@@ -125,11 +122,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         self.total_tokens = 0
         self.total_cost = 0.0
 
-    def on_chain_end(
-        self,
-        outputs: Dict[str, Any],
-        **kwargs: Any
-    ) -> None:
+    def on_chain_end(self, outputs: Dict[str, Any], **kwargs: Any) -> None:
         """Run when chain ends successfully."""
         if self.execution_start_time:
             duration_ms = int(
@@ -157,11 +150,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
             # Reset state
             self.execution_start_time = None
 
-    def on_chain_error(
-        self,
-        error: Union[Exception, KeyboardInterrupt],
-        **kwargs: Any
-    ) -> None:
+    def on_chain_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
         """Run when chain errors."""
         if self.execution_start_time:
             duration_ms = int(
@@ -185,20 +174,11 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
 
             self.execution_start_time = None
 
-    def on_llm_start(
-        self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
-        **kwargs: Any
-    ) -> None:
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
         """Run when LLM starts."""
         self.llm_call_count += 1
 
-    def on_llm_end(
-        self,
-        response: LLMResult,
-        **kwargs: Any
-    ) -> None:
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
         """Run when LLM ends."""
         # Track tokens if available
         if self.track_tokens and hasattr(response, "llm_output"):
@@ -213,11 +193,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
                 # Rough estimate: $0.002 per 1K tokens (GPT-3.5 pricing)
                 self.total_cost += (total / 1000) * 0.002
 
-    def on_agent_action(
-        self,
-        action: AgentAction,
-        **kwargs: Any
-    ) -> None:
+    def on_agent_action(self, action: AgentAction, **kwargs: Any) -> None:
         """Run when agent takes an action (tool call)."""
         self.tool_call_count += 1
 
@@ -233,34 +209,21 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
                     "tool": action.tool,
                     "tool_input": action.tool_input,
                     "log": action.log,
-                }
+                },
             )
         except Exception as e:
             print(f"Warning: Failed to log tool call: {e}")
 
-    def on_agent_finish(
-        self,
-        finish: AgentFinish,
-        **kwargs: Any
-    ) -> None:
+    def on_agent_finish(self, finish: AgentFinish, **kwargs: Any) -> None:
         """Run when agent finishes execution."""
         # This is called when the agent completes its reasoning
         pass
 
-    def on_tool_start(
-        self,
-        serialized: Dict[str, Any],
-        input_str: str,
-        **kwargs: Any
-    ) -> None:
+    def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> None:
         """Run when tool starts."""
         pass
 
-    def on_tool_end(
-        self,
-        output: str,
-        **kwargs: Any
-    ) -> None:
+    def on_tool_end(self, output: str, **kwargs: Any) -> None:
         """Run when tool ends."""
         # Log tool result as interaction
         try:
@@ -270,16 +233,12 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
                 to_agent=self.agent_name,
                 interaction_type="response",
                 message=f"Tool result: {output[:500]}",  # Truncate long outputs
-                meta_data={"output": output}
+                meta_data={"output": output},
             )
         except Exception as e:
             print(f"Warning: Failed to log tool result: {e}")
 
-    def on_tool_error(
-        self,
-        error: Union[Exception, KeyboardInterrupt],
-        **kwargs: Any
-    ) -> None:
+    def on_tool_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
         """Run when tool errors."""
         try:
             self.client.agent_workflows.create_interaction(
@@ -288,16 +247,12 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
                 to_agent=self.agent_name,
                 interaction_type="response",
                 message=f"Tool error: {str(error)}",
-                meta_data={"error": str(error), "error_type": type(error).__name__}
+                meta_data={"error": str(error), "error_type": type(error).__name__},
             )
         except Exception as e:
             print(f"Warning: Failed to log tool error: {e}")
 
-    def on_text(
-        self,
-        text: str,
-        **kwargs: Any
-    ) -> None:
+    def on_text(self, text: str, **kwargs: Any) -> None:
         """Run on arbitrary text."""
         pass
 
@@ -342,10 +297,7 @@ class LangGraphMultiAgentMonitor:
     """
 
     def __init__(
-        self,
-        client: "WhiteBoxAI",
-        workflow_name: str,
-        meta_data: Optional[Dict[str, Any]] = None
+        self, client: "WhiteBoxAI", workflow_name: str, meta_data: Optional[Dict[str, Any]] = None
     ):
         """Initialize the LangGraph monitor.
 
@@ -356,8 +308,7 @@ class LangGraphMultiAgentMonitor:
         """
         if WhiteBoxAI is None:
             raise ImportError(
-                "whiteboxai package not installed. "
-                "Install with: pip install whiteboxai"
+                "whiteboxai package not installed. " "Install with: pip install whiteboxai"
             )
 
         self.client = client
@@ -383,7 +334,7 @@ class LangGraphMultiAgentMonitor:
             name=self.workflow_name,
             framework="langchain",
             inputs=inputs,
-            meta_data=self.workflow_meta_data
+            meta_data=self.workflow_meta_data,
         )
         self.workflow_id = response.get("id")
 
@@ -398,7 +349,7 @@ class LangGraphMultiAgentMonitor:
         role: Optional[str] = None,
         model_name: Optional[str] = None,
         tools: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Register an agent in the workflow.
 
@@ -418,13 +369,11 @@ class LangGraphMultiAgentMonitor:
             role=role or agent_name,
             model_name=model_name,
             tools=tools,
-            **kwargs
+            **kwargs,
         )
 
     def get_callbacks(
-        self,
-        agent_name: str,
-        agent_role: Optional[str] = None
+        self, agent_name: str, agent_role: Optional[str] = None
     ) -> List[BaseCallbackHandler]:
         """Get callbacks for a specific agent.
 
@@ -443,7 +392,7 @@ class LangGraphMultiAgentMonitor:
                 client=self.client,
                 workflow_id=self.workflow_id,
                 agent_name=agent_name,
-                agent_role=agent_role
+                agent_role=agent_role,
             )
 
         return [self.callbacks[agent_name]]
@@ -453,7 +402,7 @@ class LangGraphMultiAgentMonitor:
         from_agent: str,
         to_agent: str,
         message: str,
-        meta_data: Optional[Dict[str, Any]] = None
+        meta_data: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Log an agent-to-agent handoff.
 
@@ -472,13 +421,11 @@ class LangGraphMultiAgentMonitor:
             to_agent=to_agent,
             interaction_type="handoff",
             message=message,
-            meta_data=meta_data
+            meta_data=meta_data,
         )
 
     def complete_monitoring(
-        self,
-        outputs: Optional[Dict[str, Any]] = None,
-        status: str = "completed"
+        self, outputs: Optional[Dict[str, Any]] = None, status: str = "completed"
     ) -> Dict[str, Any]:
         """Complete workflow monitoring.
 
@@ -494,9 +441,7 @@ class LangGraphMultiAgentMonitor:
 
         # Complete workflow
         self.client.agent_workflows.complete(
-            workflow_id=self.workflow_id,
-            outputs=outputs,
-            status=status
+            workflow_id=self.workflow_id, outputs=outputs, status=status
         )
 
         # Get analytics
@@ -506,15 +451,11 @@ class LangGraphMultiAgentMonitor:
                 "workflow_id": self.workflow_id,
                 "status": status,
                 "outputs": outputs,
-                "analytics": analytics
+                "analytics": analytics,
             }
         except Exception as e:
             print(f"Warning: Failed to retrieve analytics: {e}")
-            return {
-                "workflow_id": self.workflow_id,
-                "status": status,
-                "outputs": outputs
-            }
+            return {"workflow_id": self.workflow_id, "status": status, "outputs": outputs}
 
 
 def monitor_langchain_agent(
@@ -523,7 +464,7 @@ def monitor_langchain_agent(
     workflow_name: str,
     agent_name: str = "main",
     inputs: Optional[Dict[str, Any]] = None,
-    **run_kwargs
+    **run_kwargs,
 ) -> Dict[str, Any]:
     """Helper function to monitor a single LangChain agent execution.
 
@@ -557,9 +498,7 @@ def monitor_langchain_agent(
     """
     # Create workflow
     response = client.agent_workflows.create(
-        name=workflow_name,
-        framework="langchain",
-        inputs=inputs
+        name=workflow_name, framework="langchain", inputs=inputs
     )
     workflow_id = response.get("id")
 
@@ -568,40 +507,19 @@ def monitor_langchain_agent(
 
     # Create callback
     callback = MultiAgentCallbackHandler(
-        client=client,
-        workflow_id=workflow_id,
-        agent_name=agent_name
+        client=client, workflow_id=workflow_id, agent_name=agent_name
     )
 
     try:
         # Run agent with callback
-        result = agent_executor.run(
-            callbacks=[callback],
-            **run_kwargs
-        )
+        result = agent_executor.run(callbacks=[callback], **run_kwargs)
 
         # Complete workflow
-        client.agent_workflows.complete(
-            workflow_id,
-            outputs={"result": result}
-        )
+        client.agent_workflows.complete(workflow_id, outputs={"result": result})
 
-        return {
-            "result": result,
-            "workflow_id": workflow_id,
-            "status": "completed"
-        }
+        return {"result": result, "workflow_id": workflow_id, "status": "completed"}
     except Exception as e:
         # Log failure
-        client.agent_workflows.complete(
-            workflow_id,
-            outputs={"error": str(e)},
-            status="failed"
-        )
+        client.agent_workflows.complete(workflow_id, outputs={"error": str(e)}, status="failed")
 
-        return {
-            "result": None,
-            "workflow_id": workflow_id,
-            "status": "failed",
-            "error": str(e)
-        }
+        return {"result": None, "workflow_id": workflow_id, "status": "failed", "error": str(e)}

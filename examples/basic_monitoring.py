@@ -4,7 +4,7 @@ Basic Monitoring Example
 This example demonstrates basic model registration and prediction logging.
 """
 
-from whiteboxai import WhiteBoxAI, ModelMonitor
+from whiteboxai import ModelMonitor, WhiteBoxAI
 
 
 def main():

@@ -6,8 +6,8 @@ tasks, interactions, and costs.
 """
 
 import logging
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -76,10 +76,7 @@ class CrewAIMonitor:
     """
 
     def __init__(
-        self,
-        api_key: str,
-        api_url: Optional[str] = None,
-        organization_id: Optional[str] = None
+        self, api_key: str, api_url: Optional[str] = None, organization_id: Optional[str] = None
     ):
         """
         Initialize CrewAI monitor.
@@ -91,7 +88,11 @@ class CrewAIMonitor:
         """
         from whiteboxai import WhiteBoxAI
 
-        self.client = WhiteBoxAI(api_key=api_key, base_url=api_url) if api_url else WhiteBoxAI(api_key=api_key)
+        self.client = (
+            WhiteBoxAI(api_key=api_key, base_url=api_url)
+            if api_url
+            else WhiteBoxAI(api_key=api_key)
+        )
         self.organization_id = organization_id
         self.workflow_id = None
         self.agent_map = {}  # Maps CrewAI agent to WhiteBoxAI agent_id
@@ -104,7 +105,7 @@ class CrewAIMonitor:
         self,
         crew: Any,  # crewai.Crew
         workflow_name: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Start monitoring a CrewAI crew workflow.
@@ -122,13 +123,11 @@ class CrewAIMonitor:
             workflow_data = {
                 "name": workflow_name,
                 "framework": "crewai",
-                "metadata": metadata or {}
+                "metadata": metadata or {},
             }
 
             response = self.client.request(
-                "POST",
-                "/api/v1/workflows/multi-agent/start",
-                data=workflow_data
+                "POST", "/api/v1/workflows/multi-agent/start", data=workflow_data
             )
 
             self.workflow_id = response.get("id")
@@ -147,14 +146,12 @@ class CrewAIMonitor:
                 "inputs": {
                     "agent_count": len(crew.agents),
                     "task_count": len(crew.tasks),
-                    "process": str(crew.process) if hasattr(crew, "process") else "sequential"
+                    "process": str(crew.process) if hasattr(crew, "process") else "sequential",
                 }
             }
 
             self.client.request(
-                "POST",
-                f"/api/v1/workflows/multi-agent/{self.workflow_id}/start",
-                data=start_data
+                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/start", data=start_data
             )
 
             return self.workflow_id
@@ -181,19 +178,25 @@ class CrewAIMonitor:
                 "goal": getattr(crew_agent, "goal", None),
                 "backstory": getattr(crew_agent, "backstory", None),
                 "tools": [tool.__class__.__name__ for tool in getattr(crew_agent, "tools", [])],
-                "llm_provider": getattr(getattr(crew_agent, "llm", None), "model_name", "unknown").split("/")[0] if hasattr(crew_agent, "llm") else None,
-                "model_name": getattr(getattr(crew_agent, "llm", None), "model_name", None) if hasattr(crew_agent, "llm") else None,
+                "llm_provider": (
+                    getattr(getattr(crew_agent, "llm", None), "model_name", "unknown").split("/")[0]
+                    if hasattr(crew_agent, "llm")
+                    else None
+                ),
+                "model_name": (
+                    getattr(getattr(crew_agent, "llm", None), "model_name", None)
+                    if hasattr(crew_agent, "llm")
+                    else None
+                ),
                 "metadata": {
                     "verbose": getattr(crew_agent, "verbose", False),
                     "allow_delegation": getattr(crew_agent, "allow_delegation", False),
                     "max_iter": getattr(crew_agent, "max_iter", None),
-                }
+                },
             }
 
             response = self.client.request(
-                "POST",
-                f"/api/v1/workflows/multi-agent/{self.workflow_id}/agents",
-                data=agent_data
+                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/agents", data=agent_data
             )
 
             agent_id = response.get("id")
@@ -231,13 +234,11 @@ class CrewAIMonitor:
                 "context": {
                     "tools": [tool.__class__.__name__ for tool in getattr(crew_task, "tools", [])],
                     "async_execution": getattr(crew_task, "async_execution", False),
-                }
+                },
             }
 
             response = self.client.request(
-                "POST",
-                f"/api/v1/workflows/multi-agent/{self.workflow_id}/tasks",
-                data=task_data
+                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/tasks", data=task_data
             )
 
             task_id = response.get("id")
@@ -257,7 +258,7 @@ class CrewAIMonitor:
         inputs: Optional[Dict] = None,
         outputs: Optional[Dict] = None,
         tokens_used: int = 0,
-        cost: float = 0.0
+        cost: float = 0.0,
     ) -> None:
         """
         Log an agent execution.
@@ -281,13 +282,13 @@ class CrewAIMonitor:
                 "outputs": outputs,
                 "tokens_used": tokens_used,
                 "cost": cost,
-                "status": "completed"
+                "status": "completed",
             }
 
             self.client.request(
                 "POST",
                 f"/api/v1/workflows/multi-agent/{self.workflow_id}/executions",
-                data=execution_data
+                data=execution_data,
             )
 
             logger.debug(f"Logged execution for agent: {agent_id}")
@@ -300,7 +301,7 @@ class CrewAIMonitor:
         task: Any,
         status: str = "completed",
         output_data: Optional[Dict] = None,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
     ) -> None:
         """
         Log task completion.
@@ -320,13 +321,11 @@ class CrewAIMonitor:
             update_data = {
                 "status": status,
                 "output_data": output_data,
-                "error_message": error_message
+                "error_message": error_message,
             }
 
             self.client.request(
-                "PATCH",
-                f"/api/v1/workflows/multi-agent/tasks/{task_id}",
-                data=update_data
+                "PATCH", f"/api/v1/workflows/multi-agent/tasks/{task_id}", data=update_data
             )
 
             logger.debug(f"Logged task completion: {task_id} ({status})")
@@ -339,7 +338,7 @@ class CrewAIMonitor:
         from_agent: Any,
         to_agent: Any,
         interaction_type: str = "delegation",
-        message: Optional[str] = None
+        message: Optional[str] = None,
     ) -> None:
         """
         Log agent-to-agent interaction.
@@ -362,16 +361,18 @@ class CrewAIMonitor:
                 "interaction_type": interaction_type,
                 "from_agent_id": from_agent_id,
                 "to_agent_id": to_agent_id,
-                "message": message
+                "message": message,
             }
 
             self.client.request(
                 "POST",
                 f"/api/v1/workflows/multi-agent/{self.workflow_id}/interactions",
-                data=interaction_data
+                data=interaction_data,
             )
 
-            logger.debug(f"Logged interaction: {from_agent_id} -> {to_agent_id} ({interaction_type})")
+            logger.debug(
+                f"Logged interaction: {from_agent_id} -> {to_agent_id} ({interaction_type})"
+            )
 
         except Exception as e:
             logger.error(f"Error logging interaction: {str(e)}")
@@ -380,7 +381,7 @@ class CrewAIMonitor:
         self,
         status: str = "completed",
         outputs: Optional[Dict] = None,
-        error_message: Optional[str] = None
+        error_message: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Complete workflow monitoring.
@@ -394,16 +395,12 @@ class CrewAIMonitor:
             Workflow summary with analytics
         """
         try:
-            complete_data = {
-                "status": status,
-                "outputs": outputs,
-                "error_message": error_message
-            }
+            complete_data = {"status": status, "outputs": outputs, "error_message": error_message}
 
             response = self.client.request(
                 "POST",
                 f"/api/v1/workflows/multi-agent/{self.workflow_id}/complete",
-                data=complete_data
+                data=complete_data,
             )
 
             logger.info(f"Completed monitoring workflow: {self.workflow_id} ({status})")
@@ -411,11 +408,7 @@ class CrewAIMonitor:
             # Get analytics
             analytics = self.get_analytics()
 
-            return {
-                "workflow_id": self.workflow_id,
-                "status": status,
-                "analytics": analytics
-            }
+            return {"workflow_id": self.workflow_id, "status": status, "analytics": analytics}
 
         except Exception as e:
             logger.error(f"Error completing monitoring: {str(e)}")
@@ -433,19 +426,14 @@ class CrewAIMonitor:
                 raise ValueError("No active workflow")
 
             analytics = self.client.request(
-                "GET",
-                f"/api/v1/workflows/multi-agent/{self.workflow_id}/analytics"
+                "GET", f"/api/v1/workflows/multi-agent/{self.workflow_id}/analytics"
             )
 
             cost_breakdown = self.client.request(
-                "GET",
-                f"/api/v1/workflows/multi-agent/{self.workflow_id}/cost-breakdown"
+                "GET", f"/api/v1/workflows/multi-agent/{self.workflow_id}/cost-breakdown"
             )
 
-            return {
-                "metrics": analytics,
-                "cost_breakdown": cost_breakdown
-            }
+            return {"metrics": analytics, "cost_breakdown": cost_breakdown}
 
         except Exception as e:
             logger.error(f"Error getting analytics: {str(e)}")
@@ -458,7 +446,7 @@ def monitor_crew(
     workflow_name: str,
     api_key: str,
     api_url: Optional[str] = None,
-    metadata: Optional[Dict] = None
+    metadata: Optional[Dict] = None,
 ) -> CrewAIMonitor:
     """
     Convenience function to start monitoring a CrewAI crew.

@@ -7,8 +7,8 @@ for model registration.
 
 import logging
 import os
-from typing import Dict, Optional
 import subprocess
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +80,7 @@ def detect_git_context(path: Optional[str] = None) -> Optional[GitContext]:
     try:
         import git
     except ImportError:
-        logger.warning(
-            "GitPython not installed. Install with: pip install gitpython"
-        )
+        logger.warning("GitPython not installed. Install with: pip install gitpython")
         return _detect_git_context_subprocess(path)
 
     try:
@@ -97,9 +95,7 @@ def detect_git_context(path: Optional[str] = None) -> Optional[GitContext]:
             repository_url = remote.url
             # Convert SSH URLs to HTTPS
             if repository_url.startswith("git@github.com:"):
-                repository_url = repository_url.replace(
-                    "git@github.com:", "https://github.com/"
-                )
+                repository_url = repository_url.replace("git@github.com:", "https://github.com/")
             if repository_url.endswith(".git"):
                 repository_url = repository_url[:-4]
         except Exception as e:
@@ -196,9 +192,7 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
 
             # Convert SSH to HTTPS
             if repository_url.startswith("git@github.com:"):
-                repository_url = repository_url.replace(
-                    "git@github.com:", "https://github.com/"
-                )
+                repository_url = repository_url.replace("git@github.com:", "https://github.com/")
             if repository_url.endswith(".git"):
                 repository_url = repository_url[:-4]
         except subprocess.CalledProcessError:

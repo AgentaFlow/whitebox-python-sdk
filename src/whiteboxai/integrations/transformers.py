@@ -4,16 +4,13 @@ Hugging Face Transformers Integration
 Integration for monitoring Hugging Face Transformers models.
 """
 
-from typing import Any, Dict, Optional, List, Union
 import warnings
+from typing import Any, Dict, List, Optional, Union
 
 try:
     import transformers
-    from transformers import (
-        PreTrainedModel,
-        PreTrainedTokenizer,
-        Pipeline,
-    )
+    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer
+
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
     TRANSFORMERS_AVAILABLE = False
@@ -41,7 +38,7 @@ class TransformersMonitor(ModelMonitor):
         ```python
         from transformers import pipeline
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.transformers import TransformersMonitor
+        from whiteboxai.integrations.transformers import TransformersMonitor
 
         # Load model
         classifier = pipeline("sentiment-analysis")
@@ -67,7 +64,7 @@ class TransformersMonitor(ModelMonitor):
         tokenizer: Optional[PreTrainedTokenizer] = None,
         model_name: Optional[str] = None,
         task: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize Transformers monitor.
@@ -96,7 +93,7 @@ class TransformersMonitor(ModelMonitor):
 
         # Auto-detect task from pipeline
         if pipeline is not None and task is None:
-            self._task = getattr(pipeline, 'task', None)
+            self._task = getattr(pipeline, "task", None)
 
     def register_from_model(
         self,
@@ -149,19 +146,19 @@ class TransformersMonitor(ModelMonitor):
         # Get model information from pipeline or model
         if self.pipeline is not None:
             metadata["pipeline_type"] = self.pipeline.task
-            if hasattr(self.pipeline, 'model'):
+            if hasattr(self.pipeline, "model"):
                 metadata["model_class"] = self.pipeline.model.__class__.__name__
-                if hasattr(self.pipeline.model, 'config'):
+                if hasattr(self.pipeline.model, "config"):
                     config = self.pipeline.model.config
-                    metadata["model_type"] = getattr(config, 'model_type', None)
-                    metadata["num_parameters"] = getattr(config, 'num_parameters', None)
-                    metadata["vocab_size"] = getattr(config, 'vocab_size', None)
+                    metadata["model_type"] = getattr(config, "model_type", None)
+                    metadata["num_parameters"] = getattr(config, "num_parameters", None)
+                    metadata["vocab_size"] = getattr(config, "vocab_size", None)
         elif self.model is not None:
             metadata["model_class"] = self.model.__class__.__name__
-            if hasattr(self.model, 'config'):
+            if hasattr(self.model, "config"):
                 config = self.model.config
-                metadata["model_type"] = getattr(config, 'model_type', None)
-                metadata["num_parameters"] = getattr(config, 'num_parameters', None)
+                metadata["model_type"] = getattr(config, "model_type", None)
+                metadata["num_parameters"] = getattr(config, "num_parameters", None)
 
         # Map task to model_type
         model_type_mapping = {
@@ -224,11 +221,7 @@ class TransformersMonitor(ModelMonitor):
 
             # Tokenize inputs
             encoded = self.tokenizer(
-                inputs,
-                return_tensors="pt",
-                padding=True,
-                truncation=True,
-                **kwargs
+                inputs, return_tensors="pt", padding=True, truncation=True, **kwargs
             )
 
             # Get predictions
@@ -332,18 +325,18 @@ class TransformersMonitor(ModelMonitor):
 
         if isinstance(prediction, dict):
             # Common keys in transformers outputs
-            if 'label' in prediction:
-                return prediction['label']
-            elif 'answer' in prediction:
-                return prediction['answer']
-            elif 'generated_text' in prediction:
-                return prediction['generated_text']
-            elif 'translation_text' in prediction:
-                return prediction['translation_text']
-            elif 'summary_text' in prediction:
-                return prediction['summary_text']
-            elif 'score' in prediction:
-                return prediction['score']
+            if "label" in prediction:
+                return prediction["label"]
+            elif "answer" in prediction:
+                return prediction["answer"]
+            elif "generated_text" in prediction:
+                return prediction["generated_text"]
+            elif "translation_text" in prediction:
+                return prediction["translation_text"]
+            elif "summary_text" in prediction:
+                return prediction["summary_text"]
+            elif "score" in prediction:
+                return prediction["score"]
 
         return prediction
 
@@ -363,8 +356,7 @@ class TransformersMonitor(ModelMonitor):
         if baseline_labels is None and self.pipeline is not None:
             baseline_predictions = self.pipeline(baseline_texts)
             baseline_labels = [
-                self._extract_prediction_value(pred)
-                for pred in baseline_predictions
+                self._extract_prediction_value(pred) for pred in baseline_predictions
             ]
 
         # Convert to format expected by parent class
@@ -410,7 +402,7 @@ class TransformersPipelineWrapper:
         ```python
         from transformers import pipeline
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.transformers import TransformersPipelineWrapper
+        from whiteboxai.integrations.transformers import TransformersPipelineWrapper
 
         classifier = pipeline("sentiment-analysis")
         client = WhiteBoxAI(api_key="your-api-key")
@@ -454,7 +446,7 @@ class TransformersPipelineWrapper:
             self.monitor.register_from_model()
 
         # Get inputs
-        inputs = args[0] if args else kwargs.get('inputs')
+        inputs = args[0] if args else kwargs.get("inputs")
 
         # Make prediction
         result = self.pipeline(*args, **kwargs)
@@ -510,7 +502,7 @@ def wrap_transformers_pipeline(
 
         # Log to WhiteBoxAI
         try:
-            inputs = args[0] if args else kwargs.get('inputs')
+            inputs = args[0] if args else kwargs.get("inputs")
 
             if isinstance(inputs, list):
                 monitor.log_batch_transformers(
@@ -533,7 +525,7 @@ def wrap_transformers_pipeline(
 
 
 __all__ = [
-    'TransformersMonitor',
-    'TransformersPipelineWrapper',
-    'wrap_transformers_pipeline',
+    "TransformersMonitor",
+    "TransformersPipelineWrapper",
+    "wrap_transformers_pipeline",
 ]

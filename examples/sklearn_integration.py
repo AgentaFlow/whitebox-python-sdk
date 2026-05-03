@@ -5,11 +5,12 @@ This example demonstrates monitoring scikit-learn models.
 """
 
 import numpy as np
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.sklearn import SklearnMonitor
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+
+from whiteboxai import WhiteBoxAI
+from whiteboxai.integrations.sklearn import SklearnMonitor
 
 
 def main():
@@ -24,9 +25,7 @@ def main():
     )
 
     # Split data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Train model
     print("Training Random Forest model...")

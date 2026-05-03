@@ -39,9 +39,7 @@ class Config:
             )
 
         # Base URL
-        self.base_url = (
-            base_url or os.getenv("EXPLAINAI_BASE_URL") or "https://api.whiteboxai.io"
-        )
+        self.base_url = base_url or os.getenv("EXPLAINAI_BASE_URL") or "https://api.whiteboxai.io"
 
         # Request settings
         self.timeout = timeout

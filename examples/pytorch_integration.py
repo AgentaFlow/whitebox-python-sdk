@@ -7,9 +7,10 @@ This example demonstrates monitoring PyTorch models.
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+
 from whiteboxai import WhiteBoxAI
 from whiteboxai.integrations.pytorch import TorchMonitor
-from torch.utils.data import DataLoader, TensorDataset
 
 
 class SimpleClassifier(nn.Module):
