@@ -18,6 +18,7 @@ from whiteboxai.exceptions import (
     ValidationError,
 )
 from whiteboxai.resources import (
+    AgentWorkflowsResource,
     AlertsResource,
     DriftResource,
     ExplanationsResource,
@@ -108,6 +109,7 @@ class WhiteBoxAI:
         self.explanations = ExplanationsResource(self)
         self.drift = DriftResource(self)
         self.alerts = AlertsResource(self)
+        self.agent_workflows = AgentWorkflowsResource(self)
 
     @property
     def sync_client(self) -> httpx.Client:

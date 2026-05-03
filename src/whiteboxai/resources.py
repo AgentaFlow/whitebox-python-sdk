@@ -7,7 +7,7 @@ Resource classes for interacting with different WhiteBoxAI API endpoints.
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from explainai.client import WhiteBoxAI
+    from whiteboxai.client import WhiteBoxAI
 
 
 class BaseResource:
@@ -339,3 +339,132 @@ class AlertsResource(BaseResource):
         """Async version of list()."""
         params = {"model_id": model_id} if model_id else {}
         return await self.client.arequest("GET", "/api/v1/alerts", params=params)
+
+
+class AgentWorkflowsResource(BaseResource):
+    """Agent Workflows API resource for multi-agent monitoring."""
+
+    def create(
+        self,
+        name: str,
+        framework: str,
+        inputs: Optional[Dict[str, Any]] = None,
+        meta_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Create a new agent workflow."""
+        data = {
+            "name": name,
+            "framework": framework,
+            "inputs": inputs or {},
+            "meta_data": meta_data or {},
+        }
+        return self.client.request("POST", "/api/v1/workflows/multi-agent", data=data)
+
+    def start(
+        self,
+        workflow_id: str,
+        inputs: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Start an agent workflow."""
+        return self.client.request(
+            "POST",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/start",
+            data={"inputs": inputs or {}},
+        )
+
+    def complete(
+        self,
+        workflow_id: str,
+        outputs: Optional[Dict[str, Any]] = None,
+        status: str = "completed",
+    ) -> Dict[str, Any]:
+        """Complete an agent workflow."""
+        return self.client.request(
+            "POST",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/complete",
+            data={"outputs": outputs or {}, "status": status},
+        )
+
+    def register_agent(
+        self,
+        workflow_id: str,
+        name: str,
+        role: Optional[str] = None,
+        model_name: Optional[str] = None,
+        tools: Optional[List[str]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Register an agent in a workflow."""
+        data = {
+            "name": name,
+            "role": role or name,
+            "model_name": model_name,
+            "tools": tools or [],
+            **kwargs,
+        }
+        return self.client.request(
+            "POST",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/agents",
+            data=data,
+        )
+
+    def create_execution(
+        self,
+        workflow_id: str,
+        agent_name: str,
+        status: str,
+        inputs: Optional[Dict[str, Any]] = None,
+        outputs: Optional[Dict[str, Any]] = None,
+        duration_ms: Optional[int] = None,
+        llm_call_count: Optional[int] = None,
+        tool_call_count: Optional[int] = None,
+        tokens_used: Optional[int] = None,
+        cost: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Log an agent execution within a workflow."""
+        data = {
+            "agent_name": agent_name,
+            "status": status,
+            "inputs": inputs,
+            "outputs": outputs,
+            "duration_ms": duration_ms,
+            "llm_call_count": llm_call_count,
+            "tool_call_count": tool_call_count,
+            "tokens_used": tokens_used,
+            "cost": cost,
+        }
+        return self.client.request(
+            "POST",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/executions",
+            data=data,
+        )
+
+    def create_interaction(
+        self,
+        workflow_id: str,
+        from_agent: str,
+        to_agent: str,
+        interaction_type: str,
+        message: Optional[str] = None,
+        meta_data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Log an agent-to-agent interaction."""
+        data = {
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "interaction_type": interaction_type,
+            "message": message,
+            "meta_data": meta_data or {},
+        }
+        return self.client.request(
+            "POST",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/interactions",
+            data=data,
+        )
+
+    def get_analytics(self, workflow_id: str) -> Dict[str, Any]:
+        """Get analytics for a workflow."""
+        return self.client.request(
+            "GET",
+            f"/api/v1/workflows/multi-agent/{workflow_id}/analytics",
+        )
