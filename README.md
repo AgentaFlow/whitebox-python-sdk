@@ -5,12 +5,14 @@ Official Python SDK for integrating WhiteBoxAI monitoring into your ML applicati
 ## Features
 
 - 🚀 **Easy Integration** - Monitor models with just a few lines of code
-- 📊 **Framework Support** - Native integrations for Scikit-learn, PyTorch, TensorFlow, XGBoost, and more
+- 📊 **Framework Support** - Native integrations for Scikit-learn, PyTorch, TensorFlow, XGBoost, LightGBM, Hugging Face Transformers, and LangChain
+- 🤖 **Multi-Agent Monitoring** - First-class support for CrewAI and LangGraph multi-agent workflows
 - 🎯 **Decorator-based Monitoring** - Zero-code-change monitoring with decorators
 - ⚡ **Async/Sync Interfaces** - Support for both synchronous and asynchronous workflows
 - 🔒 **Privacy-First** - Built-in PII detection and data masking
 - 💾 **Local Caching** - TTL-based caching to reduce API calls
 - 📈 **Drift Detection** - Automatic model and data drift monitoring
+- 🗂️ **Git Context** - Automatic capture of git branch, commit, and author metadata
 - 🎨 **Flexible Configuration** - Extensive configuration options and feature flags
 
 ## Installation
@@ -196,6 +198,36 @@ wrapped_chain = wrap_langchain_chain(chain, monitor)
 result = wrapped_chain.run(question="What is AI?")  # Automatically logged
 ```
 
+### Multi-Agent Monitoring (CrewAI / LangGraph)
+
+```python
+from whiteboxai import WhiteBoxAI
+from whiteboxai.integrations.crewai_monitor import CrewAIMonitor
+
+client = WhiteBoxAI(api_key="your-api-key")
+monitor = CrewAIMonitor(client=client)
+
+# Start workflow monitoring
+workflow_id = monitor.start_monitoring(
+    workflow_name="research_pipeline",
+    description="Multi-agent research and writing workflow"
+)
+
+# Register and track agents
+monitor.register_agent(researcher, role="Research Analyst")
+monitor.register_agent(writer, role="Content Writer")
+
+# Log task completions and agent interactions
+monitor.log_task_completion(task, status="completed", output_data=result)
+monitor.log_interaction(from_agent=researcher, to_agent=writer, interaction_type="handoff")
+
+# Complete and retrieve analytics
+summary = monitor.complete_monitoring(status="completed")
+```
+
+For LangGraph multi-agent workflows, use `LangGraphMultiAgentMonitor` and `MultiAgentCallbackHandler`
+from `whiteboxai.integrations.langchain_agents`.
+
 ### XGBoost/LightGBM Monitoring
 
 ```python
@@ -284,6 +316,27 @@ asyncio.run(main())
 
 ## Advanced Features
 
+### Git Context
+
+Capture git metadata automatically alongside model monitoring:
+
+```python
+from whiteboxai import WhiteBoxAI, GitContext, detect_git_context
+
+client = WhiteBoxAI(api_key="your-api-key")
+
+# Auto-detect from current git repo
+git_ctx = detect_git_context()
+print(git_ctx.branch, git_ctx.commit_hash, git_ctx.author)
+
+# Or build manually
+git_ctx = GitContext(
+    branch="main",
+    commit_hash="abc1234",
+    author="dev@example.com"
+)
+```
+
 ### Offline Mode
 
 Enable robust operation with unreliable network connectivity. Operations are queued locally and synced automatically.
@@ -332,7 +385,7 @@ client = WhiteBoxAI(
 )
 ```
 
-See [Offline Mode Guide](../docs/OFFLINE_MODE_GUIDE.md) for complete documentation.
+See [Offline Mode Guide](docs/offline-mode.md) for complete documentation.
 
 ### Privacy Filters
 
@@ -402,7 +455,7 @@ from whiteboxai import WhiteBoxAI
 
 client = WhiteBoxAI(
     api_key="your-api-key",              # or EXPLAINAI_API_KEY env var
-    base_url="https://api.whiteboxai.io", # Custom API endpoint
+    base_url="https://api.whiteboxai.io", # or EXPLAINAI_BASE_URL env var
     timeout=30,                           # Request timeout (seconds)
     max_retries=3,                        # Retry attempts
 
@@ -427,12 +480,13 @@ client = WhiteBoxAI(
 
 Main client for API interaction.
 
-**Methods:**
-- `models` - Models resource
-- `predictions` - Predictions resource
-- `explanations` - Explanations resource
-- `drift` - Drift detection resource
-- `alerts` - Alerts resource
+**Resources:**
+- `models` - Register and manage models
+- `predictions` - Log predictions and batches
+- `explanations` - Generate and retrieve explanations
+- `drift` - Drift detection and reports
+- `alerts` - Alert management
+- `agent_workflows` - Multi-agent workflow tracking
 
 ### ModelMonitor
 
@@ -454,24 +508,32 @@ Simplified monitoring interface.
 
 - `whiteboxai.integrations.sklearn` - Scikit-learn integration
 - `whiteboxai.integrations.pytorch` - PyTorch integration
+- `whiteboxai.integrations.tensorflow` - TensorFlow/Keras integration
+- `whiteboxai.integrations.transformers` - Hugging Face Transformers integration
+- `whiteboxai.integrations.langchain` - LangChain chains and agents
+- `whiteboxai.integrations.langchain_agents` - LangGraph multi-agent monitoring
+- `whiteboxai.integrations.crewai_monitor` - CrewAI workflow monitoring
+- `whiteboxai.integrations.boosting` - XGBoost and LightGBM integration
 
 ## Examples
 
 See the `examples/` directory for more examples:
 
 - `basic_monitoring.py` - Basic monitoring example
+- `async_monitoring.py` - Async API usage
+- `decorator_monitoring.py` - Zero-code-change decorator usage
 - `sklearn_integration.py` - Scikit-learn integration
 - `pytorch_integration.py` - PyTorch integration
-- `async_monitoring.py` - Async API usage
-- `batch_logging.py` - Batch prediction logging
-- `drift_detection.py` - Drift detection example
-- `offline_mode_example.py` - Offline mode with queue management
+- `tensorflow_example.py` - TensorFlow/Keras integration
+- `transformers_example.py` - Hugging Face Transformers integration
+- `langchain_example.py` - LangChain chains and agents
 - `boosting_example.py` - XGBoost/LightGBM integration
+- `offline_mode_example.py` - Offline mode with queue management
 
 ## Support
 
 - Documentation: https://whitebox.agentaflow.com
-- Issues: https://github.com/whiteboxai/sdk/issues
+- Issues: https://github.com/AgentaFlow/whitebox-python-sdk/issues
 
 ```
 whiteboxai-python-sdk/
@@ -480,33 +542,52 @@ whiteboxai-python-sdk/
 │       ├── __init__.py
 │       ├── __version__.py
 │       ├── client.py
+│       ├── config.py
 │       ├── monitor.py
 │       ├── decorators.py
 │       ├── privacy.py
 │       ├── offline.py
+│       ├── cache.py
+│       ├── git_utils.py
+│       ├── resources.py
+│       ├── utils.py
+│       ├── exceptions.py
 │       ├── integrations/
 │       │   ├── sklearn.py
 │       │   ├── pytorch.py
 │       │   ├── tensorflow.py
 │       │   ├── transformers.py
 │       │   ├── langchain.py
+│       │   ├── langchain_agents.py
+│       │   ├── crewai_monitor.py
 │       │   └── boosting.py
-│       └── models/          # Pydantic models
+│       └── models/
 ├── tests/
 │   ├── unit/
 │   ├── integration/
 │   └── e2e/
 ├── examples/
 │   ├── basic_monitoring.py
+│   ├── async_monitoring.py
+│   ├── decorator_monitoring.py
 │   ├── sklearn_integration.py
 │   ├── pytorch_integration.py
-│   ├── offline_mode_example.py
-│   └── ...
+│   ├── tensorflow_example.py
+│   ├── transformers_example.py
+│   ├── langchain_example.py
+│   ├── boosting_example.py
+│   └── offline_mode_example.py
 ├── docs/
 │   ├── getting-started.md
 │   ├── integrations.md
 │   ├── offline-mode.md
-│   └── api-reference.md
+│   ├── api-reference.md
+│   ├── SKLEARN_INTEGRATION.md
+│   ├── PYTORCH_INTEGRATION.md
+│   ├── TENSORFLOW_INTEGRATION.md
+│   ├── HUGGINGFACE_INTEGRATION.md
+│   ├── LANGCHAIN_INTEGRATION.md
+│   └── PRODUCTION_DEPLOYMENT.md
 ├── pyproject.toml
 ├── setup.py
 ├── README.md
@@ -515,6 +596,5 @@ whiteboxai-python-sdk/
 └── .github/
     └── workflows/
         ├── test.yml
-        ├── publish.yml
-        └── docs.yml
+        └── publish.yml
 ```
