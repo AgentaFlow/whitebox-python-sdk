@@ -7,7 +7,8 @@ This example demonstrates asynchronous API usage for better performance.
 import asyncio
 
 import numpy as np
-from whiteboxai import WhiteBoxAI, ModelMonitor
+
+from whiteboxai import ModelMonitor, WhiteBoxAI
 
 
 async def register_and_log():
@@ -37,8 +38,7 @@ async def register_and_log():
         # Log batch predictions
         print("\nLogging batch predictions...")
         predictions = [
-            {"inputs": {"amount": 50.0}, "output": {"fraud_prob": 0.05}}
-            for _ in range(100)
+            {"inputs": {"amount": 50.0}, "output": {"fraud_prob": 0.05}} for _ in range(100)
         ]
 
         await monitor.alog_batch(predictions)

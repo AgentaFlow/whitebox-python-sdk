@@ -5,6 +5,7 @@ This example demonstrates how to use WhiteBoxAI to monitor Hugging Face Transfor
 """
 
 import os
+
 from whiteboxai import WhiteBoxAI
 from whiteboxai.integrations.transformers import TransformersMonitor, wrap_transformers_pipeline
 
@@ -28,16 +29,14 @@ def example_sentiment_analysis():
 
     # Create monitor
     monitor = TransformersMonitor(
-        client=client,
-        pipeline=classifier,
-        model_name="sentiment_classifier_v1"
+        client=client, pipeline=classifier, model_name="sentiment_classifier_v1"
     )
 
     # Register model
     model_id = monitor.register_from_model(
         name="DistilBERT Sentiment Classifier",
         version="1.0.0",
-        description="Sentiment analysis using DistilBERT"
+        description="Sentiment analysis using DistilBERT",
     )
     print(f"✓ Model registered with ID: {model_id}")
 
@@ -54,8 +53,8 @@ def example_sentiment_analysis():
     print("\nMaking predictions...")
     for text in test_texts:
         result = monitor.predict(text, log=True)
-        label = result[0]['label']
-        score = result[0]['score']
+        label = result[0]["label"]
+        score = result[0]["score"]
         print(f"  Text: '{text[:40]}...'")
         print(f"  Prediction: {label} (confidence: {score:.3f})")
 
@@ -86,18 +85,10 @@ def example_ner():
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client,
-        pipeline=ner_pipeline,
-        model_name="ner_model_v1"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=ner_pipeline, model_name="ner_model_v1")
 
     # Register model
-    model_id = monitor.register_from_model(
-        name="BERT NER Model",
-        version="1.0.0",
-        task="ner"
-    )
+    model_id = monitor.register_from_model(name="BERT NER Model", version="1.0.0", task="ner")
     print(f"✓ Model registered with ID: {model_id}")
 
     # Test text
@@ -116,8 +107,9 @@ def example_ner():
 
 def example_text_generation():
     """Example using text generation pipeline."""
-    from transformers import pipeline
     import time
+
+    from transformers import pipeline
 
     print("\n" + "=" * 60)
     print("Text Generation Example")
@@ -130,17 +122,11 @@ def example_text_generation():
     generator = pipeline("text-generation", model="gpt2")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client,
-        pipeline=generator,
-        model_name="gpt2_generator"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=generator, model_name="gpt2_generator")
 
     # Register model
     model_id = monitor.register_from_model(
-        name="GPT-2 Text Generator",
-        version="1.0.0",
-        task="text-generation"
+        name="GPT-2 Text Generator", version="1.0.0", task="text-generation"
     )
     print(f"✓ Model registered with ID: {model_id}")
 
@@ -152,7 +138,7 @@ def example_text_generation():
     result = generator(prompt, max_length=50, num_return_sequences=1)
     generation_time = time.time() - start_time
 
-    generated_text = result[0]['generated_text']
+    generated_text = result[0]["generated_text"]
     print(f"\nGenerated: '{generated_text}'")
 
     # Log generation metrics
@@ -182,9 +168,7 @@ def example_wrapped_pipeline():
 
     # Create monitor and wrap pipeline
     monitor = TransformersMonitor(
-        client=client,
-        pipeline=classifier,
-        model_name="wrapped_classifier"
+        client=client, pipeline=classifier, model_name="wrapped_classifier"
     )
 
     # Register model
@@ -225,11 +209,7 @@ def example_batch_prediction():
     classifier = pipeline("sentiment-analysis")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client,
-        pipeline=classifier,
-        model_name="batch_classifier"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=classifier, model_name="batch_classifier")
 
     # Register model
     monitor.register_from_model(name="Batch Sentiment Classifier")
@@ -277,6 +257,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 

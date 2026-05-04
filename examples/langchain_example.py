@@ -6,6 +6,7 @@ This example demonstrates how to use WhiteBoxAI to monitor LangChain application
 
 import os
 import time
+
 from whiteboxai import WhiteBoxAI
 from whiteboxai.integrations.langchain import LangChainMonitor, wrap_langchain_chain
 
@@ -15,9 +16,9 @@ os.environ["WHITEBOXAI_API_KEY"] = "your-api-key-here"
 
 def example_simple_chain():
     """Example using a simple LLM chain."""
+    from langchain.chains import LLMChain
     from langchain.llms import OpenAI
     from langchain.prompts import PromptTemplate
-    from langchain.chains import LLMChain
 
     print("=" * 60)
     print("Simple LLM Chain Example")
@@ -28,25 +29,19 @@ def example_simple_chain():
 
     # Create monitor
     monitor = LangChainMonitor(
-        client=client,
-        application_name="simple_qa_chain",
-        track_tokens=True,
-        track_cost=True
+        client=client, application_name="simple_qa_chain", track_tokens=True, track_cost=True
     )
 
     # Register application
     app_id = monitor.register_application(
-        name="Simple Q&A Chain",
-        version="1.0.0",
-        description="Basic question-answering chain"
+        name="Simple Q&A Chain", version="1.0.0", description="Basic question-answering chain"
     )
     print(f"✓ Application registered with ID: {app_id}")
 
     # Create chain
     llm = OpenAI(temperature=0.7)
     prompt = PromptTemplate(
-        input_variables=["question"],
-        template="Answer the following question: {question}"
+        input_variables=["question"], template="Answer the following question: {question}"
     )
     chain = LLMChain(llm=llm, prompt=prompt)
 
@@ -71,9 +66,9 @@ def example_simple_chain():
 
 def example_sequential_chain():
     """Example using a sequential chain."""
+    from langchain.chains import LLMChain, SequentialChain
     from langchain.llms import OpenAI
     from langchain.prompts import PromptTemplate
-    from langchain.chains import LLMChain, SequentialChain
 
     print("\n" + "=" * 60)
     print("Sequential Chain Example")
@@ -89,10 +84,7 @@ def example_sequential_chain():
     )
 
     # Register application
-    monitor.register_application(
-        name="Sequential Processing Chain",
-        version="1.0.0"
-    )
+    monitor.register_application(name="Sequential Processing Chain", version="1.0.0")
     print("✓ Application registered")
 
     # Create chains
@@ -100,15 +92,13 @@ def example_sequential_chain():
 
     # Chain 1: Generate topic
     prompt1 = PromptTemplate(
-        input_variables=["subject"],
-        template="Generate a creative topic about {subject}"
+        input_variables=["subject"], template="Generate a creative topic about {subject}"
     )
     chain1 = LLMChain(llm=llm, prompt=prompt1, output_key="topic")
 
     # Chain 2: Write about topic
     prompt2 = PromptTemplate(
-        input_variables=["topic"],
-        template="Write a short paragraph about: {topic}"
+        input_variables=["topic"], template="Write a short paragraph about: {topic}"
     )
     chain2 = LLMChain(llm=llm, prompt=prompt2, output_key="paragraph")
 
@@ -116,7 +106,7 @@ def example_sequential_chain():
     overall_chain = SequentialChain(
         chains=[chain1, chain2],
         input_variables=["subject"],
-        output_variables=["topic", "paragraph"]
+        output_variables=["topic", "paragraph"],
     )
 
     # Wrap chain for automatic logging
@@ -126,7 +116,7 @@ def example_sequential_chain():
     print("\nRunning sequential chain...")
     result = wrapped_chain({"subject": "artificial intelligence"})
 
-    print(f"\n  Subject: artificial intelligence")
+    print("\n  Subject: artificial intelligence")
     print(f"  Topic: {result['topic'].strip()}")
     print(f"  Paragraph: {result['paragraph'].strip()[:100]}...")
 
@@ -135,9 +125,8 @@ def example_sequential_chain():
 
 def example_agent():
     """Example using an agent with tools."""
-    from langchain.agents import AgentType, initialize_agent, Tool
+    from langchain.agents import AgentType, Tool, initialize_agent
     from langchain.llms import OpenAI
-    from langchain.utilities import SerpAPIWrapper
 
     print("\n" + "=" * 60)
     print("Agent Example")
@@ -154,9 +143,7 @@ def example_agent():
 
     # Register application
     monitor.register_application(
-        name="Search Agent",
-        version="1.0.0",
-        description="Agent with search capabilities"
+        name="Search Agent", version="1.0.0", description="Agent with search capabilities"
     )
     print("✓ Application registered")
 
@@ -169,29 +156,22 @@ def example_agent():
         """Mock calculator tool."""
         try:
             return str(eval(expression))
-        except:
+        except Exception:
             return "Invalid expression"
 
     tools = [
-        Tool(
-            name="Search",
-            func=search_tool,
-            description="Search for information"
-        ),
+        Tool(name="Search", func=search_tool, description="Search for information"),
         Tool(
             name="Calculator",
             func=calculator_tool,
-            description="Calculate mathematical expressions"
+            description="Calculate mathematical expressions",
         ),
     ]
 
     # Create agent
     llm = OpenAI(temperature=0)
     agent = initialize_agent(
-        tools=tools,
-        llm=llm,
-        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-        verbose=True
+        tools=tools, llm=llm, agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True
     )
 
     # Create callback
@@ -210,11 +190,6 @@ def example_agent():
 
 def example_rag_chain():
     """Example using a RAG (Retrieval-Augmented Generation) chain."""
-    from langchain.embeddings import OpenAIEmbeddings
-    from langchain.vectorstores import FAISS
-    from langchain.chains import RetrievalQA
-    from langchain.llms import OpenAI
-    from langchain.text_splitter import CharacterTextSplitter
 
     print("\n" + "=" * 60)
     print("RAG Chain Example")
@@ -231,9 +206,7 @@ def example_rag_chain():
 
     # Register application
     monitor.register_application(
-        name="RAG Q&A System",
-        version="1.0.0",
-        description="Question answering with retrieval"
+        name="RAG Q&A System", version="1.0.0", description="Question answering with retrieval"
     )
     print("✓ Application registered")
 
@@ -281,7 +254,7 @@ def example_rag_chain():
         documents=retrieved_docs,
         num_retrieved=len(retrieved_docs),
         retrieval_time=retrieval_time,
-        relevance_scores=[doc["score"] for doc in retrieved_docs]
+        relevance_scores=[doc["score"] for doc in retrieved_docs],
     )
 
     print(f"\n  Query: {query}")
@@ -307,10 +280,7 @@ def example_manual_logging():
     )
 
     # Register application
-    monitor.register_application(
-        name="Manual Logging App",
-        version="1.0.0"
-    )
+    monitor.register_application(name="Manual Logging App", version="1.0.0")
     print("✓ Application registered")
 
     # Log chain execution manually
@@ -320,9 +290,7 @@ def example_manual_logging():
         inputs={"question": "What is AI?"},
         outputs={"answer": "Artificial Intelligence is..."},
         execution_time=1.5,
-        llm_calls=[
-            {"model": "gpt-3.5-turbo", "tokens": 150}
-        ]
+        llm_calls=[{"model": "gpt-3.5-turbo", "tokens": 150}],
     )
     print("✓ Chain execution logged")
 
@@ -334,7 +302,7 @@ def example_manual_logging():
         model="gpt-4",
         tokens_used=200,
         cost=0.004,
-        latency=2.3
+        latency=2.3,
     )
     print("✓ LLM call logged")
 
@@ -344,7 +312,7 @@ def example_manual_logging():
         tool_name="web_search",
         tool_input="latest AI news",
         tool_output="Search results: ...",
-        execution_time=0.8
+        execution_time=0.8,
     )
     print("✓ Tool call logged")
 
@@ -376,6 +344,7 @@ def main():
     except Exception as e:
         print(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
 
 

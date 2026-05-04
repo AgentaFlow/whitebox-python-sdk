@@ -135,4 +135,9 @@ jobs:
 
     - name: Run e2e tests
       run: |
-        pytest tests/e2e -v
+        pytest tests/e2e -v || EXIT=$?
+        if [ "${EXIT:-0}" -eq 5 ]; then
+          echo "No e2e tests collected - skipping"
+          exit 0
+        fi
+        exit "${EXIT:-0}"

@@ -34,17 +34,16 @@ import logging
 import os
 import sqlite3
 import threading
-import time
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 class OperationType(Enum):
     """Types of operations that can be queued."""
+
     PREDICT = "predict"
     REGISTER_MODEL = "register_model"
     UPDATE_BASELINE = "update_baseline"
@@ -53,6 +52,7 @@ class OperationType(Enum):
 
 class OperationPriority(Enum):
     """Priority levels for queued operations."""
+
     LOW = 1
     NORMAL = 2
     HIGH = 3
@@ -72,12 +72,7 @@ class OfflineQueue:
         auto_sync: Whether to automatically sync when connection available
     """
 
-    def __init__(
-        self,
-        db_path: str,
-        max_queue_size: int = 10000,
-        auto_sync: bool = True
-    ):
+    def __init__(self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True):
         """
         Initialize offline queue.
 
@@ -98,7 +93,8 @@ class OfflineQueue:
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
         with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE TABLE IF NOT EXISTS queue (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     operation_type TEXT NOT NULL,
@@ -109,13 +105,16 @@ class OfflineQueue:
                     last_error TEXT,
                     status TEXT DEFAULT 'pending'
                 )
-            """)
+            """
+            )
 
             # Create index for efficient querying
-            conn.execute("""
+            conn.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_status_priority
                 ON queue(status, priority DESC, created_at ASC)
-            """)
+            """
+            )
 
             conn.commit()
 
@@ -123,7 +122,7 @@ class OfflineQueue:
         self,
         operation_type: OperationType,
         data: Dict[str, Any],
-        priority: OperationPriority = OperationPriority.NORMAL
+        priority: OperationPriority = OperationPriority.NORMAL,
     ) -> int:
         """
         Add an operation to the queue.
@@ -153,7 +152,7 @@ class OfflineQueue:
                     INSERT INTO queue (operation_type, priority, data)
                     VALUES (?, ?, ?)
                     """,
-                    (operation_type.value, priority.value, json.dumps(data))
+                    (operation_type.value, priority.value, json.dumps(data)),
                 )
                 conn.commit()
                 op_id = cursor.lastrowid
@@ -161,10 +160,7 @@ class OfflineQueue:
             logger.info(f"Queued operation {op_id}: {operation_type.value}")
             return op_id
 
-    def dequeue(
-        self,
-        limit: int = 100
-    ) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
+    def dequeue(self, limit: int = 100) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
         """
         Get pending operations from queue.
 
@@ -187,17 +183,13 @@ class OfflineQueue:
                     ORDER BY priority DESC, created_at ASC
                     LIMIT ?
                     """,
-                    (limit,)
+                    (limit,),
                 )
 
                 operations = []
                 for row in cursor.fetchall():
                     op_id, op_type, data_json = row
-                    operations.append((
-                        op_id,
-                        OperationType(op_type),
-                        json.loads(data_json)
-                    ))
+                    operations.append((op_id, OperationType(op_type), json.loads(data_json)))
 
                 return operations
 
@@ -216,18 +208,13 @@ class OfflineQueue:
                     SET status = 'completed'
                     WHERE id = ?
                     """,
-                    (operation_id,)
+                    (operation_id,),
                 )
                 conn.commit()
 
         logger.debug(f"Marked operation {operation_id} as completed")
 
-    def mark_failure(
-        self,
-        operation_id: int,
-        error: str,
-        max_retries: int = 3
-    ):
+    def mark_failure(self, operation_id: int, error: str, max_retries: int = 3):
         """
         Mark operation as failed and increment retry count.
 
@@ -246,7 +233,7 @@ class OfflineQueue:
                         last_error = ?
                     WHERE id = ?
                     """,
-                    (error, operation_id)
+                    (error, operation_id),
                 )
 
                 # Check if max retries exceeded
@@ -254,7 +241,7 @@ class OfflineQueue:
                     """
                     SELECT retry_count FROM queue WHERE id = ?
                     """,
-                    (operation_id,)
+                    (operation_id,),
                 )
                 retry_count = cursor.fetchone()[0]
 
@@ -265,7 +252,7 @@ class OfflineQueue:
                         SET status = 'failed'
                         WHERE id = ?
                         """,
-                        (operation_id,)
+                        (operation_id,),
                     )
                     logger.error(
                         f"Operation {operation_id} permanently failed after "
@@ -291,10 +278,7 @@ class OfflineQueue:
         """
         with sqlite3.connect(self.db_path) as conn:
             if status:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM queue WHERE status = ?",
-                    (status,)
-                )
+                cursor = conn.execute("SELECT COUNT(*) FROM queue WHERE status = ?", (status,))
             else:
                 cursor = conn.execute("SELECT COUNT(*) FROM queue")
 
@@ -316,17 +300,12 @@ class OfflineQueue:
                 """
             )
 
-            stats = {
-                'total': 0,
-                'pending': 0,
-                'completed': 0,
-                'failed': 0
-            }
+            stats = {"total": 0, "pending": 0, "completed": 0, "failed": 0}
 
             for row in cursor.fetchall():
                 status, count = row
                 stats[status] = count
-                stats['total'] += count
+                stats["total"] += count
 
             return stats
 
@@ -345,7 +324,7 @@ class OfflineQueue:
                     WHERE status = 'completed'
                     AND created_at < datetime('now', '-' || ? || ' days')
                     """,
-                    (older_than_days,)
+                    (older_than_days,),
                 )
                 deleted = cursor.rowcount
                 conn.commit()
@@ -382,14 +361,16 @@ class OfflineQueue:
             failed = []
             for row in cursor.fetchall():
                 op_id, op_type, data_json, created_at, retry_count, last_error = row
-                failed.append({
-                    'id': op_id,
-                    'operation_type': op_type,
-                    'data': json.loads(data_json),
-                    'created_at': created_at,
-                    'retry_count': retry_count,
-                    'last_error': last_error
-                })
+                failed.append(
+                    {
+                        "id": op_id,
+                        "operation_type": op_type,
+                        "data": json.loads(data_json),
+                        "created_at": created_at,
+                        "retry_count": retry_count,
+                        "last_error": last_error,
+                    }
+                )
 
             return failed
 
@@ -412,7 +393,7 @@ class OfflineManager:
         max_queue_size: int = 10000,
         auto_sync: bool = True,
         sync_interval: int = 60,
-        max_retries: int = 3
+        max_retries: int = 3,
     ):
         """
         Initialize offline manager.
@@ -429,9 +410,7 @@ class OfflineManager:
 
         db_path = str(self.offline_dir / "queue.db")
         self.queue = OfflineQueue(
-            db_path=db_path,
-            max_queue_size=max_queue_size,
-            auto_sync=auto_sync
+            db_path=db_path, max_queue_size=max_queue_size, auto_sync=auto_sync
         )
 
         self.sync_interval = sync_interval
@@ -456,10 +435,7 @@ class OfflineManager:
         """Start automatic sync thread."""
         if self._sync_thread is None or not self._sync_thread.is_alive():
             self._stop_sync.clear()
-            self._sync_thread = threading.Thread(
-                target=self._auto_sync_loop,
-                daemon=True
-            )
+            self._sync_thread = threading.Thread(target=self._auto_sync_loop, daemon=True)
             self._sync_thread.start()
             logger.info("Started automatic sync thread")
 
@@ -494,15 +470,15 @@ class OfflineManager:
         """
         if not self._client:
             logger.warning("No client set, cannot sync")
-            return {'synced': 0, 'failed': 0, 'pending': self.queue.get_queue_size()}
+            return {"synced": 0, "failed": 0, "pending": self.queue.get_queue_size()}
 
-        stats = {'synced': 0, 'failed': 0}
+        stats = {"synced": 0, "failed": 0}
 
         # Get pending operations
         operations = self.queue.dequeue(limit=batch_size)
 
         if not operations:
-            return {**stats, 'pending': 0}
+            return {**stats, "pending": 0}
 
         logger.info(f"Syncing {len(operations)} operations...")
 
@@ -520,18 +496,20 @@ class OfflineManager:
 
                 # Mark success
                 self.queue.mark_success(op_id)
-                stats['synced'] += 1
+                stats["synced"] += 1
 
             except Exception as e:
                 # Mark failure
                 error_msg = str(e)
                 self.queue.mark_failure(op_id, error_msg, self.max_retries)
-                stats['failed'] += 1
+                stats["failed"] += 1
 
-        stats['pending'] = self.queue.get_queue_size()
+        stats["pending"] = self.queue.get_queue_size()
 
-        if stats['synced'] > 0:
-            logger.info(f"Synced {stats['synced']} operations, {stats['failed']} failed, {stats['pending']} pending")
+        if stats["synced"] > 0:
+            logger.info(
+                f"Synced {stats['synced']} operations, {stats['failed']} failed, {stats['pending']} pending"
+            )
 
         return stats
 
@@ -545,12 +523,12 @@ class OfflineManager:
         stats = self.queue.get_statistics()
 
         return {
-            'enabled': True,
-            'auto_sync': self.queue.auto_sync,
-            'queue_stats': stats,
-            'sync_interval': self.sync_interval,
-            'offline_dir': str(self.offline_dir),
-            'auto_sync_running': self._sync_thread and self._sync_thread.is_alive()
+            "enabled": True,
+            "auto_sync": self.queue.auto_sync,
+            "queue_stats": stats,
+            "sync_interval": self.sync_interval,
+            "offline_dir": str(self.offline_dir),
+            "auto_sync_running": self._sync_thread and self._sync_thread.is_alive(),
         }
 
     def cleanup(self, older_than_days: int = 7):

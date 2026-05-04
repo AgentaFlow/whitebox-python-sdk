@@ -46,6 +46,7 @@ from ..core import ModelMonitor
 # Optional imports - graceful degradation
 try:
     import xgboost as xgb
+
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
@@ -53,6 +54,7 @@ except ImportError:
 
 try:
     import lightgbm as lgb
+
     LIGHTGBM_AVAILABLE = True
 except ImportError:
     LIGHTGBM_AVAILABLE = False
@@ -89,7 +91,7 @@ class XGBoostMonitor(ModelMonitor):
         model_name: str = "xgboost_model",
         track_feature_importance: bool = True,
         importance_type: str = "gain",
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize XGBoost monitor.
@@ -102,9 +104,7 @@ class XGBoostMonitor(ModelMonitor):
             **kwargs: Additional arguments passed to ModelMonitor
         """
         if not XGBOOST_AVAILABLE:
-            raise ImportError(
-                "XGBoost is not installed. Install with: pip install xgboost"
-            )
+            raise ImportError("XGBoost is not installed. Install with: pip install xgboost")
 
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
@@ -117,7 +117,7 @@ class XGBoostMonitor(ModelMonitor):
         X_train: Optional[np.ndarray] = None,
         y_train: Optional[np.ndarray] = None,
         model_type: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Register XGBoost model with WhiteBoxAI.
@@ -139,32 +139,32 @@ class XGBoostMonitor(ModelMonitor):
         model_metadata = metadata or {}
 
         # Get feature names
-        if hasattr(model, 'feature_names_in_'):
+        if hasattr(model, "feature_names_in_"):
             self._feature_names = list(model.feature_names_in_)
-            model_metadata['feature_names'] = self._feature_names
-        elif hasattr(model, 'feature_names'):
+            model_metadata["feature_names"] = self._feature_names
+        elif hasattr(model, "feature_names"):
             self._feature_names = model.feature_names
-            model_metadata['feature_names'] = self._feature_names
-        elif X_train is not None and hasattr(X_train, 'columns'):
+            model_metadata["feature_names"] = self._feature_names
+        elif X_train is not None and hasattr(X_train, "columns"):
             self._feature_names = list(X_train.columns)
-            model_metadata['feature_names'] = self._feature_names
+            model_metadata["feature_names"] = self._feature_names
 
         # Get number of features
-        if hasattr(model, 'n_features_in_'):
-            model_metadata['num_features'] = model.n_features_in_
+        if hasattr(model, "n_features_in_"):
+            model_metadata["num_features"] = model.n_features_in_
         elif self._feature_names:
-            model_metadata['num_features'] = len(self._feature_names)
+            model_metadata["num_features"] = len(self._feature_names)
 
         # Get number of trees/boosting rounds
-        if hasattr(model, 'n_estimators'):
-            model_metadata['num_trees'] = model.n_estimators
-        elif hasattr(model, 'best_iteration'):
-            model_metadata['num_trees'] = model.best_iteration
+        if hasattr(model, "n_estimators"):
+            model_metadata["num_trees"] = model.n_estimators
+        elif hasattr(model, "best_iteration"):
+            model_metadata["num_trees"] = model.best_iteration
 
         # Get XGBoost parameters
-        if hasattr(model, 'get_params'):
+        if hasattr(model, "get_params"):
             params = model.get_params()
-            model_metadata['xgboost_params'] = {
+            model_metadata["xgboost_params"] = {
                 k: str(v) for k, v in params.items() if v is not None
             }
 
@@ -173,13 +173,13 @@ class XGBoostMonitor(ModelMonitor):
             try:
                 importance = self._get_feature_importance(model)
                 if importance:
-                    model_metadata['feature_importance'] = importance
+                    model_metadata["feature_importance"] = importance
             except Exception as e:
                 warnings.warn(f"Failed to extract feature importance: {e}")
 
         # Detect model type
         if model_type is None:
-            if hasattr(model, '_estimator_type'):
+            if hasattr(model, "_estimator_type"):
                 model_type = model._estimator_type
             elif isinstance(model, xgb.XGBClassifier):
                 model_type = "classification"
@@ -190,14 +190,12 @@ class XGBoostMonitor(ModelMonitor):
             else:
                 model_type = "classification"  # Default
 
-        model_metadata['framework'] = 'xgboost'
-        model_metadata['xgboost_version'] = xgb.__version__
+        model_metadata["framework"] = "xgboost"
+        model_metadata["xgboost_version"] = xgb.__version__
 
         # Register model
         model_id = self.register_model(
-            name=self.model_name,
-            model_type=model_type,
-            metadata=model_metadata
+            name=self.model_name, model_type=model_type, metadata=model_metadata
         )
 
         # Set baseline if training data provided
@@ -212,7 +210,7 @@ class XGBoostMonitor(ModelMonitor):
         X: np.ndarray,
         y_true: Optional[np.ndarray] = None,
         log_predictions: bool = True,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
         Make predictions and log to WhiteBoxAI.
@@ -232,7 +230,7 @@ class XGBoostMonitor(ModelMonitor):
 
         # Get prediction probabilities if classification
         probabilities = None
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             try:
                 probabilities = model.predict_proba(X)
             except Exception:
@@ -247,7 +245,7 @@ class XGBoostMonitor(ModelMonitor):
                 try:
                     importance = self._get_feature_importance(model)
                     if importance:
-                        pred_metadata['feature_importance'] = importance
+                        pred_metadata["feature_importance"] = importance
                 except Exception as e:
                     warnings.warn(f"Failed to extract feature importance: {e}")
 
@@ -256,15 +254,12 @@ class XGBoostMonitor(ModelMonitor):
                 predictions=predictions,
                 actuals=y_true,
                 probabilities=probabilities,
-                metadata=pred_metadata
+                metadata=pred_metadata,
             )
 
         return predictions
 
-    def _get_feature_importance(
-        self,
-        model: Any
-    ) -> Optional[Dict[str, float]]:
+    def _get_feature_importance(self, model: Any) -> Optional[Dict[str, float]]:
         """
         Extract feature importance from XGBoost model.
 
@@ -276,20 +271,20 @@ class XGBoostMonitor(ModelMonitor):
         """
         try:
             # Try sklearn-style feature_importances_
-            if hasattr(model, 'feature_importances_'):
+            if hasattr(model, "feature_importances_"):
                 importances = model.feature_importances_
                 if self._feature_names and len(importances) == len(self._feature_names):
                     return dict(zip(self._feature_names, importances.tolist()))
                 else:
-                    return {f'f{i}': float(v) for i, v in enumerate(importances)}
+                    return {f"f{i}": float(v) for i, v in enumerate(importances)}
 
             # Try get_score method (native XGBoost)
-            if hasattr(model, 'get_score'):
+            if hasattr(model, "get_score"):
                 importance_dict = model.get_score(importance_type=self.importance_type)
                 return {k: float(v) for k, v in importance_dict.items()}
 
             # Try get_booster for sklearn API
-            if hasattr(model, 'get_booster'):
+            if hasattr(model, "get_booster"):
                 booster = model.get_booster()
                 importance_dict = booster.get_score(importance_type=self.importance_type)
                 return {k: float(v) for k, v in importance_dict.items()}
@@ -329,7 +324,7 @@ class LightGBMMonitor(ModelMonitor):
         model_name: str = "lightgbm_model",
         track_feature_importance: bool = True,
         importance_type: str = "gain",
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize LightGBM monitor.
@@ -342,9 +337,7 @@ class LightGBMMonitor(ModelMonitor):
             **kwargs: Additional arguments passed to ModelMonitor
         """
         if not LIGHTGBM_AVAILABLE:
-            raise ImportError(
-                "LightGBM is not installed. Install with: pip install lightgbm"
-            )
+            raise ImportError("LightGBM is not installed. Install with: pip install lightgbm")
 
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
@@ -357,7 +350,7 @@ class LightGBMMonitor(ModelMonitor):
         X_train: Optional[np.ndarray] = None,
         y_train: Optional[np.ndarray] = None,
         model_type: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Register LightGBM model with WhiteBoxAI.
@@ -379,34 +372,34 @@ class LightGBMMonitor(ModelMonitor):
         model_metadata = metadata or {}
 
         # Get feature names
-        if hasattr(model, 'feature_name_'):
+        if hasattr(model, "feature_name_"):
             self._feature_names = model.feature_name_
-            model_metadata['feature_names'] = self._feature_names
-        elif hasattr(model, 'feature_names_in_'):
+            model_metadata["feature_names"] = self._feature_names
+        elif hasattr(model, "feature_names_in_"):
             self._feature_names = list(model.feature_names_in_)
-            model_metadata['feature_names'] = self._feature_names
-        elif X_train is not None and hasattr(X_train, 'columns'):
+            model_metadata["feature_names"] = self._feature_names
+        elif X_train is not None and hasattr(X_train, "columns"):
             self._feature_names = list(X_train.columns)
-            model_metadata['feature_names'] = self._feature_names
+            model_metadata["feature_names"] = self._feature_names
 
         # Get number of features
-        if hasattr(model, 'n_features_in_'):
-            model_metadata['num_features'] = model.n_features_in_
+        if hasattr(model, "n_features_in_"):
+            model_metadata["num_features"] = model.n_features_in_
         elif self._feature_names:
-            model_metadata['num_features'] = len(self._feature_names)
+            model_metadata["num_features"] = len(self._feature_names)
 
         # Get number of trees
-        if hasattr(model, 'n_estimators'):
-            model_metadata['num_trees'] = model.n_estimators
-        elif hasattr(model, 'best_iteration_'):
-            model_metadata['num_trees'] = model.best_iteration_
-        elif hasattr(model, 'num_trees'):
-            model_metadata['num_trees'] = model.num_trees()
+        if hasattr(model, "n_estimators"):
+            model_metadata["num_trees"] = model.n_estimators
+        elif hasattr(model, "best_iteration_"):
+            model_metadata["num_trees"] = model.best_iteration_
+        elif hasattr(model, "num_trees"):
+            model_metadata["num_trees"] = model.num_trees()
 
         # Get LightGBM parameters
-        if hasattr(model, 'get_params'):
+        if hasattr(model, "get_params"):
             params = model.get_params()
-            model_metadata['lightgbm_params'] = {
+            model_metadata["lightgbm_params"] = {
                 k: str(v) for k, v in params.items() if v is not None
             }
 
@@ -415,13 +408,13 @@ class LightGBMMonitor(ModelMonitor):
             try:
                 importance = self._get_feature_importance(model)
                 if importance:
-                    model_metadata['feature_importance'] = importance
+                    model_metadata["feature_importance"] = importance
             except Exception as e:
                 warnings.warn(f"Failed to extract feature importance: {e}")
 
         # Detect model type
         if model_type is None:
-            if hasattr(model, '_estimator_type'):
+            if hasattr(model, "_estimator_type"):
                 model_type = model._estimator_type
             elif isinstance(model, lgb.LGBMClassifier):
                 model_type = "classification"
@@ -432,14 +425,12 @@ class LightGBMMonitor(ModelMonitor):
             else:
                 model_type = "classification"  # Default
 
-        model_metadata['framework'] = 'lightgbm'
-        model_metadata['lightgbm_version'] = lgb.__version__
+        model_metadata["framework"] = "lightgbm"
+        model_metadata["lightgbm_version"] = lgb.__version__
 
         # Register model
         model_id = self.register_model(
-            name=self.model_name,
-            model_type=model_type,
-            metadata=model_metadata
+            name=self.model_name, model_type=model_type, metadata=model_metadata
         )
 
         # Set baseline if training data provided
@@ -454,7 +445,7 @@ class LightGBMMonitor(ModelMonitor):
         X: np.ndarray,
         y_true: Optional[np.ndarray] = None,
         log_predictions: bool = True,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
         Make predictions and log to WhiteBoxAI.
@@ -474,7 +465,7 @@ class LightGBMMonitor(ModelMonitor):
 
         # Get prediction probabilities if classification
         probabilities = None
-        if hasattr(model, 'predict_proba'):
+        if hasattr(model, "predict_proba"):
             try:
                 probabilities = model.predict_proba(X)
             except Exception:
@@ -489,7 +480,7 @@ class LightGBMMonitor(ModelMonitor):
                 try:
                     importance = self._get_feature_importance(model)
                     if importance:
-                        pred_metadata['feature_importance'] = importance
+                        pred_metadata["feature_importance"] = importance
                 except Exception as e:
                     warnings.warn(f"Failed to extract feature importance: {e}")
 
@@ -498,15 +489,12 @@ class LightGBMMonitor(ModelMonitor):
                 predictions=predictions,
                 actuals=y_true,
                 probabilities=probabilities,
-                metadata=pred_metadata
+                metadata=pred_metadata,
             )
 
         return predictions
 
-    def _get_feature_importance(
-        self,
-        model: Any
-    ) -> Optional[Dict[str, float]]:
+    def _get_feature_importance(self, model: Any) -> Optional[Dict[str, float]]:
         """
         Extract feature importance from LightGBM model.
 
@@ -518,23 +506,23 @@ class LightGBMMonitor(ModelMonitor):
         """
         try:
             # Try sklearn-style feature_importances_
-            if hasattr(model, 'feature_importances_'):
+            if hasattr(model, "feature_importances_"):
                 importances = model.feature_importances_
                 if self._feature_names and len(importances) == len(self._feature_names):
                     return dict(zip(self._feature_names, importances.tolist()))
                 else:
-                    return {f'f{i}': float(v) for i, v in enumerate(importances)}
+                    return {f"f{i}": float(v) for i, v in enumerate(importances)}
 
             # Try feature_importance method (native LightGBM)
-            if hasattr(model, 'feature_importance'):
+            if hasattr(model, "feature_importance"):
                 importances = model.feature_importance(importance_type=self.importance_type)
                 if self._feature_names and len(importances) == len(self._feature_names):
                     return dict(zip(self._feature_names, importances.tolist()))
                 else:
-                    return {f'f{i}': float(v) for i, v in enumerate(importances)}
+                    return {f"f{i}": float(v) for i, v in enumerate(importances)}
 
             # Try booster
-            if hasattr(model, 'booster_'):
+            if hasattr(model, "booster_"):
                 booster = model.booster_
                 importances = booster.feature_importance(importance_type=self.importance_type)
                 feature_names = booster.feature_name()
@@ -547,11 +535,7 @@ class LightGBMMonitor(ModelMonitor):
 
 
 # Unified wrapper functions
-def wrap_xgboost_model(
-    model: Any,
-    monitor: XGBoostMonitor,
-    auto_register: bool = True
-) -> Any:
+def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool = True) -> Any:
     """
     Wrap an XGBoost model for automatic monitoring.
 
@@ -576,7 +560,7 @@ def wrap_xgboost_model(
 
     # Store original methods
     original_predict = model.predict
-    if hasattr(model, 'predict_proba'):
+    if hasattr(model, "predict_proba"):
         original_predict_proba = model.predict_proba
     else:
         original_predict_proba = None
@@ -595,6 +579,7 @@ def wrap_xgboost_model(
 
     # Wrap predict_proba if available
     if original_predict_proba:
+
         def wrapped_predict_proba(X, *args, **kwargs):
             probabilities = original_predict_proba(X, *args, **kwargs)
 
@@ -602,9 +587,7 @@ def wrap_xgboost_model(
             try:
                 predictions = np.argmax(probabilities, axis=1)
                 monitor.log_predictions(
-                    inputs=X,
-                    predictions=predictions,
-                    probabilities=probabilities
+                    inputs=X, predictions=predictions, probabilities=probabilities
                 )
             except Exception as e:
                 warnings.warn(f"Failed to log predictions: {e}")
@@ -618,11 +601,7 @@ def wrap_xgboost_model(
     return model
 
 
-def wrap_lightgbm_model(
-    model: Any,
-    monitor: LightGBMMonitor,
-    auto_register: bool = True
-) -> Any:
+def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: bool = True) -> Any:
     """
     Wrap a LightGBM model for automatic monitoring.
 
@@ -647,7 +626,7 @@ def wrap_lightgbm_model(
 
     # Store original methods
     original_predict = model.predict
-    if hasattr(model, 'predict_proba'):
+    if hasattr(model, "predict_proba"):
         original_predict_proba = model.predict_proba
     else:
         original_predict_proba = None
@@ -666,6 +645,7 @@ def wrap_lightgbm_model(
 
     # Wrap predict_proba if available
     if original_predict_proba:
+
         def wrapped_predict_proba(X, *args, **kwargs):
             probabilities = original_predict_proba(X, *args, **kwargs)
 
@@ -673,9 +653,7 @@ def wrap_lightgbm_model(
             try:
                 predictions = np.argmax(probabilities, axis=1)
                 monitor.log_predictions(
-                    inputs=X,
-                    predictions=predictions,
-                    probabilities=probabilities
+                    inputs=X, predictions=predictions, probabilities=probabilities
                 )
             except Exception as e:
                 warnings.warn(f"Failed to log predictions: {e}")

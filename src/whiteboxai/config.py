@@ -39,9 +39,7 @@ class Config:
             )
 
         # Base URL
-        self.base_url = (
-            base_url or os.getenv("EXPLAINAI_BASE_URL") or "https://api.whiteboxai.io"
-        )
+        self.base_url = base_url or os.getenv("EXPLAINAI_BASE_URL") or "https://api.whiteboxai.io"
 
         # Request settings
         self.timeout = timeout
@@ -69,7 +67,7 @@ class Config:
         self.async_enabled = kwargs.get("async_enabled", True)
 
         # SDK metadata
-        self.sdk_version = "0.1.0"
+        self.sdk_version = "0.2.0"
 
     def to_dict(self) -> dict:
         """Convert configuration to dictionary."""

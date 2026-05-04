@@ -6,16 +6,13 @@ when the API is unavailable and syncing when connection is restored.
 """
 
 import os
-import time
-from typing import Dict, List
 
-import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from explainai import WhiteBoxAI
-from explainai.offline import OperationPriority, OperationType
+from whiteboxai import WhiteBoxAI
+from whiteboxai.offline import OperationPriority, OperationType
 
 
 def example_1_basic_offline_mode():
@@ -31,14 +28,14 @@ def example_1_basic_offline_mode():
         offline_dir="./offline_queue",
         offline_auto_sync=True,  # Auto-sync every 60 seconds
         offline_sync_interval=60,
-        offline_max_queue_size=10000
+        offline_max_queue_size=10000,
     )
 
     print(f"Offline mode enabled: {client.is_offline_enabled()}")
 
     # Check offline status
     status = client.get_offline_status()
-    print(f"\nOffline Status:")
+    print("\nOffline Status:")
     print(f"  Queue size: {status['queue_size']}")
     print(f"  Statistics: {status['statistics']}")
 
@@ -60,7 +57,7 @@ def example_2_manual_sync():
         api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
-        offline_auto_sync=False  # Disable auto-sync
+        offline_auto_sync=False,  # Disable auto-sync
     )
 
     # Simulate queueing operations
@@ -71,9 +68,9 @@ def example_2_manual_sync():
         {
             "model_id": "model_123",
             "inputs": {"feature1": 1.0, "feature2": 2.0},
-            "outputs": [0.8, 0.2]
+            "outputs": [0.8, 0.2],
         },
-        OperationPriority.HIGH
+        OperationPriority.HIGH,
     )
 
     client._offline_manager._queue.enqueue(
@@ -83,9 +80,9 @@ def example_2_manual_sync():
             "predictions": [
                 {"inputs": {"f1": 1}, "outputs": [0.7, 0.3]},
                 {"inputs": {"f1": 2}, "outputs": [0.6, 0.4]},
-            ]
+            ],
         },
-        OperationPriority.NORMAL
+        OperationPriority.NORMAL,
     )
 
     # Check queue status
@@ -95,7 +92,7 @@ def example_2_manual_sync():
     # Manually trigger sync when connection is available
     print("\nTriggering manual sync...")
     result = client.sync_offline_queue(batch_size=50)
-    print(f"Sync result:")
+    print("Sync result:")
     print(f"  Synced: {result['synced']}")
     print(f"  Failed: {result['failed']}")
     print(f"  Pending: {result['pending']}")
@@ -114,7 +111,7 @@ def example_3_priority_based_syncing():
         api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
-        offline_auto_sync=False
+        offline_auto_sync=False,
     )
 
     # Queue operations with different priorities
@@ -122,9 +119,7 @@ def example_3_priority_based_syncing():
 
     # Low priority - batch logging
     client._offline_manager._queue.enqueue(
-        OperationType.LOG_BATCH,
-        {"model_id": "model_123", "batch": []},
-        OperationPriority.LOW
+        OperationType.LOG_BATCH, {"model_id": "model_123", "batch": []}, OperationPriority.LOW
     )
     print("  ✓ Queued LOW priority: batch logging")
 
@@ -132,7 +127,7 @@ def example_3_priority_based_syncing():
     client._offline_manager._queue.enqueue(
         OperationType.PREDICT,
         {"model_id": "model_123", "prediction": [0.5, 0.5]},
-        OperationPriority.NORMAL
+        OperationPriority.NORMAL,
     )
     print("  ✓ Queued NORMAL priority: prediction")
 
@@ -140,7 +135,7 @@ def example_3_priority_based_syncing():
     client._offline_manager._queue.enqueue(
         OperationType.REGISTER_MODEL,
         {"name": "critical_model", "model_type": "classification"},
-        OperationPriority.HIGH
+        OperationPriority.HIGH,
     )
     print("  ✓ Queued HIGH priority: model registration")
 
@@ -148,7 +143,7 @@ def example_3_priority_based_syncing():
     client._offline_manager._queue.enqueue(
         OperationType.PREDICT,
         {"model_id": "model_123", "urgent": True, "prediction": [0.9, 0.1]},
-        OperationPriority.CRITICAL
+        OperationPriority.CRITICAL,
     )
     print("  ✓ Queued CRITICAL priority: urgent prediction")
 
@@ -173,12 +168,12 @@ def example_4_queue_management():
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
-        offline_max_queue_size=100  # Limit queue size
+        offline_max_queue_size=100,  # Limit queue size
     )
 
     # Get queue statistics
     status = client.get_offline_status()
-    print(f"\nInitial Queue Status:")
+    print("\nInitial Queue Status:")
     print(f"  Total: {status['statistics']['total']}")
     print(f"  Pending: {status['statistics']['pending']}")
     print(f"  Completed: {status['statistics']['completed']}")
@@ -205,15 +200,9 @@ def example_5_ml_model_with_offline():
 
     # Create synthetic dataset
     X, y = make_classification(
-        n_samples=1000,
-        n_features=10,
-        n_informative=8,
-        n_redundant=2,
-        random_state=42
+        n_samples=1000, n_features=10, n_informative=8, n_redundant=2, random_state=42
     )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Train model
     print("\nTraining Random Forest model...")
@@ -227,7 +216,7 @@ def example_5_ml_model_with_offline():
         enable_offline=True,
         offline_dir="./ml_offline_queue",
         offline_auto_sync=True,
-        offline_sync_interval=30  # Sync every 30 seconds
+        offline_sync_interval=30,  # Sync every 30 seconds
     )
 
     print(f"\nOffline mode: {client.is_offline_enabled()}")
@@ -247,7 +236,7 @@ def example_5_ml_model_with_offline():
 
     # Check queue status
     status = client.get_offline_status()
-    print(f"\nQueue Status:")
+    print("\nQueue Status:")
     print(f"  Pending operations: {status['statistics']['pending']}")
     print(f"  Completed: {status['statistics']['completed']}")
 
@@ -265,7 +254,7 @@ def example_6_error_handling():
         api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
-        offline_auto_sync=False
+        offline_auto_sync=False,
     )
 
     print("\nOffline mode retry behavior:")
@@ -278,16 +267,14 @@ def example_6_error_handling():
     op_id = client._offline_manager._queue.enqueue(
         OperationType.PREDICT,
         {"model_id": "test", "prediction": [0.5, 0.5]},
-        OperationPriority.NORMAL
+        OperationPriority.NORMAL,
     )
 
     # Mark as failed multiple times (simulating retries)
     print(f"\nSimulating retry attempts for operation {op_id}...")
     for attempt in range(3):
         client._offline_manager._queue.mark_failure(
-            op_id,
-            f"Simulated error (attempt {attempt + 1})",
-            max_retries=3
+            op_id, f"Simulated error (attempt {attempt + 1})", max_retries=3
         )
         print(f"  Attempt {attempt + 1}: Failed")
 
@@ -323,9 +310,9 @@ def example_7_context_manager():
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=True,
-        offline_sync_interval=60
+        offline_sync_interval=60,
     ) as client:
-        print(f"\n✓ Client initialized with offline mode")
+        print("\n✓ Client initialized with offline mode")
         print(f"  Auto-sync running: {client._offline_manager._sync_running}")
 
         status = client.get_offline_status()
@@ -360,6 +347,7 @@ def run_all_examples():
         except Exception as e:
             print(f"\n✗ Example failed: {e}\n")
             import traceback
+
             traceback.print_exc()
 
     print("\n" + "=" * 80)

@@ -4,14 +4,12 @@ TensorFlow/Keras Integration Example
 This example demonstrates how to use WhiteBoxAI with TensorFlow/Keras models.
 """
 
-import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # TensorFlow imports
 try:
-    import tensorflow as tf
     from tensorflow import keras
 except ImportError:
     print("TensorFlow not installed. Install with: pip install tensorflow")
@@ -29,18 +27,11 @@ def main():
     # Generate synthetic classification data
     print("\n1. Generating synthetic data...")
     X, y = make_classification(
-        n_samples=1000,
-        n_features=20,
-        n_informative=15,
-        n_redundant=5,
-        n_classes=2,
-        random_state=42
+        n_samples=1000, n_features=20, n_informative=15, n_redundant=5, n_classes=2, random_state=42
     )
 
     # Split data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Standardize features
     scaler = StandardScaler()
@@ -52,37 +43,36 @@ def main():
 
     # Build Keras model
     print("\n2. Building Keras model...")
-    model = keras.Sequential([
-        keras.layers.Dense(64, activation='relu', input_shape=(20,)),
-        keras.layers.BatchNormalization(),
-        keras.layers.Dropout(0.3),
-        keras.layers.Dense(32, activation='relu'),
-        keras.layers.Dropout(0.2),
-        keras.layers.Dense(1, activation='sigmoid')
-    ])
+    model = keras.Sequential(
+        [
+            keras.layers.Dense(64, activation="relu", input_shape=(20,)),
+            keras.layers.BatchNormalization(),
+            keras.layers.Dropout(0.3),
+            keras.layers.Dense(32, activation="relu"),
+            keras.layers.Dropout(0.2),
+            keras.layers.Dense(1, activation="sigmoid"),
+        ]
+    )
 
     # Compile model
     model.compile(
         optimizer=keras.optimizers.Adam(learning_rate=0.001),
-        loss='binary_crossentropy',
-        metrics=['accuracy', keras.metrics.AUC()]
+        loss="binary_crossentropy",
+        metrics=["accuracy", keras.metrics.AUC()],
     )
 
     print(f"   Model built with {model.count_params():,} parameters")
 
     # Initialize WhiteBoxAI
     print("\n3. Initializing WhiteBoxAI monitoring...")
-    client = WhiteBoxAI(
-        api_key='demo-api-key',
-        base_url='http://localhost:8000'
-    )
+    client = WhiteBoxAI(api_key="demo-api-key", base_url="http://localhost:8000")
 
     # Create Keras monitor
     monitor = KerasMonitor(
         client=client,
         model=model,
         model_name="keras_binary_classifier",
-        model_type="classification"
+        model_type="classification",
     )
 
     # Register model
@@ -100,38 +90,32 @@ def main():
     # Create WhiteBoxAI callback
     print("\n5. Training model with WhiteBoxAI monitoring...")
     callback = WhiteBoxAICallback(
-        monitor=monitor,
-        log_frequency=5,  # Log every 5 epochs
-        log_validation=True
+        monitor=monitor, log_frequency=5, log_validation=True  # Log every 5 epochs
     )
 
     # Additional callbacks
     early_stopping = keras.callbacks.EarlyStopping(
-        monitor='val_loss',
-        patience=10,
-        restore_best_weights=True
+        monitor="val_loss", patience=10, restore_best_weights=True
     )
 
     reduce_lr = keras.callbacks.ReduceLROnPlateau(
-        monitor='val_loss',
-        factor=0.5,
-        patience=5,
-        min_lr=1e-6
+        monitor="val_loss", factor=0.5, patience=5, min_lr=1e-6
     )
 
     # Train model
     history = model.fit(
-        X_train, y_train,
+        X_train,
+        y_train,
         epochs=50,
         batch_size=32,
         validation_split=0.2,
         callbacks=[callback, early_stopping, reduce_lr],
-        verbose=0
+        verbose=0,
     )
 
-    final_epoch = len(history.history['loss'])
-    final_acc = history.history['accuracy'][-1]
-    final_val_acc = history.history['val_accuracy'][-1]
+    final_epoch = len(history.history["loss"])
+    final_acc = history.history["accuracy"][-1]
+    final_val_acc = history.history["val_accuracy"][-1]
 
     print(f"   Training completed in {final_epoch} epochs")
     print(f"   Final training accuracy: {final_acc:.4f}")
@@ -146,10 +130,7 @@ def main():
     # Make predictions with automatic logging
     print("\n7. Making predictions with automatic logging...")
     predictions = monitor.predict(
-        X_test,
-        log=True,
-        actuals=y_test,
-        metadata={'phase': 'test_evaluation'}
+        X_test, log=True, actuals=y_test, metadata={"phase": "test_evaluation"}
     )
     print(f"   ✓ Logged {len(predictions)} predictions")
 
@@ -163,13 +144,12 @@ def main():
 
     # Save model
     print("\n9. Saving model...")
-    model.save('models/keras_binary_classifier')
+    model.save("models/keras_binary_classifier")
     print("   ✓ Model saved to 'models/keras_binary_classifier'")
 
     # Register saved model
     monitor.register_saved_model(
-        model_path='models/keras_binary_classifier',
-        metadata={'format': 'SavedModel'}
+        model_path="models/keras_binary_classifier", metadata={"format": "SavedModel"}
     )
     print("   ✓ SavedModel registered with WhiteBoxAI")
 
@@ -179,7 +159,7 @@ def main():
         drift_report = monitor.check_drift()
         if drift_report:
             print(f"   Drift detected: {drift_report.get('drift_detected', False)}")
-            if drift_report.get('drift_score'):
+            if drift_report.get("drift_score"):
                 print(f"   Drift score: {drift_report['drift_score']:.4f}")
         else:
             print("   No drift detected")

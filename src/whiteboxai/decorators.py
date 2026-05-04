@@ -9,7 +9,7 @@ import inspect
 import time
 from typing import Any, Callable, Dict, Optional
 
-from explainai.monitor import ModelMonitor
+from whiteboxai.monitor import ModelMonitor
 
 
 def monitor_model(
@@ -254,9 +254,7 @@ def _extract_inputs(
         return _default_input_extractor(func, args, kwargs)
 
 
-def _default_input_extractor(
-    func: Callable, args: tuple, kwargs: dict
-) -> Dict[str, Any]:
+def _default_input_extractor(func: Callable, args: tuple, kwargs: dict) -> Dict[str, Any]:
     """Default input extractor."""
     sig = inspect.signature(func)
     bound_args = sig.bind(*args, **kwargs)
@@ -280,7 +278,7 @@ def monitor_performance(threshold_ms: Optional[float] = None):
 
     Example:
         ```python
-        from explainai.decorators import monitor_performance
+        from whiteboxai.decorators import monitor_performance
 
         @monitor_performance(threshold_ms=1000)
         def slow_function():

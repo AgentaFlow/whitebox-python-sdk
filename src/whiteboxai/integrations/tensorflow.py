@@ -4,19 +4,21 @@ TensorFlow/Keras Integration
 Integration for monitoring TensorFlow and Keras models.
 """
 
-from typing import Any, Dict, Optional, Union
 import warnings
+from typing import Any, Dict, Optional, Union
 
 try:
     import tensorflow as tf
     from tensorflow import keras
+
     TENSORFLOW_AVAILABLE = True
 except ImportError:
     TENSORFLOW_AVAILABLE = False
     keras = None
 
 import numpy as np
-from explainai.monitor import ModelMonitor
+
+from whiteboxai.monitor import ModelMonitor
 
 
 class KerasMonitor(ModelMonitor):
@@ -27,7 +29,7 @@ class KerasMonitor(ModelMonitor):
         ```python
         from tensorflow import keras
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.tensorflow import KerasMonitor
+        from whiteboxai.integrations.tensorflow import KerasMonitor
 
         # Build model
         model = keras.Sequential([
@@ -41,7 +43,7 @@ class KerasMonitor(ModelMonitor):
         monitor = KerasMonitor(client, model=model, model_name="keras_model")
 
         # Train with monitoring callback
-        from explainai.integrations.tensorflow import WhiteBoxAICallback
+        from whiteboxai.integrations.tensorflow import WhiteBoxAICallback
 
         model.fit(X_train, y_train,
                   callbacks=[WhiteBoxAICallback(monitor)])
@@ -54,10 +56,10 @@ class KerasMonitor(ModelMonitor):
     def __init__(
         self,
         client,
-        model: Optional['keras.Model'] = None,
+        model: Optional["keras.Model"] = None,
         model_name: Optional[str] = None,
         model_type: str = "regression",
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize Keras monitor.
@@ -70,9 +72,7 @@ class KerasMonitor(ModelMonitor):
             **kwargs: Additional arguments for ModelMonitor
         """
         if not TENSORFLOW_AVAILABLE:
-            raise ImportError(
-                "TensorFlow is not installed. Install with: pip install tensorflow"
-            )
+            raise ImportError("TensorFlow is not installed. Install with: pip install tensorflow")
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -132,9 +132,9 @@ class KerasMonitor(ModelMonitor):
 
         # Get input/output shapes
         try:
-            if hasattr(self.model, 'input_shape'):
+            if hasattr(self.model, "input_shape"):
                 metadata["input_shape"] = str(self.model.input_shape)
-            if hasattr(self.model, 'output_shape'):
+            if hasattr(self.model, "output_shape"):
                 metadata["output_shape"] = str(self.model.output_shape)
         except Exception:
             pass
@@ -199,7 +199,9 @@ class KerasMonitor(ModelMonitor):
                 # Single prediction
                 self.log_prediction(
                     inputs=inputs_np[0] if len(inputs_np.shape) > 1 else inputs_np,
-                    prediction=predictions_np[0] if len(predictions_np.shape) > 1 else predictions_np,
+                    prediction=(
+                        predictions_np[0] if len(predictions_np.shape) > 1 else predictions_np
+                    ),
                     actual=actuals[0] if actuals is not None else None,
                     **kwargs,
                 )
@@ -365,13 +367,13 @@ class WhiteBoxAICallback(keras.callbacks.Callback):
         # Log metrics at specified frequency
         if (epoch + 1) % self.log_frequency == 0:
             # Extract train and val metrics
-            train_loss = logs.get('loss')
-            val_loss = logs.get('val_loss')
+            train_loss = logs.get("loss")
+            val_loss = logs.get("val_loss")
 
             # Extract additional metrics
             metrics = {}
             for key, value in logs.items():
-                if key not in ['loss', 'val_loss']:
+                if key not in ["loss", "val_loss"]:
                     metrics[key] = float(value) if value is not None else None
 
             # Log epoch metrics
@@ -388,10 +390,12 @@ class WhiteBoxAICallback(keras.callbacks.Callback):
             logs = {}
 
         # Log final metrics
-        self.monitor.log_custom_metric("training_complete", {
-            "final_metrics": {k: float(v) if v is not None else None
-                              for k, v in logs.items()},
-        })
+        self.monitor.log_custom_metric(
+            "training_complete",
+            {
+                "final_metrics": {k: float(v) if v is not None else None for k, v in logs.items()},
+            },
+        )
 
 
 class TorchMonitor(ModelMonitor):
@@ -406,15 +410,15 @@ class TorchMonitor(ModelMonitor):
             "TorchMonitor in tensorflow module is deprecated. "
             "Use whiteboxai.integrations.pytorch.TorchMonitor instead.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         super().__init__(*args, **kwargs)
 
 
 def wrap_keras_model(
-    model: 'keras.Model',
+    model: "keras.Model",
     monitor: KerasMonitor,
-) -> 'keras.Model':
+) -> "keras.Model":
     """
     Wrap a Keras model to automatically log predictions.
 
@@ -464,8 +468,8 @@ def wrap_keras_model(
 
 
 __all__ = [
-    'KerasMonitor',
-    'WhiteBoxAICallback',
-    'TorchMonitor',  # Deprecated
-    'wrap_keras_model',
+    "KerasMonitor",
+    "WhiteBoxAICallback",
+    "TorchMonitor",  # Deprecated
+    "wrap_keras_model",
 ]

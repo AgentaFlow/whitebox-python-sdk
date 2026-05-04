@@ -4,15 +4,16 @@ LangChain Integration
 Integration for monitoring LangChain applications including chains, agents, and RAG pipelines.
 """
 
-from typing import Any, Dict, Optional, List
-import warnings
 import time
+import warnings
+from typing import Any, Dict, List, Optional
 
 try:
-    from langchain.callbacks.base import BaseCallbackHandler
-    from langchain.schema import LLMResult, AgentAction, AgentFinish
-    from langchain.chains.base import Chain
     from langchain.agents import AgentExecutor
+    from langchain.callbacks.base import BaseCallbackHandler
+    from langchain.chains.base import Chain
+    from langchain.schema import AgentAction, AgentFinish, LLMResult
+
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
@@ -20,7 +21,7 @@ except ImportError:
     Chain = object
     AgentExecutor = object
 
-from explainai.monitor import ModelMonitor
+from whiteboxai.monitor import ModelMonitor
 
 
 class LangChainMonitor(ModelMonitor):
@@ -40,7 +41,7 @@ class LangChainMonitor(ModelMonitor):
         from langchain.chains import LLMChain
         from langchain.llms import OpenAI
         from whiteboxai import WhiteBoxAI
-        from explainai.integrations.langchain import LangChainMonitor
+        from whiteboxai.integrations.langchain import LangChainMonitor
 
         # Setup monitoring
         client = WhiteBoxAI(api_key="your-api-key")
@@ -71,7 +72,7 @@ class LangChainMonitor(ModelMonitor):
         application_name: Optional[str] = None,
         track_tokens: bool = True,
         track_cost: bool = True,
-        **kwargs
+        **kwargs,
     ):
         """
         Initialize LangChain monitor.
@@ -84,9 +85,7 @@ class LangChainMonitor(ModelMonitor):
             **kwargs: Additional arguments for ModelMonitor
         """
         if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "langchain is not installed. Install with: pip install langchain"
-            )
+            raise ImportError("langchain is not installed. Install with: pip install langchain")
 
         super().__init__(client, **kwargs)
         self._application_name = application_name
@@ -432,11 +431,13 @@ class WhiteBoxAICallbackHandler(BaseCallbackHandler):
         if run_id not in self._agent_steps:
             self._agent_steps[run_id] = []
 
-        self._agent_steps[run_id].append({
-            "tool": action.tool,
-            "tool_input": action.tool_input,
-            "log": action.log,
-        })
+        self._agent_steps[run_id].append(
+            {
+                "tool": action.tool,
+                "tool_input": action.tool_input,
+                "log": action.log,
+            }
+        )
 
     def on_agent_finish(
         self,
@@ -629,7 +630,7 @@ def wrap_langchain_chain(
 
 
 __all__ = [
-    'LangChainMonitor',
-    'WhiteBoxAICallbackHandler',
-    'wrap_langchain_chain',
+    "LangChainMonitor",
+    "WhiteBoxAICallbackHandler",
+    "wrap_langchain_chain",
 ]
