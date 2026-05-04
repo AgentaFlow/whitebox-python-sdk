@@ -190,11 +190,6 @@ def example_agent():
 
 def example_rag_chain():
     """Example using a RAG (Retrieval-Augmented Generation) chain."""
-    from langchain.chains import RetrievalQA
-    from langchain.embeddings import OpenAIEmbeddings
-    from langchain.llms import OpenAI
-    from langchain.text_splitter import CharacterTextSplitter
-    from langchain.vectorstores import FAISS
 
     print("\n" + "=" * 60)
     print("RAG Chain Example")

@@ -6,10 +6,7 @@ when the API is unavailable and syncing when connection is restored.
 """
 
 import os
-import time
-from typing import Dict, List
 
-import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split

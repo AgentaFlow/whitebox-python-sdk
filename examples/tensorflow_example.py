@@ -4,14 +4,12 @@ TensorFlow/Keras Integration Example
 This example demonstrates how to use WhiteBoxAI with TensorFlow/Keras models.
 """
 
-import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # TensorFlow imports
 try:
-    import tensorflow as tf
     from tensorflow import keras
 except ImportError:
     print("TensorFlow not installed. Install with: pip install tensorflow")
