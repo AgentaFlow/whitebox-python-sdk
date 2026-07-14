@@ -1,11 +1,11 @@
-# Getting Started with WhiteBoxAI SDK
+# Getting Started with WhiteBoxXAI SDK
 
 ## Installation
 
-Install the WhiteBoxAI SDK using pip:
+Install the WhiteBoxXAI SDK using pip:
 
 ```bash
-pip install whiteboxai-sdk
+pip install whitebox-xai-sdk
 ```
 
 ### Optional Dependencies
@@ -14,16 +14,16 @@ Install with specific framework support:
 
 ```bash
 # Scikit-learn support
-pip install whiteboxai-sdk[sklearn]
+pip install whitebox-xai-sdk[sklearn]
 
 # PyTorch support
-pip install whiteboxai-sdk[pytorch]
+pip install whitebox-xai-sdk[pytorch]
 
 # TensorFlow support
-pip install whiteboxai-sdk[tensorflow]
+pip install whitebox-xai-sdk[tensorflow]
 
 # All integrations
-pip install whiteboxai-sdk[all]
+pip install whitebox-xai-sdk[all]
 ```
 
 ## Quick Start
@@ -31,21 +31,21 @@ pip install whiteboxai-sdk[all]
 ### 1. Initialize the Client
 
 ```python
-from whiteboxai import WhiteBoxAI
+from whiteboxxai import WhiteBoxXAI
 
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 ```
 
 You can also set the API key via environment variable:
 
 ```bash
-export EXPLAINAI_API_KEY=your-api-key
+export WHITEBOXXAI_API_KEY=your-api-key
 ```
 
 ### 2. Create a Monitor
 
 ```python
-from whiteboxai import ModelMonitor
+from whiteboxxai import ModelMonitor
 
 monitor = ModelMonitor(client)
 ```
@@ -81,9 +81,9 @@ monitor.log_prediction(
 Configure the client with various options:
 
 ```python
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key="your-api-key",
-    base_url="https://api.whiteboxai.io",
+    base_url="https://api.whiteboxxai.com",
     timeout=30,
     max_retries=3,
     enable_caching=True,
@@ -95,5 +95,5 @@ client = WhiteBoxAI(
 ## Support
 
 For help and support:
-- Documentation: https://whitebox.agentaflow.com
+- Documentation: https://docs.whiteboxxai.com
 - Issues: https://github.com/AgentaFlow/whitebox-python-sdk/issues

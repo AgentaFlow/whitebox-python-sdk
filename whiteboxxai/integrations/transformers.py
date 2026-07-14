@@ -5,11 +5,11 @@ Integration for monitoring Hugging Face Transformers models.
 """
 
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 try:
     import transformers
-    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer
+    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer, pipeline
 
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
@@ -18,7 +18,8 @@ except ImportError:
     PreTrainedTokenizer = object
     Pipeline = object
 
-from whiteboxai.monitor import ModelMonitor
+import numpy as np
+from whiteboxxai.monitor import ModelMonitor
 
 
 class TransformersMonitor(ModelMonitor):
@@ -37,14 +38,14 @@ class TransformersMonitor(ModelMonitor):
     Example:
         ```python
         from transformers import pipeline
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.transformers import TransformersMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.transformers import TransformersMonitor
 
         # Load model
         classifier = pipeline("sentiment-analysis")
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TransformersMonitor(
             client=client,
             pipeline=classifier,
@@ -70,7 +71,7 @@ class TransformersMonitor(ModelMonitor):
         Initialize Transformers monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             pipeline: Hugging Face pipeline (recommended)
             model: PreTrainedModel (if not using pipeline)
             tokenizer: PreTrainedTokenizer (if not using pipeline)
@@ -104,7 +105,7 @@ class TransformersMonitor(ModelMonitor):
         **kwargs: Any,
     ) -> int:
         """
-        Register Transformers model with WhiteBoxAI.
+        Register Transformers model with WhiteBoxXAI.
 
         Args:
             name: Model name (default: model class name or pipeline task)
@@ -244,7 +245,9 @@ class TransformersMonitor(ModelMonitor):
                 # Single prediction
                 self.log_prediction_transformers(
                     input_text=inputs,
-                    prediction=predictions if isinstance(predictions, dict) else predictions[0],
+                    prediction=predictions
+                    if isinstance(predictions, dict)
+                    else predictions[0],
                     actual=actuals,
                 )
 
@@ -272,7 +275,7 @@ class TransformersMonitor(ModelMonitor):
         else:
             pred_value = prediction
 
-        # Log to WhiteBoxAI
+        # Log to WhiteBoxXAI
         self.log_prediction(
             inputs={"text": input_text},
             prediction=pred_value,
@@ -401,11 +404,11 @@ class TransformersPipelineWrapper:
     Example:
         ```python
         from transformers import pipeline
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.transformers import TransformersPipelineWrapper
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.transformers import TransformersPipelineWrapper
 
         classifier = pipeline("sentiment-analysis")
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
 
         # Wrap pipeline
         wrapped = TransformersPipelineWrapper(classifier, client)
@@ -427,7 +430,7 @@ class TransformersPipelineWrapper:
 
         Args:
             pipeline: Hugging Face pipeline
-            client: WhiteBoxAI client
+            client: WhiteBoxXAI client
             model_name: Model name
             auto_register: Auto-register model on first prediction
         """
@@ -500,7 +503,7 @@ def wrap_transformers_pipeline(
         # Make prediction
         result = original_call(*args, **kwargs)
 
-        # Log to WhiteBoxAI
+        # Log to WhiteBoxXAI
         try:
             inputs = args[0] if args else kwargs.get("inputs")
 

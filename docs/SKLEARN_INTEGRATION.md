@@ -1,6 +1,6 @@
 # Scikit-learn Integration Guide
 
-This guide shows you how to integrate WhiteBoxAI monitoring with scikit-learn models.
+This guide shows you how to integrate WhiteBoxXAI monitoring with scikit-learn models.
 
 ## Table of Contents
 
@@ -18,13 +18,13 @@ This guide shows you how to integrate WhiteBoxAI monitoring with scikit-learn mo
 ## Quick Start
 
 ```python
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.sklearn import SklearnMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.sklearn import SklearnMonitor
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris
 
 # Initialize client
-client = WhiteBoxAI(api_key='your-api-key')
+client = WhiteBoxXAI(api_key='your-api-key')
 
 # Train your model
 X, y = load_iris(return_X_y=True)
@@ -47,7 +47,7 @@ predictions = monitored_model.predict(X)
 
 ## Supported Model Types
 
-WhiteBoxAI supports all major scikit-learn model types:
+WhiteBoxXAI supports all major scikit-learn model types:
 
 ### Classification Models
 - LogisticRegression
@@ -81,10 +81,10 @@ WhiteBoxAI supports all major scikit-learn model types:
 
 ## Automatic Model Detection
 
-WhiteBoxAI automatically detects model types and configuration:
+WhiteBoxXAI automatically detects model types and configuration:
 
 ```python
-from whiteboxai.integrations.sklearn import SklearnWrapper
+from whiteboxxai.integrations.sklearn import SklearnWrapper
 
 # Automatic detection
 wrapper = SklearnWrapper(client=client)
@@ -185,7 +185,7 @@ Monitor models during cross-validation:
 
 ```python
 from sklearn.model_selection import cross_val_score, cross_validate
-from whiteboxai.integrations.sklearn import monitor_cv
+from whiteboxxai.integrations.sklearn import monitor_cv
 
 # Simple cross-validation with monitoring
 model = RandomForestClassifier()
@@ -245,7 +245,7 @@ outer_scores = monitor_cv(
 Track hyperparameter search experiments:
 
 ```python
-from whiteboxai.integrations.sklearn import MonitoredGridSearchCV
+from whiteboxxai.integrations.sklearn import MonitoredGridSearchCV
 
 # Define parameter grid
 param_grid = {
@@ -389,8 +389,8 @@ monitored_v2 = SklearnMonitor(
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.sklearn import SklearnMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.sklearn import SklearnMonitor
 import pandas as pd
 
 # Generate data
@@ -400,7 +400,7 @@ X_df = pd.DataFrame(X, columns=feature_names)
 X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2)
 
 # Initialize client
-client = WhiteBoxAI(api_key='your-api-key')
+client = WhiteBoxXAI(api_key='your-api-key')
 
 # Train model
 model = RandomForestClassifier(n_estimators=100, random_state=42)
@@ -564,10 +564,10 @@ monitored_model = SklearnMonitor(
 
 ## Resources
 
-- [WhiteBoxAI SDK Documentation](https://docs.whiteboxai.com/sdk)
+- [WhiteBoxXAI SDK Documentation](https://docs.whiteboxxai.com/sdk)
 - [Scikit-learn Documentation](https://scikit-learn.org)
-- [API Reference](https://docs.whiteboxai.com/api)
-- [Support](mailto:whiteboxai-support@kpmg.com)
+- [API Reference](https://docs.whiteboxxai.com/api)
+- [Support](mailto:whiteboxxai-support@whiteboxxai.com)
 
 ---
 

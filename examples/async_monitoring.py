@@ -7,14 +7,13 @@ This example demonstrates asynchronous API usage for better performance.
 import asyncio
 
 import numpy as np
-
-from whiteboxai import ModelMonitor, WhiteBoxAI
+from whiteboxxai import ModelMonitor, WhiteBoxXAI
 
 
 async def register_and_log():
     """Register model and log predictions asynchronously."""
     # Create client with async context manager
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client)
 
         # Register model asynchronously
@@ -38,7 +37,8 @@ async def register_and_log():
         # Log batch predictions
         print("\nLogging batch predictions...")
         predictions = [
-            {"inputs": {"amount": 50.0}, "output": {"fraud_prob": 0.05}} for _ in range(100)
+            {"inputs": {"amount": 50.0}, "output": {"fraud_prob": 0.05}}
+            for _ in range(100)
         ]
 
         await monitor.alog_batch(predictions)
@@ -52,7 +52,7 @@ async def register_and_log():
 
 async def parallel_logging():
     """Log predictions in parallel for better throughput."""
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client, model_id=123)
 
         # Create multiple prediction logging tasks
@@ -71,7 +71,7 @@ async def parallel_logging():
 
 async def drift_detection():
     """Detect drift asynchronously."""
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client, model_id=123)
 
         # Set baseline

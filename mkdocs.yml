@@ -1,5 +1,5 @@
-site_name: WhiteBoxAI Python SDK
-site_description: Official Python SDK for WhiteBoxAI - AI Observability & Explainability Platform
+site_name: WhiteBoxXAI Python SDK
+site_description: Official Python SDK for WhiteBoxXAI - AI Observability & Explainability Platform
 site_author: AgentaFlow
 site_url: https://github.com/AgentaFlow/whitebox-python-sdk
 
@@ -41,7 +41,7 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
-          paths: [src]
+          paths: [.]
           options:
             docstring_style: google
             show_source: true
@@ -87,6 +87,6 @@ extra:
     - icon: fontawesome/brands/github
       link: https://github.com/AgentaFlow/whitebox-python-sdk
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/whiteboxai-sdk/
+      link: https://pypi.org/project/whitebox-xai-sdk/
 
 copyright: Copyright &copy; 2026 AgentaFlow

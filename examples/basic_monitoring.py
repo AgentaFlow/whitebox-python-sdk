@@ -4,12 +4,12 @@ Basic Monitoring Example
 This example demonstrates basic model registration and prediction logging.
 """
 
-from whiteboxai import ModelMonitor, WhiteBoxAI
+from whiteboxxai import ModelMonitor, WhiteBoxXAI
 
 
 def main():
     # Initialize client with API key
-    client = WhiteBoxAI(api_key="your-api-key")
+    client = WhiteBoxXAI(api_key="your-api-key")
 
     # Create monitor instance
     monitor = ModelMonitor(client)

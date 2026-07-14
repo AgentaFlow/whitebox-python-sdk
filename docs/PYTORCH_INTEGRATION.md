@@ -1,6 +1,6 @@
 # PyTorch Integration Guide
 
-Complete guide for integrating WhiteBoxAI monitoring with PyTorch models.
+Complete guide for integrating WhiteBoxXAI monitoring with PyTorch models.
 
 ## Table of Contents
 
@@ -21,11 +21,11 @@ Complete guide for integrating WhiteBoxAI monitoring with PyTorch models.
 ```python
 import torch
 import torch.nn as nn
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.pytorch import TorchMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.pytorch import TorchMonitor
 
-# Initialize WhiteBoxAI
-client = WhiteBoxAI(api_key='your-api-key')
+# Initialize WhiteBoxXAI
+client = WhiteBoxXAI(api_key='your-api-key')
 
 # Define your PyTorch model
 class SimpleNN(nn.Module):
@@ -59,7 +59,7 @@ prediction = monitor.predict(X)
 
 ## Supported Models
 
-WhiteBoxAI supports all PyTorch model types:
+WhiteBoxXAI supports all PyTorch model types:
 
 ### Sequential Models
 
@@ -131,7 +131,7 @@ monitor = TorchMonitor(
 ### Basic Training with Monitoring
 
 ```python
-from whiteboxai.integrations.pytorch import TrainingMonitor
+from whiteboxxai.integrations.pytorch import TrainingMonitor
 
 # Create training monitor
 training_monitor = TrainingMonitor(
@@ -208,7 +208,7 @@ training_monitor.log_validation(
 ### Early Stopping with Drift Detection
 
 ```python
-from whiteboxai.monitoring import EarlyStopping
+from whiteboxxai.monitoring import EarlyStopping
 
 early_stopping = EarlyStopping(
     monitor=training_monitor,
@@ -252,7 +252,7 @@ traced_model = torch.jit.trace(model, example_input)
 # Save traced model
 torch.jit.save(traced_model, "model_traced.pt")
 
-# Register with WhiteBoxAI
+# Register with WhiteBoxXAI
 monitor = TorchMonitor(
     model=traced_model,
     client=client,
@@ -270,7 +270,7 @@ scripted_model = torch.jit.script(model)
 # Save scripted model
 torch.jit.save(scripted_model, "model_scripted.pt")
 
-# Register with WhiteBoxAI
+# Register with WhiteBoxXAI
 monitor = TorchMonitor(
     model=scripted_model,
     client=client,
@@ -372,7 +372,7 @@ for data, target in monitored_loader:
 ### GPU Metrics Tracking
 
 ```python
-from whiteboxai.monitoring import GPUMonitor
+from whiteboxxai.monitoring import GPUMonitor
 
 # Enable GPU monitoring
 gpu_monitor = GPUMonitor()
@@ -473,7 +473,7 @@ def train_ddp(rank, world_size):
     model = SimpleNN().to(rank)
     ddp_model = DDP(model, device_ids=[rank])
 
-    # Only rank 0 logs to WhiteBoxAI
+    # Only rank 0 logs to WhiteBoxXAI
     if rank == 0:
         monitor = TorchMonitor(
             model=ddp_model.module,
@@ -520,11 +520,11 @@ def save_checkpoint(model, optimizer, epoch, filepath):
         'epoch': epoch,
         'model_state_dict': model.state_dict(),
         'optimizer_state_dict': optimizer.state_dict(),
-        'whiteboxai_model_id': monitor.model_id
+        'whiteboxxai_model_id': monitor.model_id
     }
     torch.save(checkpoint, filepath)
 
-    # Log checkpoint to WhiteBoxAI
+    # Log checkpoint to WhiteBoxXAI
     monitor.log_checkpoint(
         epoch=epoch,
         checkpoint_path=filepath
@@ -534,7 +534,7 @@ def load_checkpoint(filepath, model, optimizer):
     checkpoint = torch.load(filepath)
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    return checkpoint['epoch'], checkpoint['whiteboxai_model_id']
+    return checkpoint['epoch'], checkpoint['whiteboxxai_model_id']
 ```
 
 ### 2. Gradient Monitoring
@@ -638,8 +638,8 @@ import torch.optim as optim
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.pytorch import TorchMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.pytorch import TorchMonitor
 
 # Generate synthetic data
 X, y = make_classification(
@@ -688,8 +688,8 @@ model = BinaryClassifier(input_dim=20)
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 criterion = nn.BCELoss()
 
-# Initialize WhiteBoxAI monitor
-client = WhiteBoxAI(api_key='your-api-key')
+# Initialize WhiteBoxXAI monitor
+client = WhiteBoxXAI(api_key='your-api-key')
 monitor = TorchMonitor(
     model=model,
     client=client,
@@ -1014,7 +1014,7 @@ monitor = TorchMonitor(
 # Save only state dict
 torch.save(model.state_dict(), 'model_weights.pth')
 
-# Register with WhiteBoxAI
+# Register with WhiteBoxXAI
 monitor.register_model(
     model_path='model_weights.pth',
     save_weights_only=True
@@ -1026,8 +1026,8 @@ monitor.register_model(
 ## Resources
 
 - [PyTorch Documentation](https://pytorch.org/docs/)
-- [WhiteBoxAI API Reference](https://docs.whiteboxai.com/api)
-- [Best Practices Guide](https://docs.whiteboxai.com/best-practices)
+- [WhiteBoxXAI API Reference](https://docs.whiteboxxai.com/api)
+- [Best Practices Guide](https://docs.whiteboxxai.com/best-practices)
 
 ---
 

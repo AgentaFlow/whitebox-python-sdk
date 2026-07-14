@@ -5,17 +5,19 @@ SDK Configuration
 import os
 from typing import Any, Optional
 
+from whiteboxxai import __version__ as _sdk_version
+
 
 class Config:
     """
     SDK configuration class.
 
-    Manages configuration settings for the WhiteBoxAI SDK including API keys,
+    Manages configuration settings for the WhiteBoxXAI SDK including API keys,
     URLs, timeouts, and feature flags.
 
     Args:
-        api_key: WhiteBoxAI API key
-        base_url: Base URL for WhiteBoxAI API
+        api_key: WhiteBoxXAI API key
+        base_url: Base URL for WhiteBoxXAI API
         timeout: Request timeout in seconds
         max_retries: Maximum number of retry attempts
         **kwargs: Additional configuration options
@@ -31,17 +33,25 @@ class Config:
     ):
         """Initialize configuration."""
         # API key (from parameter or environment)
-        self.api_key = api_key or os.getenv("EXPLAINAI_API_KEY")
+        self.api_key = api_key or os.getenv("WHITEBOXXAI_API_KEY")
         if not self.api_key:
             raise ValueError(
                 "API key is required. Provide via 'api_key' parameter or "
-                "EXPLAINAI_API_KEY environment variable."
+                "WHITEBOXXAI_API_KEY environment variable."
             )
 
         # Base URL
-        self.base_url = base_url or os.getenv("EXPLAINAI_BASE_URL") or "https://api.whiteboxai.io"
+        self.base_url = (
+            base_url
+            or os.getenv("WHITEBOXXAI_BASE_URL")
+            or "https://api.whiteboxxai.com"
+        )
 
         # Request settings
+        if timeout <= 0:
+            raise ValueError("timeout must be a positive number of seconds.")
+        if max_retries < 0:
+            raise ValueError("max_retries must be zero or a positive integer.")
         self.timeout = timeout
         self.max_retries = max_retries
 
@@ -67,7 +77,7 @@ class Config:
         self.async_enabled = kwargs.get("async_enabled", True)
 
         # SDK metadata
-        self.sdk_version = "0.2.0"
+        self.sdk_version = _sdk_version
 
     def to_dict(self) -> dict:
         """Convert configuration to dictionary."""

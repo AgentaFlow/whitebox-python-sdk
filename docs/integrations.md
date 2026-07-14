@@ -1,6 +1,6 @@
 # Framework Integrations
 
-WhiteBoxAI SDK provides native integrations for popular ML frameworks.
+WhiteBoxXAI SDK provides native integrations for popular ML frameworks.
 
 ## Scikit-learn
 
@@ -8,15 +8,15 @@ Monitor scikit-learn models with automatic feature extraction:
 
 ```python
 from sklearn.ensemble import RandomForestClassifier
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.sklearn import SklearnMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.sklearn import SklearnMonitor
 
 # Train your model
 model = RandomForestClassifier()
 model.fit(X_train, y_train)
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = SklearnMonitor(client, model=model)
 monitor.register_from_model(model_type="classification")
 
@@ -33,14 +33,14 @@ Monitor PyTorch models with tensor tracking:
 
 ```python
 import torch.nn as nn
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.pytorch import TorchMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.pytorch import TorchMonitor
 
 # Define your model
 model = nn.Sequential(...)
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = TorchMonitor(client, model=model)
 monitor.register_from_model(model_type="classification")
 
@@ -56,19 +56,19 @@ Monitor TensorFlow models with training callbacks:
 
 ```python
 from tensorflow import keras
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.tensorflow import KerasMonitor, WhiteBoxAICallback
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.tensorflow import KerasMonitor, WhiteBoxXAICallback
 
 # Build your model
 model = keras.Sequential([...])
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = KerasMonitor(client, model=model, model_name="keras_model")
 monitor.register_from_model(model_type="regression")
 
 # Train with monitoring
-callback = WhiteBoxAICallback(monitor, log_frequency=1)
+callback = WhiteBoxXAICallback(monitor, log_frequency=1)
 model.fit(X_train, y_train, callbacks=[callback], epochs=50)
 ```
 
@@ -80,14 +80,14 @@ Monitor transformers pipelines and models:
 
 ```python
 from transformers import pipeline
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.transformers import TransformersMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.transformers import TransformersMonitor
 
 # Load model
 classifier = pipeline("sentiment-analysis")
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = TransformersMonitor(
     client=client,
     pipeline=classifier,
@@ -106,11 +106,11 @@ Monitor LangChain applications and chains:
 
 ```python
 from langchain.chains import LLMChain
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.langchain import LangChainMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.langchain import LangChainMonitor
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = LangChainMonitor(
     client=client,
     application_name="qa_bot",
@@ -131,15 +131,15 @@ Monitor gradient boosting models:
 
 ```python
 import xgboost as xgb
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.boosting import XGBoostMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.boosting import XGBoostMonitor
 
 # Train model
 model = xgb.XGBClassifier()
 model.fit(X_train, y_train)
 
 # Setup monitoring
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = XGBoostMonitor(
     client=client,
     model_name="fraud_detector",
@@ -155,7 +155,7 @@ predictions = monitor.predict(model, X_test, y_test)
 Create custom integrations by extending the base `ModelMonitor` class:
 
 ```python
-from whiteboxai import ModelMonitor
+from whiteboxxai import ModelMonitor
 
 class CustomMonitor(ModelMonitor):
     def __init__(self, client, model, **kwargs):

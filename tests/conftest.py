@@ -2,7 +2,7 @@
 
 import pytest
 
-from whiteboxai import WhiteBoxAI
+from whiteboxxai import WhiteBoxXAI
 
 
 @pytest.fixture
@@ -13,8 +13,8 @@ def mock_api_key():
 
 @pytest.fixture
 def client(mock_api_key):
-    """Create a WhiteBoxAI client for testing."""
-    return WhiteBoxAI(api_key=mock_api_key, base_url="http://localhost:8000", timeout=10)
+    """Create a WhiteBoxXAI client for testing."""
+    return WhiteBoxXAI(api_key=mock_api_key, base_url="http://localhost:8000", timeout=10)
 
 
 @pytest.fixture

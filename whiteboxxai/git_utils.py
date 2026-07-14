@@ -7,10 +7,16 @@ for model registration.
 
 import logging
 import os
+import shutil
 import subprocess
+from pathlib import Path
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+# Resolved once to an absolute path so a malicious "git" earlier on PATH
+# can't get picked up instead of the real executable.
+_GIT_EXECUTABLE = shutil.which("git") or "git"
 
 
 class GitContext:
@@ -95,7 +101,9 @@ def detect_git_context(path: Optional[str] = None) -> Optional[GitContext]:
             repository_url = remote.url
             # Convert SSH URLs to HTTPS
             if repository_url.startswith("git@github.com:"):
-                repository_url = repository_url.replace("git@github.com:", "https://github.com/")
+                repository_url = repository_url.replace(
+                    "git@github.com:", "https://github.com/"
+                )
             if repository_url.endswith(".git"):
                 repository_url = repository_url[:-4]
         except Exception as e:
@@ -171,8 +179,10 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         cwd = path or os.getcwd()
 
         # Check if Git is available
-        subprocess.run(
-            ["git", "--version"],
+        # Every subprocess.run call below uses a fully static argv list (no
+        # shell=True, no interpolated/untrusted strings) - nosec B603.
+        subprocess.run(  # nosec B603
+            [_GIT_EXECUTABLE, "--version"],
             capture_output=True,
             check=True,
             cwd=cwd,
@@ -181,8 +191,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get repository URL
         repository_url = None
         try:
-            result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "remote", "get-url", "origin"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -192,7 +202,9 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
 
             # Convert SSH to HTTPS
             if repository_url.startswith("git@github.com:"):
-                repository_url = repository_url.replace("git@github.com:", "https://github.com/")
+                repository_url = repository_url.replace(
+                    "git@github.com:", "https://github.com/"
+                )
             if repository_url.endswith(".git"):
                 repository_url = repository_url[:-4]
         except subprocess.CalledProcessError:
@@ -201,8 +213,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get commit SHA
         commit_sha = None
         try:
-            result = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "rev-parse", "HEAD"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -215,8 +227,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get commit message
         commit_message = None
         try:
-            result = subprocess.run(
-                ["git", "log", "-1", "--pretty=%B"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "log", "-1", "--pretty=%B"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -229,8 +241,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get commit author
         commit_author = None
         try:
-            result = subprocess.run(
-                ["git", "log", "-1", "--pretty=%an <%ae>"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "log", "-1", "--pretty=%an <%ae>"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -243,8 +255,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get branch
         branch = None
         try:
-            result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -259,8 +271,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Get tag
         tag = None
         try:
-            result = subprocess.run(
-                ["git", "describe", "--exact-match", "--tags", "HEAD"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "describe", "--exact-match", "--tags", "HEAD"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -273,8 +285,8 @@ def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitCo
         # Check if dirty
         is_dirty = False
         try:
-            result = subprocess.run(
-                ["git", "status", "--porcelain"],
+            result = subprocess.run(  # nosec B603
+                [_GIT_EXECUTABLE, "status", "--porcelain"],
                 capture_output=True,
                 text=True,
                 check=True,

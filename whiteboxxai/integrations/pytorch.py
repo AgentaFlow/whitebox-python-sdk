@@ -4,7 +4,9 @@ PyTorch Integration
 Integration for monitoring PyTorch models.
 """
 
-from typing import Any, Callable, Dict, Optional
+from __future__ import annotations
+
+from typing import Any, Callable, Dict, Optional, Union
 
 try:
     import torch
@@ -13,10 +15,18 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
-    nn = object
     torch = None
 
-from whiteboxai.monitor import ModelMonitor
+    class _NNStub:
+        """Stand-in for `torch.nn` so `nn.Module` stays resolvable (as a type
+        hint and as a base class) when PyTorch isn't installed."""
+
+        Module = object
+
+    nn = _NNStub()
+
+import numpy as np
+from whiteboxxai.monitor import ModelMonitor
 
 
 class TorchMonitor(ModelMonitor):
@@ -27,8 +37,8 @@ class TorchMonitor(ModelMonitor):
         ```python
         import torch
         import torch.nn as nn
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.pytorch import TorchMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.pytorch import TorchMonitor
 
         # Define model
         model = nn.Sequential(
@@ -38,7 +48,7 @@ class TorchMonitor(ModelMonitor):
         )
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model=model)
         monitor.register_from_model(model_type="classification")
 
@@ -53,7 +63,9 @@ class TorchMonitor(ModelMonitor):
     def __init__(self, client, model: Optional[nn.Module] = None, **kwargs):
         """Initialize PyTorch monitor."""
         if not TORCH_AVAILABLE:
-            raise ImportError("PyTorch is not installed. Install with: pip install torch")
+            raise ImportError(
+                "PyTorch is not installed. Install with: pip install torch"
+            )
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -142,7 +154,9 @@ class TorchMonitor(ModelMonitor):
 
         # Count parameters
         total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        trainable_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
 
         metadata["total_parameters"] = total_params
         metadata["trainable_parameters"] = trainable_params
@@ -164,7 +178,7 @@ class TorchWrapper(nn.Module):
     """
     Wrapper for PyTorch models with automatic monitoring.
 
-    This wrapper intercepts forward calls and logs predictions to WhiteBoxAI.
+    This wrapper intercepts forward calls and logs predictions to WhiteBoxXAI.
     """
 
     def __init__(self, model: nn.Module, monitor: TorchMonitor):
@@ -184,7 +198,9 @@ class TorchWrapper(nn.Module):
 
         return output
 
-    def _log_batch_predictions(self, inputs: torch.Tensor, outputs: torch.Tensor) -> None:
+    def _log_batch_predictions(
+        self, inputs: torch.Tensor, outputs: torch.Tensor
+    ) -> None:
         """Log batch of predictions."""
         # Convert to numpy/lists
         inputs_np = inputs.detach().cpu().numpy()
@@ -224,10 +240,10 @@ def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] =
 
     Example:
         ```python
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.pytorch import TorchMonitor, monitor_forward
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.pytorch import TorchMonitor, monitor_forward
 
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model_id=123)
 
         class MyModel(nn.Module):
@@ -249,7 +265,7 @@ def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] =
                 inputs = args[0] if args else None
 
             # Log prediction
-            if inputs is not None and isinstance(inputs, torch.Tensor):
+            if TORCH_AVAILABLE and inputs is not None and isinstance(inputs, torch.Tensor):
                 inputs_np = inputs.detach().cpu().numpy()
                 outputs_np = output.detach().cpu().numpy()
 

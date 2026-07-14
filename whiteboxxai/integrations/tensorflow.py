@@ -4,8 +4,13 @@ TensorFlow/Keras Integration
 Integration for monitoring TensorFlow and Keras models.
 """
 
+from __future__ import annotations
+
+import logging
 import warnings
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+
+logger = logging.getLogger(__name__)
 
 try:
     import tensorflow as tf
@@ -14,11 +19,19 @@ try:
     TENSORFLOW_AVAILABLE = True
 except ImportError:
     TENSORFLOW_AVAILABLE = False
-    keras = None
+    tf = None
+
+    class _KerasStub:
+        """Stand-in for `keras` so `keras.callbacks.Callback` stays
+        resolvable as a base class when TensorFlow isn't installed."""
+
+        class callbacks:
+            Callback = object
+
+    keras = _KerasStub()
 
 import numpy as np
-
-from whiteboxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
 
 
 class KerasMonitor(ModelMonitor):
@@ -28,8 +41,8 @@ class KerasMonitor(ModelMonitor):
     Example:
         ```python
         from tensorflow import keras
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.tensorflow import KerasMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.tensorflow import KerasMonitor
 
         # Build model
         model = keras.Sequential([
@@ -39,14 +52,14 @@ class KerasMonitor(ModelMonitor):
         model.compile(optimizer='adam', loss='mse')
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = KerasMonitor(client, model=model, model_name="keras_model")
 
         # Train with monitoring callback
-        from whiteboxai.integrations.tensorflow import WhiteBoxAICallback
+        from whiteboxxai.integrations.tensorflow import WhiteBoxXAICallback
 
         model.fit(X_train, y_train,
-                  callbacks=[WhiteBoxAICallback(monitor)])
+                  callbacks=[WhiteBoxXAICallback(monitor)])
 
         # Make predictions with automatic logging
         predictions = monitor.predict(X_test)
@@ -65,14 +78,16 @@ class KerasMonitor(ModelMonitor):
         Initialize Keras monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             model: Keras model to monitor
             model_name: Name for the model
             model_type: Type of model (classification, regression)
             **kwargs: Additional arguments for ModelMonitor
         """
         if not TENSORFLOW_AVAILABLE:
-            raise ImportError("TensorFlow is not installed. Install with: pip install tensorflow")
+            raise ImportError(
+                "TensorFlow is not installed. Install with: pip install tensorflow"
+            )
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -89,7 +104,7 @@ class KerasMonitor(ModelMonitor):
         **kwargs: Any,
     ) -> int:
         """
-        Register Keras model with WhiteBoxAI.
+        Register Keras model with WhiteBoxXAI.
 
         Args:
             name: Model name (default: model class name)
@@ -127,8 +142,8 @@ class KerasMonitor(ModelMonitor):
         try:
             config = self.model.get_config()
             metadata["model_config"] = str(config)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Could not read model config: {e}")
 
         # Get input/output shapes
         try:
@@ -136,8 +151,8 @@ class KerasMonitor(ModelMonitor):
                 metadata["input_shape"] = str(self.model.input_shape)
             if hasattr(self.model, "output_shape"):
                 metadata["output_shape"] = str(self.model.output_shape)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug(f"Could not read model input/output shape: {e}")
 
         # Register model
         self.model_id = self.client.register_model(
@@ -199,9 +214,9 @@ class KerasMonitor(ModelMonitor):
                 # Single prediction
                 self.log_prediction(
                     inputs=inputs_np[0] if len(inputs_np.shape) > 1 else inputs_np,
-                    prediction=(
-                        predictions_np[0] if len(predictions_np.shape) > 1 else predictions_np
-                    ),
+                    prediction=predictions_np[0]
+                    if len(predictions_np.shape) > 1
+                    else predictions_np,
                     actual=actuals[0] if actuals is not None else None,
                     **kwargs,
                 )
@@ -298,7 +313,7 @@ class KerasMonitor(ModelMonitor):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Register a SavedModel with WhiteBoxAI.
+        Register a SavedModel with WhiteBoxXAI.
 
         Args:
             model_path: Path to SavedModel directory
@@ -314,14 +329,14 @@ class KerasMonitor(ModelMonitor):
             self.register_from_model(**model_metadata)
 
 
-class WhiteBoxAICallback(keras.callbacks.Callback):
+class WhiteBoxXAICallback(keras.callbacks.Callback):
     """
     Keras callback for automatic monitoring during training.
 
     Example:
         ```python
         monitor = KerasMonitor(client, model=model, model_name="my_model")
-        callback = WhiteBoxAICallback(monitor, log_frequency=1)
+        callback = WhiteBoxXAICallback(monitor, log_frequency=1)
 
         model.fit(X_train, y_train,
                   validation_data=(X_val, y_val),
@@ -393,7 +408,9 @@ class WhiteBoxAICallback(keras.callbacks.Callback):
         self.monitor.log_custom_metric(
             "training_complete",
             {
-                "final_metrics": {k: float(v) if v is not None else None for k, v in logs.items()},
+                "final_metrics": {
+                    k: float(v) if v is not None else None for k, v in logs.items()
+                },
             },
         )
 
@@ -408,7 +425,7 @@ class TorchMonitor(ModelMonitor):
     def __init__(self, *args, **kwargs):
         warnings.warn(
             "TorchMonitor in tensorflow module is deprecated. "
-            "Use whiteboxai.integrations.pytorch.TorchMonitor instead.",
+            "Use whiteboxxai.integrations.pytorch.TorchMonitor instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -441,7 +458,7 @@ def wrap_keras_model(
         # Make prediction
         predictions = original_predict(x, *args, **kwargs)
 
-        # Log to WhiteBoxAI
+        # Log to WhiteBoxXAI
         try:
             if isinstance(x, tf.Tensor):
                 x_np = x.numpy()
@@ -469,7 +486,7 @@ def wrap_keras_model(
 
 __all__ = [
     "KerasMonitor",
-    "WhiteBoxAICallback",
+    "WhiteBoxXAICallback",
     "TorchMonitor",  # Deprecated
     "wrap_keras_model",
 ]

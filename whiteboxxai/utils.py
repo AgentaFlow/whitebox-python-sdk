@@ -1,7 +1,7 @@
 """
 SDK Utilities
 
-General utility functions for the WhiteBoxAI SDK.
+General utility functions for the WhiteBoxXAI SDK.
 """
 
 import json
@@ -47,7 +47,10 @@ def validate_model_type(model_type: str) -> bool:
         model_type: Model type string
 
     Returns:
-        True if valid, False otherwise
+        True if valid
+
+    Raises:
+        ValueError: If model_type is not a recognized type
     """
     valid_types = {
         "classification",
@@ -61,7 +64,11 @@ def validate_model_type(model_type: str) -> bool:
         "computer_vision",
         "other",
     }
-    return model_type.lower() in valid_types
+    if model_type.lower() not in valid_types:
+        raise ValueError(
+            f"Invalid model type: {model_type!r}. Must be one of {sorted(valid_types)}."
+        )
+    return True
 
 
 def extract_feature_names(data: Union[np.ndarray, pd.DataFrame, Dict]) -> List[str]:
@@ -227,7 +234,7 @@ def validate_features(features: Any) -> bool:
         raise ValueError(f"Unsupported features type: {type(features)}")
 
 
-def format_features(features: Any) -> Dict[str, Any]:
+def format_features(features: Any) -> Union[List[Any], Dict[str, Any]]:
     """
     Format features for API transmission.
 
@@ -235,14 +242,15 @@ def format_features(features: Any) -> Dict[str, Any]:
         features: Features to format
 
     Returns:
-        Formatted features dictionary
+        Formatted features as a list (list/tuple/numpy array input) or a
+        dictionary (dict input, returned as-is).
     """
     if isinstance(features, dict):
         return features
     elif isinstance(features, (list, tuple, np.ndarray)):
-        return {"features": serialize_data(features)}
+        return serialize_data(features)
     else:
-        return {"features": features}
+        return serialize_data(features)
 
 
 def validate_prediction(prediction: Any) -> bool:
@@ -263,17 +271,21 @@ def validate_prediction(prediction: Any) -> bool:
     return True
 
 
-def serialize_numpy(arr: np.ndarray) -> List:
+def serialize_numpy(arr: Any) -> List:
     """
-    Serialize numpy array to list.
+    Serialize numpy array (or array-like) to list.
 
     Args:
-        arr: Numpy array
+        arr: Numpy array, or any array-like object (e.g. a plain list)
 
     Returns:
         List representation
     """
-    return arr.tolist()
+    if isinstance(arr, np.ndarray):
+        return arr.tolist()
+    if hasattr(arr, "tolist"):
+        return arr.tolist()
+    return list(arr)
 
 
 def deserialize_numpy(data: List) -> np.ndarray:
@@ -289,29 +301,63 @@ def deserialize_numpy(data: List) -> np.ndarray:
     return np.array(data)
 
 
-def compute_metrics(y_true: Any, y_pred: Any) -> Dict[str, float]:
+def compute_metrics(
+    y_true: Any, y_pred: Any, task: str = "classification"
+) -> Dict[str, float]:
     """
     Compute basic metrics for predictions.
 
     Args:
         y_true: True labels
         y_pred: Predicted labels
+        task: Type of task - "classification" or "regression"
 
     Returns:
         Dictionary of metrics
+
+    Raises:
+        ValueError: If task is not recognized, or y_true/y_pred lengths differ
     """
+    if task not in ("classification", "regression"):
+        raise ValueError(
+            f"Unsupported task: {task!r}. Must be 'classification' or 'regression'."
+        )
+
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
 
-    metrics = {}
+    if y_true.shape[0] != y_pred.shape[0]:
+        raise ValueError(
+            "y_true and y_pred must have the same length "
+            f"(got {y_true.shape[0]} and {y_pred.shape[0]})."
+        )
 
-    # Basic accuracy for classification
-    if y_true.dtype == y_pred.dtype and np.issubdtype(y_true.dtype, np.integer):
+    metrics: Dict[str, float] = {}
+
+    if task == "classification":
         metrics["accuracy"] = float(np.mean(y_true == y_pred))
+
+        precisions = []
+        recalls = []
+        for cls in np.unique(y_true):
+            predicted_positive = np.sum(y_pred == cls)
+            actual_positive = np.sum(y_true == cls)
+            true_positive = np.sum((y_pred == cls) & (y_true == cls))
+
+            precisions.append(
+                true_positive / predicted_positive if predicted_positive > 0 else 0.0
+            )
+            recalls.append(
+                true_positive / actual_positive if actual_positive > 0 else 0.0
+            )
+
+        metrics["precision"] = float(np.mean(precisions))
+        metrics["recall"] = float(np.mean(recalls))
     else:
-        # MSE for regression
-        metrics["mse"] = float(np.mean((y_true - y_pred) ** 2))
+        mse = float(np.mean((y_true - y_pred) ** 2))
+        metrics["mse"] = mse
         metrics["mae"] = float(np.mean(np.abs(y_true - y_pred)))
+        metrics["rmse"] = float(np.sqrt(mse))
 
     return metrics
 

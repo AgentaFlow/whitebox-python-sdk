@@ -1,22 +1,24 @@
 """
 TensorFlow/Keras Integration Example
 
-This example demonstrates how to use WhiteBoxAI with TensorFlow/Keras models.
+This example demonstrates how to use WhiteBoxXAI with TensorFlow/Keras models.
 """
 
+import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 # TensorFlow imports
 try:
+    import tensorflow as tf
     from tensorflow import keras
 except ImportError:
     print("TensorFlow not installed. Install with: pip install tensorflow")
     exit(1)
 
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.tensorflow import KerasMonitor, WhiteBoxAICallback
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.tensorflow import KerasMonitor, WhiteBoxXAICallback
 
 
 def main():
@@ -27,11 +29,18 @@ def main():
     # Generate synthetic classification data
     print("\n1. Generating synthetic data...")
     X, y = make_classification(
-        n_samples=1000, n_features=20, n_informative=15, n_redundant=5, n_classes=2, random_state=42
+        n_samples=1000,
+        n_features=20,
+        n_informative=15,
+        n_redundant=5,
+        n_classes=2,
+        random_state=42,
     )
 
     # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
     # Standardize features
     scaler = StandardScaler()
@@ -63,9 +72,9 @@ def main():
 
     print(f"   Model built with {model.count_params():,} parameters")
 
-    # Initialize WhiteBoxAI
-    print("\n3. Initializing WhiteBoxAI monitoring...")
-    client = WhiteBoxAI(api_key="demo-api-key", base_url="http://localhost:8000")
+    # Initialize WhiteBoxXAI
+    print("\n3. Initializing WhiteBoxXAI monitoring...")
+    client = WhiteBoxXAI(api_key="demo-api-key", base_url="http://localhost:8000")
 
     # Create Keras monitor
     monitor = KerasMonitor(
@@ -87,9 +96,9 @@ def main():
     monitor.set_baseline(X_train, y_train)
     print("   ✓ Baseline set")
 
-    # Create WhiteBoxAI callback
-    print("\n5. Training model with WhiteBoxAI monitoring...")
-    callback = WhiteBoxAICallback(
+    # Create WhiteBoxXAI callback
+    print("\n5. Training model with WhiteBoxXAI monitoring...")
+    callback = WhiteBoxXAICallback(
         monitor=monitor, log_frequency=5, log_validation=True  # Log every 5 epochs
     )
 
@@ -140,7 +149,9 @@ def main():
         prob = predictions[i][0]
         pred_class = 1 if prob > 0.5 else 0
         actual = y_test[i]
-        print(f"   Sample {i+1}: Predicted={pred_class} (prob={prob:.3f}), Actual={actual}")
+        print(
+            f"   Sample {i+1}: Predicted={pred_class} (prob={prob:.3f}), Actual={actual}"
+        )
 
     # Save model
     print("\n9. Saving model...")
@@ -151,7 +162,7 @@ def main():
     monitor.register_saved_model(
         model_path="models/keras_binary_classifier", metadata={"format": "SavedModel"}
     )
-    print("   ✓ SavedModel registered with WhiteBoxAI")
+    print("   ✓ SavedModel registered with WhiteBoxXAI")
 
     # Check drift
     print("\n10. Checking for data drift...")

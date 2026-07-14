@@ -114,4 +114,6 @@ def cache_key(*args, **kwargs) -> str:
         "kwargs": sorted(kwargs.items()),
     }
     key_str = json.dumps(key_data, sort_keys=True)
-    return hashlib.md5(key_str.encode()).hexdigest()
+    # Cache key, not a security control - usedforsecurity=False keeps this fast
+    # and avoids flagging MD5 as if it protected something sensitive.
+    return hashlib.md5(key_str.encode(), usedforsecurity=False).hexdigest()

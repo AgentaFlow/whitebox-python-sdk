@@ -1,5 +1,5 @@
 """
-Offline mode support for WhiteBoxAI SDK.
+Offline mode support for WhiteBoxXAI SDK.
 
 This module provides offline queueing capabilities for the SDK, allowing
 operations to be queued locally when the API is unavailable and synced
@@ -15,11 +15,11 @@ Features:
 Example:
     Enable offline mode:
 
-    >>> from whiteboxai import WhiteBoxAI
-    >>> client = WhiteBoxAI(
+    >>> from whiteboxxai import WhiteBoxXAI
+    >>> client = WhiteBoxXAI(
     ...     api_key="your-api-key",
     ...     enable_offline=True,
-    ...     offline_dir="./whiteboxai_offline"
+    ...     offline_dir="./whiteboxxai_offline"
     ... )
     >>>
     >>> # Operations are queued when offline
@@ -34,9 +34,11 @@ import logging
 import os
 import sqlite3
 import threading
+import time
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,9 @@ class OfflineQueue:
         auto_sync: Whether to automatically sync when connection available
     """
 
-    def __init__(self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True):
+    def __init__(
+        self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True
+    ):
         """
         Initialize offline queue.
 
@@ -143,7 +147,9 @@ class OfflineQueue:
             if self.max_queue_size > 0:
                 current_size = self.get_queue_size()
                 if current_size >= self.max_queue_size:
-                    raise ValueError(f"Queue is full ({current_size}/{self.max_queue_size})")
+                    raise ValueError(
+                        f"Queue is full ({current_size}/{self.max_queue_size})"
+                    )
 
             # Insert operation
             with sqlite3.connect(self.db_path) as conn:
@@ -160,7 +166,9 @@ class OfflineQueue:
             logger.info(f"Queued operation {op_id}: {operation_type.value}")
             return op_id
 
-    def dequeue(self, limit: int = 100) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
+    def dequeue(
+        self, limit: int = 100
+    ) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
         """
         Get pending operations from queue.
 
@@ -189,7 +197,9 @@ class OfflineQueue:
                 operations = []
                 for row in cursor.fetchall():
                     op_id, op_type, data_json = row
-                    operations.append((op_id, OperationType(op_type), json.loads(data_json)))
+                    operations.append(
+                        (op_id, OperationType(op_type), json.loads(data_json))
+                    )
 
                 return operations
 
@@ -278,7 +288,9 @@ class OfflineQueue:
         """
         with sqlite3.connect(self.db_path) as conn:
             if status:
-                cursor = conn.execute("SELECT COUNT(*) FROM queue WHERE status = ?", (status,))
+                cursor = conn.execute(
+                    "SELECT COUNT(*) FROM queue WHERE status = ?", (status,)
+                )
             else:
                 cursor = conn.execute("SELECT COUNT(*) FROM queue")
 
@@ -330,7 +342,9 @@ class OfflineQueue:
                 conn.commit()
 
         if deleted > 0:
-            logger.info(f"Cleared {deleted} completed operations older than {older_than_days} days")
+            logger.info(
+                f"Cleared {deleted} completed operations older than {older_than_days} days"
+            )
 
     def clear_all(self):
         """Clear all operations from queue (use with caution)."""
@@ -377,7 +391,7 @@ class OfflineQueue:
 
 class OfflineManager:
     """
-    Manages offline mode for WhiteBoxAI SDK.
+    Manages offline mode for WhiteBoxXAI SDK.
 
     Handles automatic queueing when offline and syncing when online.
 
@@ -389,7 +403,7 @@ class OfflineManager:
 
     def __init__(
         self,
-        offline_dir: str = "./whiteboxai_offline",
+        offline_dir: str = "./whiteboxxai_offline",
         max_queue_size: int = 10000,
         auto_sync: bool = True,
         sync_interval: int = 60,
@@ -417,17 +431,17 @@ class OfflineManager:
         self.max_retries = max_retries
         self._sync_thread = None
         self._stop_sync = threading.Event()
-        self._client = None  # Will be set by WhiteBoxAI client
+        self._client = None  # Will be set by WhiteBoxXAI client
 
         if auto_sync:
             self.start_auto_sync()
 
     def set_client(self, client):
         """
-        Set the WhiteBoxAI client for syncing.
+        Set the WhiteBoxXAI client for syncing.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
         """
         self._client = client
 
@@ -435,7 +449,9 @@ class OfflineManager:
         """Start automatic sync thread."""
         if self._sync_thread is None or not self._sync_thread.is_alive():
             self._stop_sync.clear()
-            self._sync_thread = threading.Thread(target=self._auto_sync_loop, daemon=True)
+            self._sync_thread = threading.Thread(
+                target=self._auto_sync_loop, daemon=True
+            )
             self._sync_thread.start()
             logger.info("Started automatic sync thread")
 

@@ -4,12 +4,12 @@ Scikit-learn Integration Example
 This example demonstrates monitoring scikit-learn models.
 """
 
+import numpy as np
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.sklearn import SklearnMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.sklearn import SklearnMonitor
 
 
 def main():
@@ -24,7 +24,9 @@ def main():
     )
 
     # Split data
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=42
+    )
 
     # Train model
     print("Training Random Forest model...")
@@ -35,8 +37,8 @@ def main():
     print(f"Model accuracy: {accuracy:.3f}")
 
     # Setup monitoring
-    print("\nSetting up WhiteBoxAI monitoring...")
-    client = WhiteBoxAI(api_key="your-api-key")
+    print("\nSetting up WhiteBoxXAI monitoring...")
+    client = WhiteBoxXAI(api_key="your-api-key")
     monitor = SklearnMonitor(client, model=model)
 
     # Register model with automatic metadata extraction
