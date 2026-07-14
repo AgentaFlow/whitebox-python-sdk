@@ -1,5 +1,5 @@
 """
-LangChain Multi-Agent Integration for WhiteBoxAI
+LangChain Multi-Agent Integration for WhiteBoxXAI
 
 Enhanced callback handler for monitoring multi-agent LangChain workflows including:
 - LangGraph multi-agent patterns
@@ -15,9 +15,9 @@ from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import AgentAction, AgentFinish, LLMResult
 
 try:
-    from whiteboxai import WhiteBoxAI
+    from whiteboxxai import WhiteBoxXAI
 except ImportError:
-    WhiteBoxAI = None
+    WhiteBoxXAI = None
 
 
 class MultiAgentCallbackHandler(BaseCallbackHandler):
@@ -33,16 +33,16 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
     Example:
         ```python
         from langchain.agents import AgentExecutor, create_react_agent
-        from whiteboxai.integrations import MultiAgentCallbackHandler
+        from whiteboxxai.integrations import MultiAgentCallbackHandler
 
-        # Initialize WhiteBoxAI client
-        client = WhiteBoxAI(api_key="your_key")
+        # Initialize WhiteBoxXAI client
+        client = WhiteBoxXAI(api_key="your_key")
 
         # Create workflow
         workflow_id = client.agent_workflows.create(
             name="Research Workflow",
             framework="langchain"
-        ).get("id")
+        ).id
 
         # Start workflow
         client.agent_workflows.start(workflow_id)
@@ -72,7 +72,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
 
     def __init__(
         self,
-        client: "WhiteBoxAI",
+        client: "WhiteBoxXAI",
         workflow_id: str,
         agent_name: str = "main",
         agent_role: Optional[str] = None,
@@ -82,16 +82,16 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         """Initialize the callback handler.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             workflow_id: ID of the workflow to track
             agent_name: Name of the current agent
             agent_role: Role/description of the agent
             track_tokens: Whether to track token usage
             track_costs: Whether to estimate costs
         """
-        if WhiteBoxAI is None:
+        if WhiteBoxXAI is None:
             raise ImportError(
-                "whiteboxai package not installed. " "Install with: pip install whiteboxai"
+                "whiteboxxai package not installed. " "Install with: pip install whiteboxxai"
             )
 
         self.client = client
@@ -268,7 +268,7 @@ class LangGraphMultiAgentMonitor:
     Example:
         ```python
         from langgraph.graph import StateGraph
-        from whiteboxai.integrations import LangGraphMultiAgentMonitor
+        from whiteboxxai.integrations import LangGraphMultiAgentMonitor
 
         # Create monitor
         monitor = LangGraphMultiAgentMonitor(
@@ -297,18 +297,21 @@ class LangGraphMultiAgentMonitor:
     """
 
     def __init__(
-        self, client: "WhiteBoxAI", workflow_name: str, meta_data: Optional[Dict[str, Any]] = None
+        self,
+        client: "WhiteBoxXAI",
+        workflow_name: str,
+        meta_data: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the LangGraph monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             workflow_name: Name for the workflow
             meta_data: Additional meta_data to attach
         """
-        if WhiteBoxAI is None:
+        if WhiteBoxXAI is None:
             raise ImportError(
-                "whiteboxai package not installed. " "Install with: pip install whiteboxai"
+                "whiteboxxai package not installed. " "Install with: pip install whiteboxxai"
             )
 
         self.client = client
@@ -455,11 +458,15 @@ class LangGraphMultiAgentMonitor:
             }
         except Exception as e:
             print(f"Warning: Failed to retrieve analytics: {e}")
-            return {"workflow_id": self.workflow_id, "status": status, "outputs": outputs}
+            return {
+                "workflow_id": self.workflow_id,
+                "status": status,
+                "outputs": outputs,
+            }
 
 
 def monitor_langchain_agent(
-    client: "WhiteBoxAI",
+    client: "WhiteBoxXAI",
     agent_executor: Any,
     workflow_name: str,
     agent_name: str = "main",
@@ -469,7 +476,7 @@ def monitor_langchain_agent(
     """Helper function to monitor a single LangChain agent execution.
 
     Args:
-        client: WhiteBoxAI client
+        client: WhiteBoxXAI client
         agent_executor: LangChain AgentExecutor instance
         workflow_name: Name for the workflow
         agent_name: Name of the agent
@@ -482,7 +489,7 @@ def monitor_langchain_agent(
     Example:
         ```python
         from langchain.agents import AgentExecutor, create_react_agent
-        from whiteboxai.integrations import monitor_langchain_agent
+        from whiteboxxai.integrations import monitor_langchain_agent
 
         result_dict = monitor_langchain_agent(
             client=client,
@@ -522,4 +529,9 @@ def monitor_langchain_agent(
         # Log failure
         client.agent_workflows.complete(workflow_id, outputs={"error": str(e)}, status="failed")
 
-        return {"result": None, "workflow_id": workflow_id, "status": "failed", "error": str(e)}
+        return {
+            "result": None,
+            "workflow_id": workflow_id,
+            "status": "failed",
+            "error": str(e),
+        }

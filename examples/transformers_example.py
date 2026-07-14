@@ -1,16 +1,16 @@
 """
 Hugging Face Transformers Integration Example
 
-This example demonstrates how to use WhiteBoxAI to monitor Hugging Face Transformers models.
+This example demonstrates how to use WhiteBoxXAI to monitor Hugging Face Transformers models.
 """
 
 import os
 
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.transformers import TransformersMonitor, wrap_transformers_pipeline
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.transformers import TransformersMonitor, wrap_transformers_pipeline
 
 # Optional: Set API key
-os.environ["WHITEBOXAI_API_KEY"] = "your-api-key-here"
+os.environ["WHITEBOXXAI_API_KEY"] = "your-api-key-here"
 
 
 def example_sentiment_analysis():
@@ -21,8 +21,8 @@ def example_sentiment_analysis():
     print("Sentiment Analysis Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Load sentiment analysis pipeline
     classifier = pipeline("sentiment-analysis")
@@ -78,8 +78,8 @@ def example_ner():
     print("Named Entity Recognition Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Load NER pipeline
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
@@ -115,8 +115,8 @@ def example_text_generation():
     print("Text Generation Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Load text generation pipeline (using smaller GPT-2 for demo)
     generator = pipeline("text-generation", model="gpt2")
@@ -160,8 +160,8 @@ def example_wrapped_pipeline():
     print("Wrapped Pipeline Example (Auto-logging)")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Load pipeline
     classifier = pipeline("sentiment-analysis")
@@ -202,8 +202,8 @@ def example_batch_prediction():
     print("Batch Prediction Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Load pipeline
     classifier = pipeline("sentiment-analysis")
@@ -239,7 +239,7 @@ def example_batch_prediction():
 def main():
     """Run all examples."""
     print("\n" + "=" * 60)
-    print("WhiteBoxAI - Hugging Face Transformers Integration Examples")
+    print("WhiteBoxXAI - Hugging Face Transformers Integration Examples")
     print("=" * 60)
 
     try:

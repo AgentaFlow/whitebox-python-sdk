@@ -4,6 +4,8 @@ PyTorch Integration
 Integration for monitoring PyTorch models.
 """
 
+from __future__ import annotations
+
 from typing import Any, Callable, Dict, Optional
 
 try:
@@ -13,10 +15,17 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
-    nn = object
     torch = None
 
-from whiteboxai.monitor import ModelMonitor
+    class _NNStub:
+        """Stand-in for `torch.nn` so `nn.Module` stays resolvable (as a type
+        hint and as a base class) when PyTorch isn't installed."""
+
+        Module = object
+
+    nn = _NNStub()
+
+from whiteboxxai.monitor import ModelMonitor
 
 
 class TorchMonitor(ModelMonitor):
@@ -27,8 +36,8 @@ class TorchMonitor(ModelMonitor):
         ```python
         import torch
         import torch.nn as nn
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.pytorch import TorchMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.pytorch import TorchMonitor
 
         # Define model
         model = nn.Sequential(
@@ -38,7 +47,7 @@ class TorchMonitor(ModelMonitor):
         )
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model=model)
         monitor.register_from_model(model_type="classification")
 
@@ -164,7 +173,7 @@ class TorchWrapper(nn.Module):
     """
     Wrapper for PyTorch models with automatic monitoring.
 
-    This wrapper intercepts forward calls and logs predictions to WhiteBoxAI.
+    This wrapper intercepts forward calls and logs predictions to WhiteBoxXAI.
     """
 
     def __init__(self, model: nn.Module, monitor: TorchMonitor):
@@ -224,10 +233,10 @@ def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] =
 
     Example:
         ```python
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.pytorch import TorchMonitor, monitor_forward
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.pytorch import TorchMonitor, monitor_forward
 
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model_id=123)
 
         class MyModel(nn.Module):
@@ -249,7 +258,7 @@ def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] =
                 inputs = args[0] if args else None
 
             # Log prediction
-            if inputs is not None and isinstance(inputs, torch.Tensor):
+            if TORCH_AVAILABLE and inputs is not None and isinstance(inputs, torch.Tensor):
                 inputs_np = inputs.detach().cpu().numpy()
                 outputs_np = output.detach().cpu().numpy()
 

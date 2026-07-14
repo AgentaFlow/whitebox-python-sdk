@@ -8,7 +8,7 @@ pytest.importorskip("sklearn")
 from sklearn.datasets import make_classification  # noqa: E402
 from sklearn.ensemble import RandomForestClassifier  # noqa: E402
 
-from whiteboxai.integrations.sklearn import SklearnMonitor  # noqa: E402
+from whiteboxxai.integrations.sklearn import SklearnMonitor  # noqa: E402
 
 
 class TestSklearnIntegration:

@@ -1,7 +1,7 @@
 """
-WhiteBoxAI Client
+WhiteBoxXAI Client
 
-Main client class for interacting with the WhiteBoxAI API.
+Main client class for interacting with the WhiteBoxXAI API.
 """
 
 import asyncio
@@ -12,13 +12,13 @@ from urllib.parse import urljoin
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from whiteboxai.config import Config
-from whiteboxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
-from whiteboxai.resources import (
-    AgentWorkflowsResource,
+from whiteboxxai.config import Config
+from whiteboxxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
+from whiteboxxai.resources import (
     AlertsResource,
     DriftResource,
     ExplanationsResource,
+    FairnessResource,
     ModelsResource,
     PredictionsResource,
 )
@@ -26,32 +26,32 @@ from whiteboxai.resources import (
 logger = logging.getLogger(__name__)
 
 
-class WhiteBoxAI:
+class WhiteBoxXAI:
     """
-    Main client for WhiteBoxAI SDK.
+    Main client for WhiteBoxXAI SDK.
 
-    Provides access to all WhiteBoxAI API resources including models, predictions,
-    explanations, drift detection, and alerting.
+    Provides access to all WhiteBoxXAI API resources including models, predictions,
+    explanations, drift detection, fairness/bias audits, and alerting.
 
     Args:
-        api_key: WhiteBoxAI API key
-        base_url: Base URL for WhiteBoxAI API (default: https://api.whiteboxai.io)
+        api_key: WhiteBoxXAI API key
+        base_url: Base URL for WhiteBoxXAI API (default: https://api.whiteboxxai.com)
         timeout: Request timeout in seconds (default: 30)
         max_retries: Maximum number of retry attempts (default: 3)
         enable_offline: Enable offline mode (queues operations when API unavailable)
-        offline_dir: Directory for offline queue storage (default: ./whiteboxai_offline)
+        offline_dir: Directory for offline queue storage (default: ./whiteboxxai_offline)
         offline_max_queue_size: Maximum operations to queue (default: 10000, 0 = unlimited)
         offline_auto_sync: Enable automatic syncing (default: True)
         offline_sync_interval: Seconds between sync attempts (default: 60)
         **kwargs: Additional configuration options
 
     Example:
-        >>> client = WhiteBoxAI(api_key="your_api_key")
+        >>> client = WhiteBoxXAI(api_key="your_api_key")
         >>> model = client.models.register(name="fraud_detection", model_type="classification")
         >>> client.predictions.log(model_id=model.id, inputs=features, outputs=prediction)
 
         With offline mode:
-        >>> client = WhiteBoxAI(
+        >>> client = WhiteBoxXAI(
         ...     api_key="your_api_key",
         ...     enable_offline=True,
         ...     offline_dir="./offline_queue"
@@ -63,17 +63,17 @@ class WhiteBoxAI:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.whiteboxai.io",
+        base_url: str = "https://api.whiteboxxai.com",
         timeout: int = 30,
         max_retries: int = 3,
         enable_offline: bool = False,
-        offline_dir: str = "./whiteboxai_offline",
+        offline_dir: str = "./whiteboxxai_offline",
         offline_max_queue_size: int = 10000,
         offline_auto_sync: bool = True,
         offline_sync_interval: int = 60,
         **kwargs: Any,
     ):
-        """Initialize WhiteBoxAI client."""
+        """Initialize WhiteBoxXAI client."""
         self.config = Config(
             api_key=api_key,
             base_url=base_url,
@@ -89,7 +89,7 @@ class WhiteBoxAI:
         # Initialize offline mode
         self._offline_manager = None
         if enable_offline:
-            from whiteboxai.offline import OfflineManager
+            from whiteboxxai.offline import OfflineManager
 
             self._offline_manager = OfflineManager(
                 offline_dir=offline_dir,
@@ -105,8 +105,8 @@ class WhiteBoxAI:
         self.predictions = PredictionsResource(self)
         self.explanations = ExplanationsResource(self)
         self.drift = DriftResource(self)
+        self.fairness = FairnessResource(self)
         self.alerts = AlertsResource(self)
-        self.agent_workflows = AgentWorkflowsResource(self)
 
     @property
     def sync_client(self) -> httpx.Client:
@@ -135,7 +135,7 @@ class WhiteBoxAI:
         return {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
-            "User-Agent": f"whiteboxai-python-sdk/{self.config.sdk_version}",
+            "User-Agent": f"whiteboxxai-python-sdk/{self.config.sdk_version}",
         }
 
     @retry(
@@ -239,13 +239,24 @@ class WhiteBoxAI:
             APIError: For other error status codes
         """
         if response.status_code == 401:
-            raise AuthenticationError("Invalid API key or authentication failed")
+            raise AuthenticationError(
+                "Invalid API key or authentication failed",
+                status_code=response.status_code,
+            )
         elif response.status_code == 429:
-            raise RateLimitError("Rate limit exceeded. Please retry later.")
+            retry_after = response.headers.get("Retry-After")
+            raise RateLimitError(
+                "Rate limit exceeded. Please retry later.",
+                retry_after=int(retry_after)
+                if isinstance(retry_after, str) and retry_after.isdigit()
+                else None,
+            )
         elif response.status_code == 422:
             try:
                 error_data = response.json()
-                raise ValidationError(f"Validation error: {error_data}")
+                raise ValidationError(f"Validation error: {error_data}", fields=error_data)
+            except ValidationError:
+                raise
             except Exception:
                 raise ValidationError("Validation error occurred")
         elif response.status_code >= 400:
@@ -253,8 +264,14 @@ class WhiteBoxAI:
                 error_data = response.json()
                 message = error_data.get("detail", response.text)
             except Exception:
+                error_data = None
                 message = response.text
-            raise APIError(f"API error ({response.status_code}): {message}")
+            raise APIError(
+                f"API error ({response.status_code}): {message}",
+                status_code=response.status_code,
+                response=error_data,
+                request_id=response.headers.get("X-Request-ID"),
+            )
 
         try:
             return response.json()
@@ -337,7 +354,7 @@ class WhiteBoxAI:
         if self._sync_client:
             self._sync_client.close()
 
-    def __enter__(self) -> "WhiteBoxAI":
+    def __enter__(self) -> "WhiteBoxXAI":
         """Context manager entry."""
         return self
 
@@ -345,7 +362,7 @@ class WhiteBoxAI:
         """Context manager exit."""
         self.close()
 
-    async def __aenter__(self) -> "WhiteBoxAI":
+    async def __aenter__(self) -> "WhiteBoxXAI":
         """Async context manager entry."""
         return self
 

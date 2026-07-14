@@ -1,6 +1,6 @@
 # Hugging Face Transformers Integration Guide
 
-This guide demonstrates how to use WhiteBoxAI to monitor Hugging Face Transformers models for NLP tasks including text classification, named entity recognition, question answering, and text generation.
+This guide demonstrates how to use WhiteBoxXAI to monitor Hugging Face Transformers models for NLP tasks including text classification, named entity recognition, question answering, and text generation.
 
 ## Table of Contents
 
@@ -14,27 +14,27 @@ This guide demonstrates how to use WhiteBoxAI to monitor Hugging Face Transforme
 
 ## Installation
 
-Install WhiteBoxAI SDK with Transformers support:
+Install WhiteBoxXAI SDK with Transformers support:
 
 ```bash
-pip install whiteboxai[transformers]
+pip install whiteboxxai[transformers]
 ```
 
 Or install dependencies separately:
 
 ```bash
-pip install whiteboxai transformers torch
+pip install whiteboxxai transformers torch
 ```
 
 ## Quick Start
 
 ```python
 from transformers import pipeline
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.transformers import TransformersMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.transformers import TransformersMonitor
 
 # Initialize client
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 
 # Load Hugging Face pipeline
 classifier = pipeline("sentiment-analysis")
@@ -59,13 +59,13 @@ print(result)  # [{'label': 'POSITIVE', 'score': 0.9998}]
 
 ## Supported Tasks
 
-WhiteBoxAI supports all major Hugging Face Transformers tasks:
+WhiteBoxXAI supports all major Hugging Face Transformers tasks:
 
 ### Text Classification
 
 ```python
 from transformers import pipeline
-from whiteboxai.integrations.transformers import TransformersMonitor
+from whiteboxxai.integrations.transformers import TransformersMonitor
 
 # Sentiment analysis
 classifier = pipeline("sentiment-analysis")
@@ -182,7 +182,7 @@ summary = monitor.predict(article, max_length=130, min_length=30, log=True)
 ### Method 1: Using TransformersMonitor
 
 ```python
-from whiteboxai.integrations.transformers import TransformersMonitor
+from whiteboxxai.integrations.transformers import TransformersMonitor
 
 # Create monitor
 monitor = TransformersMonitor(
@@ -208,7 +208,7 @@ results = monitor.predict(["Text 1", "Text 2"], log=True)
 ### Method 2: Using Pipeline Wrapper
 
 ```python
-from whiteboxai.integrations.transformers import wrap_transformers_pipeline
+from whiteboxxai.integrations.transformers import wrap_transformers_pipeline
 
 # Wrap pipeline for auto-logging
 wrapped_classifier = wrap_transformers_pipeline(classifier, monitor)
@@ -220,7 +220,7 @@ result = wrapped_classifier("Input text")
 ### Method 3: Using TransformersPipelineWrapper
 
 ```python
-from whiteboxai.integrations.transformers import TransformersPipelineWrapper
+from whiteboxxai.integrations.transformers import TransformersPipelineWrapper
 
 # Wrap pipeline (with auto-registration)
 wrapper = TransformersPipelineWrapper(
@@ -528,7 +528,7 @@ See complete examples in:
 Main class for monitoring Transformers models.
 
 **Methods**:
-- `register_from_model()` - Register model with WhiteBoxAI
+- `register_from_model()` - Register model with WhiteBoxXAI
 - `predict()` - Make predictions with logging
 - `set_baseline()` - Set baseline data for drift detection
 - `log_generation_metrics()` - Log text generation metrics
@@ -544,6 +544,6 @@ Function to wrap existing pipelines.
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/whiteboxai/whiteboxai
-- Documentation: https://docs.whiteboxai.com
-- Email: support@whiteboxai.com
+- GitHub Issues: https://github.com/whiteboxxai/whiteboxxai
+- Documentation: https://docs.whiteboxxai.com
+- Email: support@whiteboxxai.com

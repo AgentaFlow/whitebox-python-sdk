@@ -1,5 +1,5 @@
 """
-XGBoost and LightGBM integration for WhiteBoxAI.
+XGBoost and LightGBM integration for WhiteBoxXAI.
 
 This module provides monitoring capabilities for gradient boosting models
 from XGBoost and LightGBM frameworks. It supports both frameworks through
@@ -10,10 +10,10 @@ Example:
     Basic XGBoost monitoring:
 
     >>> import xgboost as xgb
-    >>> from whiteboxai import WhiteBoxAI
-    >>> from whiteboxai.integrations.boosting import XGBoostMonitor
+    >>> from whiteboxxai import WhiteBoxXAI
+    >>> from whiteboxxai.integrations.boosting import XGBoostMonitor
     >>>
-    >>> client = WhiteBoxAI(api_key="your-api-key")
+    >>> client = WhiteBoxXAI(api_key="your-api-key")
     >>> monitor = XGBoostMonitor(client=client, model_name="fraud_detector")
     >>>
     >>> model = xgb.XGBClassifier()
@@ -25,7 +25,7 @@ Example:
     LightGBM monitoring:
 
     >>> import lightgbm as lgb
-    >>> from whiteboxai.integrations.boosting import LightGBMMonitor
+    >>> from whiteboxxai.integrations.boosting import LightGBMMonitor
     >>>
     >>> monitor = LightGBMMonitor(client=client, model_name="churn_predictor")
     >>>
@@ -36,12 +36,15 @@ Example:
     >>> predictions = monitor.predict(model, X_test, y_test)
 """
 
+import logging
 import warnings
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from ..core import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
+
+logger = logging.getLogger(__name__)
 
 # Optional imports - graceful degradation
 try:
@@ -69,7 +72,7 @@ class XGBoostMonitor(ModelMonitor):
     logging, feature importance tracking, and automatic model registration.
 
     Attributes:
-        client: WhiteBoxAI client instance
+        client: WhiteBoxXAI client instance
         model_name: Name of the model being monitored
         track_feature_importance: Whether to track feature importance with predictions
         importance_type: Type of importance to track ('weight', 'gain', 'cover', 'total_gain', 'total_cover')
@@ -97,7 +100,7 @@ class XGBoostMonitor(ModelMonitor):
         Initialize XGBoost monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             model_name: Name of the model
             track_feature_importance: Whether to track feature importance
             importance_type: Type of importance ('weight', 'gain', 'cover', 'total_gain', 'total_cover')
@@ -120,7 +123,7 @@ class XGBoostMonitor(ModelMonitor):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Register XGBoost model with WhiteBoxAI.
+        Register XGBoost model with WhiteBoxXAI.
 
         Automatically extracts model metadata including feature names,
         number of features, number of trees, and feature importance.
@@ -213,7 +216,7 @@ class XGBoostMonitor(ModelMonitor):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
-        Make predictions and log to WhiteBoxAI.
+        Make predictions and log to WhiteBoxXAI.
 
         Args:
             model: XGBoost model
@@ -233,8 +236,8 @@ class XGBoostMonitor(ModelMonitor):
         if hasattr(model, "predict_proba"):
             try:
                 probabilities = model.predict_proba(X)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"predict_proba failed, continuing without probabilities: {e}")
 
         # Log predictions
         if log_predictions:
@@ -302,7 +305,7 @@ class LightGBMMonitor(ModelMonitor):
     logging, feature importance tracking, and automatic model registration.
 
     Attributes:
-        client: WhiteBoxAI client instance
+        client: WhiteBoxXAI client instance
         model_name: Name of the model being monitored
         track_feature_importance: Whether to track feature importance with predictions
         importance_type: Type of importance to track ('split' or 'gain')
@@ -330,7 +333,7 @@ class LightGBMMonitor(ModelMonitor):
         Initialize LightGBM monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             model_name: Name of the model
             track_feature_importance: Whether to track feature importance
             importance_type: Type of importance ('split' or 'gain')
@@ -353,7 +356,7 @@ class LightGBMMonitor(ModelMonitor):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Register LightGBM model with WhiteBoxAI.
+        Register LightGBM model with WhiteBoxXAI.
 
         Automatically extracts model metadata including feature names,
         number of features, number of trees, and feature importance.
@@ -448,7 +451,7 @@ class LightGBMMonitor(ModelMonitor):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> np.ndarray:
         """
-        Make predictions and log to WhiteBoxAI.
+        Make predictions and log to WhiteBoxXAI.
 
         Args:
             model: LightGBM model
@@ -468,8 +471,8 @@ class LightGBMMonitor(ModelMonitor):
         if hasattr(model, "predict_proba"):
             try:
                 probabilities = model.predict_proba(X)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"predict_proba failed, continuing without probabilities: {e}")
 
         # Log predictions
         if log_predictions:

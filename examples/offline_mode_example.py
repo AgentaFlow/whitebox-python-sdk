@@ -1,5 +1,5 @@
 """
-Offline Mode Examples for WhiteBoxAI SDK
+Offline Mode Examples for WhiteBoxXAI SDK
 
 This example demonstrates how to use offline mode for queueing operations
 when the API is unavailable and syncing when connection is restored.
@@ -11,8 +11,8 @@ from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
-from whiteboxai import WhiteBoxAI
-from whiteboxai.offline import OperationPriority, OperationType
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.offline import OperationPriority, OperationType
 
 
 def example_1_basic_offline_mode():
@@ -22,8 +22,8 @@ def example_1_basic_offline_mode():
     print("=" * 80)
 
     # Initialize client with offline mode enabled
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=True,  # Auto-sync every 60 seconds
@@ -53,8 +53,8 @@ def example_2_manual_sync():
     print("=" * 80)
 
     # Initialize with auto-sync disabled for manual control
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,  # Disable auto-sync
@@ -107,8 +107,8 @@ def example_3_priority_based_syncing():
     print("Example 3: Priority-Based Syncing")
     print("=" * 80)
 
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -119,7 +119,9 @@ def example_3_priority_based_syncing():
 
     # Low priority - batch logging
     client._offline_manager._queue.enqueue(
-        OperationType.LOG_BATCH, {"model_id": "model_123", "batch": []}, OperationPriority.LOW
+        OperationType.LOG_BATCH,
+        {"model_id": "model_123", "batch": []},
+        OperationPriority.LOW,
     )
     print("  ✓ Queued LOW priority: batch logging")
 
@@ -163,8 +165,8 @@ def example_4_queue_management():
     print("Example 4: Queue Management")
     print("=" * 80)
 
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -211,8 +213,8 @@ def example_5_ml_model_with_offline():
     print("  ✓ Model trained")
 
     # Initialize client with offline mode
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./ml_offline_queue",
         offline_auto_sync=True,
@@ -250,8 +252,8 @@ def example_6_error_handling():
     print("Example 6: Error Handling and Retry")
     print("=" * 80)
 
-    client = WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    client = WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -300,13 +302,13 @@ def example_7_context_manager():
     print("Example 7: Context Manager Usage")
     print("=" * 80)
 
-    print("\nUsing WhiteBoxAI client as context manager:")
+    print("\nUsing WhiteBoxXAI client as context manager:")
     print("  - Automatically starts auto-sync")
     print("  - Properly stops sync on exit")
     print("  - Ensures resource cleanup")
 
-    with WhiteBoxAI(
-        api_key=os.getenv("WHITEBOXAI_API_KEY", "test_key"),
+    with WhiteBoxXAI(
+        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=True,
@@ -328,7 +330,7 @@ def example_7_context_manager():
 def run_all_examples():
     """Run all offline mode examples."""
     print("\n" + "=" * 80)
-    print("WhiteBoxAI SDK - Offline Mode Examples")
+    print("WhiteBoxXAI SDK - Offline Mode Examples")
     print("=" * 80 + "\n")
 
     examples = [
@@ -357,8 +359,8 @@ def run_all_examples():
 
 if __name__ == "__main__":
     # Set environment variable if not set
-    if "WHITEBOXAI_API_KEY" not in os.environ:
-        print("Note: WHITEBOXAI_API_KEY not set, using 'test_key' for examples")
-        print("Set your API key: export WHITEBOXAI_API_KEY=your_key_here\n")
+    if "WHITEBOXXAI_API_KEY" not in os.environ:
+        print("Note: WHITEBOXXAI_API_KEY not set, using 'test_key' for examples")
+        print("Set your API key: export WHITEBOXXAI_API_KEY=your_key_here\n")
 
     run_all_examples()

@@ -4,6 +4,8 @@ LangChain Integration
 Integration for monitoring LangChain applications including chains, agents, and RAG pipelines.
 """
 
+from __future__ import annotations
+
 import time
 import warnings
 from typing import Any, Dict, List, Optional
@@ -20,8 +22,11 @@ except ImportError:
     BaseCallbackHandler = object
     Chain = object
     AgentExecutor = object
+    AgentAction = object
+    AgentFinish = object
+    LLMResult = object
 
-from whiteboxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
 
 
 class LangChainMonitor(ModelMonitor):
@@ -40,11 +45,11 @@ class LangChainMonitor(ModelMonitor):
         ```python
         from langchain.chains import LLMChain
         from langchain.llms import OpenAI
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.langchain import LangChainMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.langchain import LangChainMonitor
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = LangChainMonitor(
             client=client,
             application_name="my_langchain_app"
@@ -78,7 +83,7 @@ class LangChainMonitor(ModelMonitor):
         Initialize LangChain monitor.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
             application_name: Name of the LangChain application
             track_tokens: Track token usage
             track_cost: Track API costs
@@ -101,7 +106,7 @@ class LangChainMonitor(ModelMonitor):
         **kwargs: Any,
     ) -> int:
         """
-        Register LangChain application with WhiteBoxAI.
+        Register LangChain application with WhiteBoxXAI.
 
         Args:
             name: Application name
@@ -137,12 +142,12 @@ class LangChainMonitor(ModelMonitor):
         self._registered = True
         return self.model_id
 
-    def create_callback_handler(self) -> "WhiteBoxAICallbackHandler":
+    def create_callback_handler(self) -> "WhiteBoxXAICallbackHandler":
         """
         Create a LangChain callback handler for automatic logging.
 
         Returns:
-            WhiteBoxAICallbackHandler instance
+            WhiteBoxXAICallbackHandler instance
 
         Example:
             ```python
@@ -153,7 +158,7 @@ class LangChainMonitor(ModelMonitor):
         if not self._registered:
             self.register_application()
 
-        return WhiteBoxAICallbackHandler(monitor=self)
+        return WhiteBoxXAICallbackHandler(monitor=self)
 
     def log_chain_execution(
         self,
@@ -332,9 +337,9 @@ class LangChainMonitor(ModelMonitor):
         )
 
 
-class WhiteBoxAICallbackHandler(BaseCallbackHandler):
+class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
     """
-    LangChain callback handler for automatic logging to WhiteBoxAI.
+    LangChain callback handler for automatic logging to WhiteBoxXAI.
 
     Example:
         ```python
@@ -631,6 +636,6 @@ def wrap_langchain_chain(
 
 __all__ = [
     "LangChainMonitor",
-    "WhiteBoxAICallbackHandler",
+    "WhiteBoxXAICallbackHandler",
     "wrap_langchain_chain",
 ]

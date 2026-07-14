@@ -7,17 +7,17 @@ This example demonstrates zero-code-change monitoring using decorators.
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
 
-from whiteboxai import ModelMonitor, WhiteBoxAI, monitor_model, monitor_prediction
+from whiteboxxai import ModelMonitor, WhiteBoxXAI, monitor_model, monitor_prediction
 
 # Global monitor instance
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 monitor = ModelMonitor(client, model_id=123)
 
 
 @monitor_model(monitor, input_keys=["features"], explain=True)
 def predict_fraud(features):
     """Predict fraud probability."""
-    # Simulate model prediction
+    # Simulate model prediction (assume a RandomForestClassifier is trained)
     prediction = np.random.choice([0, 1])
     probability = np.random.random()
 

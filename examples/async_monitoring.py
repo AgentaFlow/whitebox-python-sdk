@@ -8,13 +8,13 @@ import asyncio
 
 import numpy as np
 
-from whiteboxai import ModelMonitor, WhiteBoxAI
+from whiteboxxai import ModelMonitor, WhiteBoxXAI
 
 
 async def register_and_log():
     """Register model and log predictions asynchronously."""
     # Create client with async context manager
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client)
 
         # Register model asynchronously
@@ -52,7 +52,7 @@ async def register_and_log():
 
 async def parallel_logging():
     """Log predictions in parallel for better throughput."""
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client, model_id=123)
 
         # Create multiple prediction logging tasks
@@ -71,7 +71,7 @@ async def parallel_logging():
 
 async def drift_detection():
     """Detect drift asynchronously."""
-    async with WhiteBoxAI(api_key="your-api-key") as client:
+    async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client, model_id=123)
 
         # Set baseline

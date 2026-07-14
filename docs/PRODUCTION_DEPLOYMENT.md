@@ -1,6 +1,6 @@
 # Production Deployment Guide
 
-This guide covers best practices for deploying WhiteBoxAI monitoring in production environments.
+This guide covers best practices for deploying WhiteBoxXAI monitoring in production environments.
 
 ## Table of Contents
 
@@ -25,7 +25,7 @@ This guide covers best practices for deploying WhiteBoxAI monitoring in producti
 │                    Application Layer                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │ ML Service 1 │  │ ML Service 2 │  │ ML Service N │      │
-│  │ + WhiteBoxAI │  │ + WhiteBoxAI │  │ + WhiteBoxAI │      │
+│  │ + WhiteBoxXAI │  │ + WhiteBoxXAI │  │ + WhiteBoxXAI │      │
 │  │   SDK        │  │   SDK        │  │   SDK        │      │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘      │
 └─────────┼──────────────────┼──────────────────┼─────────────┘
@@ -37,7 +37,7 @@ This guide covers best practices for deploying WhiteBoxAI monitoring in producti
                     └────────┬────────┘
                              │
                     ┌────────▼────────┐
-                    │  WhiteBoxAI API │
+                    │  WhiteBoxXAI API │
                     │   (FastAPI)     │
                     └────────┬────────┘
                              │
@@ -52,7 +52,7 @@ This guide covers best practices for deploying WhiteBoxAI monitoring in producti
 ### Components
 
 1. **SDK Integration**: Lightweight SDK embedded in ML services
-2. **API Gateway**: Load-balanced WhiteBoxAI API endpoints
+2. **API Gateway**: Load-balanced WhiteBoxXAI API endpoints
 3. **Data Layer**: PostgreSQL + TimescaleDB, Redis cache, object storage
 4. **Worker Layer**: Background workers for explanations and reports
 
@@ -64,42 +64,42 @@ This guide covers best practices for deploying WhiteBoxAI monitoring in producti
 
 ```bash
 # API Configuration
-WHITEBOXAI_API_KEY=prod-api-key-here
-WHITEBOXAI_BASE_URL=https://api.whiteboxai.yourcompany.com
-WHITEBOXAI_ENVIRONMENT=production
+WHITEBOXXAI_API_KEY=prod-api-key-here
+WHITEBOXXAI_BASE_URL=https://api.whiteboxxai.yourcompany.com
+WHITEBOXXAI_ENVIRONMENT=production
 
 # Performance Tuning
-WHITEBOXAI_BATCH_SIZE=100
-WHITEBOXAI_ASYNC_LOGGING=true
-WHITEBOXAI_SAMPLING_RATE=0.1
-WHITEBOXAI_CACHE_ENABLED=true
-WHITEBOXAI_CACHE_TTL=3600
+WHITEBOXXAI_BATCH_SIZE=100
+WHITEBOXXAI_ASYNC_LOGGING=true
+WHITEBOXXAI_SAMPLING_RATE=0.1
+WHITEBOXXAI_CACHE_ENABLED=true
+WHITEBOXXAI_CACHE_TTL=3600
 
 # Reliability
-WHITEBOXAI_MAX_RETRIES=3
-WHITEBOXAI_RETRY_BACKOFF=exponential
-WHITEBOXAI_TIMEOUT=30
-WHITEBOXAI_CIRCUIT_BREAKER_ENABLED=true
+WHITEBOXXAI_MAX_RETRIES=3
+WHITEBOXXAI_RETRY_BACKOFF=exponential
+WHITEBOXXAI_TIMEOUT=30
+WHITEBOXXAI_CIRCUIT_BREAKER_ENABLED=true
 
 # Security
-WHITEBOXAI_TLS_VERIFY=true
-WHITEBOXAI_PII_DETECTION=true
-WHITEBOXAI_DATA_MASKING=true
+WHITEBOXXAI_TLS_VERIFY=true
+WHITEBOXXAI_PII_DETECTION=true
+WHITEBOXXAI_DATA_MASKING=true
 
 # Monitoring
-WHITEBOXAI_ENABLE_METRICS=true
-WHITEBOXAI_METRICS_PORT=9090
-WHITEBOXAI_LOG_LEVEL=info
+WHITEBOXXAI_ENABLE_METRICS=true
+WHITEBOXXAI_METRICS_PORT=9090
+WHITEBOXXAI_LOG_LEVEL=info
 ```
 
 ### Configuration File (config.yaml)
 
 ```yaml
-whiteboxai:
+whiteboxxai:
   # API Settings
   api:
-    base_url: ${WHITEBOXAI_BASE_URL}
-    api_key: ${WHITEBOXAI_API_KEY}
+    base_url: ${WHITEBOXXAI_BASE_URL}
+    api_key: ${WHITEBOXXAI_API_KEY}
     timeout: 30
     max_retries: 3
 
@@ -155,15 +155,15 @@ whiteboxai:
 
 ```python
 import os
-from whiteboxai import WhiteBoxAI
-from whiteboxai.config import Config
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.config import Config
 
 # Load config based on environment
 env = os.getenv('ENVIRONMENT', 'development')
 config = Config.from_file(f'config.{env}.yaml')
 
 # Initialize client with config
-client = WhiteBoxAI(config=config)
+client = WhiteBoxXAI(config=config)
 ```
 
 ### Secrets Management
@@ -183,8 +183,8 @@ def get_secret(secret_name):
         raise e
 
 # Get API key from secrets manager
-api_key = get_secret('whiteboxai/api-key')
-client = WhiteBoxAI(api_key=api_key)
+api_key = get_secret('whiteboxxai/api-key')
+client = WhiteBoxXAI(api_key=api_key)
 ```
 
 #### HashiCorp Vault
@@ -199,8 +199,8 @@ def get_vault_secret(path):
     return secret['data']['data']
 
 # Get API key from Vault
-secrets = get_vault_secret('whiteboxai/production')
-client = WhiteBoxAI(api_key=secrets['api_key'])
+secrets = get_vault_secret('whiteboxxai/production')
+client = WhiteBoxXAI(api_key=secrets['api_key'])
 ```
 
 ---
@@ -212,7 +212,7 @@ client = WhiteBoxAI(api_key=secrets['api_key'])
 Always use batch logging for production:
 
 ```python
-from whiteboxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
 from collections import deque
 import threading
 import time
@@ -267,7 +267,7 @@ Use async logging to prevent blocking:
 
 ```python
 import asyncio
-from whiteboxai import AsyncWhiteBoxAI
+from whiteboxxai import AsyncWhiteBoxXAI
 
 async def predict_and_log(model, X):
     # Make prediction (sync)
@@ -283,7 +283,7 @@ async def predict_and_log(model, X):
     return prediction
 
 # Initialize async client
-client = AsyncWhiteBoxAI(api_key='your-api-key')
+client = AsyncWhiteBoxXAI(api_key='your-api-key')
 
 # Run
 asyncio.run(predict_and_log(model, X))
@@ -334,7 +334,7 @@ class CachedMonitor:
 Use connection pooling for database connections:
 
 ```python
-from whiteboxai import WhiteBoxAI
+from whiteboxxai import WhiteBoxXAI
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
 
@@ -354,7 +354,7 @@ session.mount('http://', adapter)
 session.mount('https://', adapter)
 
 # Use custom session
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key='your-api-key',
     session=session
 )
@@ -368,20 +368,20 @@ client = WhiteBoxAI(
 
 ```python
 # DON'T: Hardcode API keys
-client = WhiteBoxAI(api_key='sk-abc123...')  # BAD!
+client = WhiteBoxXAI(api_key='sk-abc123...')  # BAD!
 
 # DO: Use environment variables
-client = WhiteBoxAI()  # Reads from WHITEBOXAI_API_KEY
+client = WhiteBoxXAI()  # Reads from WHITEBOXXAI_API_KEY
 
 # DO: Use secrets management
 from your_secrets import get_secret
-client = WhiteBoxAI(api_key=get_secret('whiteboxai-api-key'))
+client = WhiteBoxXAI(api_key=get_secret('whiteboxxai-api-key'))
 ```
 
 ### 2. PII Detection and Masking
 
 ```python
-from whiteboxai.security import PIIDetector, DataMasker
+from whiteboxxai.security import PIIDetector, DataMasker
 
 # Enable PII detection
 pii_detector = PIIDetector()
@@ -410,7 +410,7 @@ def safe_log_prediction(inputs, prediction):
 
 ```python
 # Verify SSL certificates in production
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key='your-api-key',
     verify_ssl=True,
     cert='/path/to/cert.pem'  # Optional custom cert
@@ -420,7 +420,7 @@ client = WhiteBoxAI(
 ### 4. Rate Limiting
 
 ```python
-from whiteboxai.utils import RateLimiter
+from whiteboxxai.utils import RateLimiter
 
 # Implement client-side rate limiting
 limiter = RateLimiter(
@@ -444,7 +444,7 @@ def log_prediction(inputs, prediction):
 ### 1. Circuit Breaker Pattern
 
 ```python
-from whiteboxai.resilience import CircuitBreaker
+from whiteboxxai.resilience import CircuitBreaker
 
 circuit_breaker = CircuitBreaker(
     failure_threshold=5,
@@ -468,7 +468,7 @@ try:
 except CircuitBreaker.CircuitBreakerOpen:
     # Circuit is open, skip logging
     prediction = model.predict(inputs)
-    logger.warning("WhiteBoxAI circuit breaker open, prediction not logged")
+    logger.warning("WhiteBoxXAI circuit breaker open, prediction not logged")
 ```
 
 ### 2. Fallback Strategies
@@ -497,13 +497,13 @@ class LocalLogger:
 ### 3. Health Checks
 
 ```python
-from whiteboxai.health import HealthCheck
+from whiteboxxai.health import HealthCheck
 
 health_check = HealthCheck(client)
 
 # Check API health
 if not health_check.is_healthy():
-    logger.error("WhiteBoxAI API is unhealthy")
+    logger.error("WhiteBoxXAI API is unhealthy")
     # Switch to degraded mode
 
 # Expose health endpoint for orchestrators
@@ -511,7 +511,7 @@ if not health_check.is_healthy():
 def health():
     return {
         "status": "healthy" if health_check.is_healthy() else "degraded",
-        "whiteboxai": health_check.check_api(),
+        "whiteboxxai": health_check.check_api(),
         "model": health_check.check_model(model_id)
     }
 ```
@@ -524,21 +524,21 @@ def health():
 
 ```python
 from prometheus_client import Counter, Histogram, Gauge
-from whiteboxai.metrics import PrometheusExporter
+from whiteboxxai.metrics import PrometheusExporter
 
 # Define metrics
 predictions_logged = Counter(
-    'whiteboxai_predictions_logged_total',
-    'Total predictions logged to WhiteBoxAI'
+    'whiteboxxai_predictions_logged_total',
+    'Total predictions logged to WhiteBoxXAI'
 )
 
 logging_latency = Histogram(
-    'whiteboxai_logging_latency_seconds',
+    'whiteboxxai_logging_latency_seconds',
     'Latency of logging operations'
 )
 
 api_errors = Counter(
-    'whiteboxai_api_errors_total',
+    'whiteboxxai_api_errors_total',
     'Total API errors',
     ['error_type']
 )
@@ -599,26 +599,26 @@ def log_prediction_with_context(inputs, prediction):
 
 ```bash
 #!/bin/bash
-# backup-whiteboxai.sh
+# backup-whiteboxxai.sh
 
 # Backup configuration
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/backups/whiteboxai/${DATE}"
+BACKUP_DIR="/backups/whiteboxxai/${DATE}"
 
 # Backup database
-pg_dump whiteboxai_production > "${BACKUP_DIR}/database.sql"
+pg_dump whiteboxxai_production > "${BACKUP_DIR}/database.sql"
 
 # Backup model metadata
 python -c "
-from whiteboxai import WhiteBoxAI
-client = WhiteBoxAI()
+from whiteboxxai import WhiteBoxXAI
+client = WhiteBoxXAI()
 models = client.list_models()
 with open('${BACKUP_DIR}/models.json', 'w') as f:
     json.dump(models, f)
 "
 
 # Upload to S3
-aws s3 sync ${BACKUP_DIR} s3://whiteboxai-backups/${DATE}
+aws s3 sync ${BACKUP_DIR} s3://whiteboxxai-backups/${DATE}
 ```
 
 ### Recovery Procedures
@@ -687,7 +687,7 @@ class ScalableMonitor:
 ### Kubernetes Deployment
 
 ```yaml
-# whiteboxai-monitor.yaml
+# whiteboxxai-monitor.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -706,13 +706,13 @@ spec:
       - name: ml-service
         image: your-ml-service:latest
         env:
-        - name: WHITEBOXAI_API_KEY
+        - name: WHITEBOXXAI_API_KEY
           valueFrom:
             secretKeyRef:
-              name: whiteboxai-secrets
+              name: whiteboxxai-secrets
               key: api-key
-        - name: WHITEBOXAI_BASE_URL
-          value: "https://api.whiteboxai.internal"
+        - name: WHITEBOXXAI_BASE_URL
+          value: "https://api.whiteboxxai.internal"
         resources:
           requests:
             memory: "512Mi"
@@ -726,10 +726,10 @@ spec:
 
 ## Resources
 
-- [WhiteBoxAI API Documentation](https://docs.whiteboxai.com/api)
-- [SDK Reference](https://docs.whiteboxai.com/sdk)
-- [Best Practices](https://docs.whiteboxai.com/best-practices)
-- [Support](mailto:whiteboxai-support@kpmg.com)
+- [WhiteBoxXAI API Documentation](https://docs.whiteboxxai.com/api)
+- [SDK Reference](https://docs.whiteboxxai.com/sdk)
+- [Best Practices](https://docs.whiteboxxai.com/best-practices)
+- [Support](mailto:whiteboxxai-support@whiteboxxai.com)
 
 ---
 

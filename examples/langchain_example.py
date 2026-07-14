@@ -1,17 +1,45 @@
 """
 LangChain Integration Example
 
-This example demonstrates how to use WhiteBoxAI to monitor LangChain applications.
+This example demonstrates how to use WhiteBoxXAI to monitor LangChain applications.
 """
 
+import ast
+import operator
 import os
 import time
 
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.langchain import LangChainMonitor, wrap_langchain_chain
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.langchain import LangChainMonitor, wrap_langchain_chain
 
 # Optional: Set API key
-os.environ["WHITEBOXAI_API_KEY"] = "your-api-key-here"
+os.environ["WHITEBOXXAI_API_KEY"] = "your-api-key-here"
+
+_SAFE_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+}
+
+
+def safe_eval_arithmetic(expression: str) -> float:
+    """Evaluate a simple arithmetic expression without eval()'s ability to run
+    arbitrary code - important here since a tool like this may be called with
+    an LLM-influenced (and therefore untrusted) argument."""
+
+    def _eval(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return node.value
+        if isinstance(node, ast.BinOp) and type(node.op) in _SAFE_OPERATORS:
+            return _SAFE_OPERATORS[type(node.op)](_eval(node.left), _eval(node.right))
+        if isinstance(node, ast.UnaryOp) and type(node.op) in _SAFE_OPERATORS:
+            return _SAFE_OPERATORS[type(node.op)](_eval(node.operand))
+        raise ValueError(f"Unsupported expression: {expression}")
+
+    return _eval(ast.parse(expression, mode="eval").body)
 
 
 def example_simple_chain():
@@ -24,24 +52,30 @@ def example_simple_chain():
     print("Simple LLM Chain Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
-        client=client, application_name="simple_qa_chain", track_tokens=True, track_cost=True
+        client=client,
+        application_name="simple_qa_chain",
+        track_tokens=True,
+        track_cost=True,
     )
 
     # Register application
     app_id = monitor.register_application(
-        name="Simple Q&A Chain", version="1.0.0", description="Basic question-answering chain"
+        name="Simple Q&A Chain",
+        version="1.0.0",
+        description="Basic question-answering chain",
     )
     print(f"✓ Application registered with ID: {app_id}")
 
     # Create chain
     llm = OpenAI(temperature=0.7)
     prompt = PromptTemplate(
-        input_variables=["question"], template="Answer the following question: {question}"
+        input_variables=["question"],
+        template="Answer the following question: {question}",
     )
     chain = LLMChain(llm=llm, prompt=prompt)
 
@@ -74,8 +108,8 @@ def example_sequential_chain():
     print("Sequential Chain Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -92,7 +126,8 @@ def example_sequential_chain():
 
     # Chain 1: Generate topic
     prompt1 = PromptTemplate(
-        input_variables=["subject"], template="Generate a creative topic about {subject}"
+        input_variables=["subject"],
+        template="Generate a creative topic about {subject}",
     )
     chain1 = LLMChain(llm=llm, prompt=prompt1, output_key="topic")
 
@@ -132,8 +167,8 @@ def example_agent():
     print("Agent Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -143,7 +178,9 @@ def example_agent():
 
     # Register application
     monitor.register_application(
-        name="Search Agent", version="1.0.0", description="Agent with search capabilities"
+        name="Search Agent",
+        version="1.0.0",
+        description="Agent with search capabilities",
     )
     print("✓ Application registered")
 
@@ -155,7 +192,7 @@ def example_agent():
     def calculator_tool(expression: str) -> str:
         """Mock calculator tool."""
         try:
-            return str(eval(expression))
+            return str(safe_eval_arithmetic(expression))
         except Exception:
             return "Invalid expression"
 
@@ -190,13 +227,12 @@ def example_agent():
 
 def example_rag_chain():
     """Example using a RAG (Retrieval-Augmented Generation) chain."""
-
     print("\n" + "=" * 60)
     print("RAG Chain Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -206,7 +242,9 @@ def example_rag_chain():
 
     # Register application
     monitor.register_application(
-        name="RAG Q&A System", version="1.0.0", description="Question answering with retrieval"
+        name="RAG Q&A System",
+        version="1.0.0",
+        description="Question answering with retrieval",
     )
     print("✓ Application registered")
 
@@ -270,8 +308,8 @@ def example_manual_logging():
     print("Manual Logging Example")
     print("=" * 60)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key=os.getenv("WHITEBOXAI_API_KEY"))
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -322,7 +360,7 @@ def example_manual_logging():
 def main():
     """Run all examples."""
     print("\n" + "=" * 60)
-    print("WhiteBoxAI - LangChain Integration Examples")
+    print("WhiteBoxXAI - LangChain Integration Examples")
     print("=" * 60)
 
     try:

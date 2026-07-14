@@ -2,7 +2,7 @@
 XGBoost and LightGBM Integration Examples
 
 This script demonstrates how to monitor gradient boosting models
-(XGBoost and LightGBM) using WhiteBoxAI.
+(XGBoost and LightGBM) using WhiteBoxXAI.
 
 Examples include:
 1. XGBoost binary classification
@@ -18,9 +18,9 @@ from sklearn.datasets import make_classification, make_regression
 from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-# WhiteBoxAI imports
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.boosting import (
+# WhiteBoxXAI imports
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.boosting import (
     LightGBMMonitor,
     XGBoostMonitor,
     wrap_lightgbm_model,
@@ -48,8 +48,8 @@ def example_xgboost_classification():
     )
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Create monitor
     monitor = XGBoostMonitor(
@@ -64,8 +64,8 @@ def example_xgboost_classification():
     model = xgb.XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
-    # Register model with WhiteBoxAI
-    print("Registering model with WhiteBoxAI...")
+    # Register model with WhiteBoxXAI
+    print("Registering model with WhiteBoxXAI...")
     model_id = monitor.register_from_model(
         model=model,
         X_train=X_train,
@@ -85,7 +85,7 @@ def example_xgboost_classification():
     # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print("Predictions logged to WhiteBoxAI")
+    print("Predictions logged to WhiteBoxXAI")
 
     # Get feature importance
     importance = model.feature_importances_
@@ -114,12 +114,14 @@ def example_xgboost_regression():
     )
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Create monitor
     monitor = XGBoostMonitor(
-        client=client, model_name="xgboost_price_predictor", track_feature_importance=True
+        client=client,
+        model_name="xgboost_price_predictor",
+        track_feature_importance=True,
     )
 
     # Train XGBoost regressor
@@ -163,8 +165,8 @@ def example_lightgbm_classification():
     )
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Create monitor
     monitor = LightGBMMonitor(
@@ -179,8 +181,8 @@ def example_lightgbm_classification():
     model = lgb.LGBMClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
-    # Register model with WhiteBoxAI
-    print("Registering model with WhiteBoxAI...")
+    # Register model with WhiteBoxXAI
+    print("Registering model with WhiteBoxXAI...")
     model_id = monitor.register_from_model(
         model=model,
         X_train=X_train,
@@ -197,11 +199,10 @@ def example_lightgbm_classification():
     print("\nMaking predictions...")
     predictions = monitor.predict(model, X_test, y_test)
 
-    # Get probabilities and calculate metrics
-    probabilities = model.predict_proba(X_test)
+    # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Predictions logged with {len(probabilities)} probability estimates")
+    print("Predictions logged with probabilities")
 
     # Feature importance
     importance = model.feature_importances_
@@ -229,12 +230,14 @@ def example_lightgbm_regression():
     )
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Create monitor
     monitor = LightGBMMonitor(
-        client=client, model_name="lightgbm_sales_predictor", track_feature_importance=True
+        client=client,
+        model_name="lightgbm_sales_predictor",
+        track_feature_importance=True,
     )
 
     # Train LightGBM regressor
@@ -284,8 +287,8 @@ def example_feature_importance_tracking():
 
     X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Train XGBoost model
     print("Training XGBoost model...")
@@ -351,8 +354,8 @@ def example_model_comparison():
     X, y = make_classification(n_samples=1000, n_features=20, n_informative=15, random_state=42)
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Initialize WhiteBoxAI client
-    client = WhiteBoxAI(api_key="demo-api-key")
+    # Initialize WhiteBoxXAI client
+    client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Train and monitor XGBoost
     print("Training XGBoost model...")
@@ -383,12 +386,12 @@ def example_model_comparison():
     print(f"XGBoost Accuracy:  {xgb_accuracy:.4f}")
     print(f"LightGBM Accuracy: {lgb_accuracy:.4f}")
     print(f"\nBetter model: {'XGBoost' if xgb_accuracy > lgb_accuracy else 'LightGBM'}")
-    print("Both models logged to WhiteBoxAI for detailed analysis")
+    print("Both models logged to WhiteBoxXAI for detailed analysis")
 
 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
-    print("WhiteBoxAI - Gradient Boosting Integration Examples")
+    print("WhiteBoxXAI - Gradient Boosting Integration Examples")
     print("=" * 60)
 
     # Run examples

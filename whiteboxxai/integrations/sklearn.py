@@ -17,7 +17,7 @@ except ImportError:
 
 import numpy as np
 
-from whiteboxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
 
 
 class SklearnMonitor(ModelMonitor):
@@ -27,15 +27,15 @@ class SklearnMonitor(ModelMonitor):
     Example:
         ```python
         from sklearn.ensemble import RandomForestClassifier
-        from whiteboxai import WhiteBoxAI
-        from whiteboxai.integrations.sklearn import SklearnMonitor
+        from whiteboxxai import WhiteBoxXAI
+        from whiteboxxai.integrations.sklearn import SklearnMonitor
 
         # Train model
         model = RandomForestClassifier()
         model.fit(X_train, y_train)
 
         # Setup monitoring
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = SklearnMonitor(client, model=model)
         monitor.register_from_model(model_type="classification")
 
@@ -170,7 +170,7 @@ class SklearnWrapper:
     Wrapper for sklearn models with automatic monitoring.
 
     This wrapper intercepts predict/predict_proba calls and logs predictions
-    to WhiteBoxAI automatically.
+    to WhiteBoxXAI automatically.
     """
 
     def __init__(self, model: BaseEstimator, monitor: SklearnMonitor):

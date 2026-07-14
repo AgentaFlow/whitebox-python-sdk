@@ -1,6 +1,6 @@
-# WhiteBoxAI Python SDK
+# WhiteBoxXAI Python SDK
 
-Official Python SDK for integrating WhiteBoxAI monitoring into your ML applications.
+Official Python SDK for integrating WhiteBoxXAI monitoring into your ML applications.
 
 ## Features
 
@@ -18,14 +18,14 @@ Official Python SDK for integrating WhiteBoxAI monitoring into your ML applicati
 ## Installation
 
 ```bash
-pip install whiteboxai-sdk
+pip install whitebox-xai-sdk
 
 # With specific framework support
-pip install whiteboxai-sdk[sklearn]
-pip install whiteboxai-sdk[pytorch]
-pip install whiteboxai-sdk[langchain]
-pip install whiteboxai-sdk[crewai]
-pip install whiteboxai-sdk[all]  # All integrations
+pip install whitebox-xai-sdk[sklearn]
+pip install whitebox-xai-sdk[pytorch]
+pip install whitebox-xai-sdk[langchain]
+pip install whitebox-xai-sdk[crewai]
+pip install whitebox-xai-sdk[all]  # All integrations
 ```
 
 ## Quick Start
@@ -33,10 +33,10 @@ pip install whiteboxai-sdk[all]  # All integrations
 ### Basic Usage
 
 ```python
-from whiteboxai import WhiteBoxAI, ModelMonitor
+from whiteboxxai import WhiteBoxXAI, ModelMonitor
 
 # Initialize client
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 
 # Create monitor
 monitor = ModelMonitor(client)
@@ -58,13 +58,13 @@ monitor.log_prediction(
 ### Git Integration
 
 ```python
-from whiteboxai import WhiteBoxAI, detect_git_context
+from whiteboxxai import WhiteBoxXAI, detect_git_context
 
 # Auto-detect Git context
 git_context = detect_git_context()
 
 # Initialize with Git context
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 model_id = client.models.register(
     name="my_model",
     **git_context.to_dict()  # Include Git metadata
@@ -74,7 +74,7 @@ model_id = client.models.register(
 ### CrewAI Multi-Agent Monitoring
 
 ```python
-from whiteboxai.integrations import CrewAIMonitor
+from whiteboxxai.integrations import CrewAIMonitor
 from crewai import Agent, Task, Crew
 
 # Initialize monitor
@@ -99,7 +99,7 @@ summary = monitor.complete_monitoring(outputs={"result": result})
 ### LangChain Multi-Agent Monitoring
 
 ```python
-from whiteboxai.integrations import LangGraphMultiAgentMonitor
+from whiteboxxai.integrations import LangGraphMultiAgentMonitor
 
 # Create monitor
 monitor = LangGraphMultiAgentMonitor(
@@ -128,7 +128,7 @@ summary = monitor.complete_monitoring(outputs={"result": result})
 ### Scikit-learn
 
 ```python
-from whiteboxai.integrations import SklearnMonitor
+from whiteboxxai.integrations import SklearnMonitor
 from sklearn.ensemble import RandomForestClassifier
 
 # Wrap your model
@@ -144,7 +144,7 @@ predictions = wrapped_model.predict(X_test)
 ### PyTorch
 
 ```python
-from whiteboxai.integrations import TorchMonitor
+from whiteboxxai.integrations import TorchMonitor
 import torch.nn as nn
 
 # Monitor your model
@@ -160,7 +160,7 @@ for epoch in range(num_epochs):
 ### TensorFlow/Keras
 
 ```python
-from whiteboxai.integrations import KerasMonitor
+from whiteboxxai.integrations import KerasMonitor
 
 # Add callback
 monitor = KerasMonitor(client=client, model_id=model_id)
@@ -174,7 +174,7 @@ model.fit(
 ### LangChain
 
 ```python
-from whiteboxai.integrations import LangChainMonitor
+from whiteboxxai.integrations import LangChainMonitor
 
 # Monitor chain execution
 monitor = LangChainMonitor(client=client)

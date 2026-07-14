@@ -1,6 +1,6 @@
 # LangChain Integration Guide
 
-This guide demonstrates how to use WhiteBoxAI to monitor LangChain applications including chains, agents, and RAG pipelines.
+This guide demonstrates how to use WhiteBoxXAI to monitor LangChain applications including chains, agents, and RAG pipelines.
 
 ## Table of Contents
 
@@ -14,10 +14,10 @@ This guide demonstrates how to use WhiteBoxAI to monitor LangChain applications 
 
 ## Installation
 
-Install WhiteBoxAI SDK with LangChain support:
+Install WhiteBoxXAI SDK with LangChain support:
 
 ```bash
-pip install whiteboxai langchain
+pip install whiteboxxai langchain
 ```
 
 For specific LLM providers, install additional dependencies:
@@ -39,11 +39,11 @@ pip install transformers
 from langchain.chains import LLMChain
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.langchain import LangChainMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.langchain import LangChainMonitor
 
 # Initialize client
-client = WhiteBoxAI(api_key="your-api-key")
+client = WhiteBoxXAI(api_key="your-api-key")
 
 # Create monitor
 monitor = LangChainMonitor(
@@ -85,9 +85,9 @@ Main class for monitoring LangChain applications. Tracks:
 - Tool usage
 - RAG retrievals
 
-### WhiteBoxAICallbackHandler
+### WhiteBoxXAICallbackHandler
 
-LangChain callback handler that automatically logs events to WhiteBoxAI.
+LangChain callback handler that automatically logs events to WhiteBoxXAI.
 
 ### Supported Components
 
@@ -102,7 +102,7 @@ LangChain callback handler that automatically logs events to WhiteBoxAI.
 ### Method 1: Callback Handler (Recommended)
 
 ```python
-from whiteboxai.integrations.langchain import LangChainMonitor
+from whiteboxxai.integrations.langchain import LangChainMonitor
 
 # Create monitor
 monitor = LangChainMonitor(client, application_name="my_app")
@@ -119,7 +119,7 @@ agent.run(input="...", callbacks=[callback])
 ### Method 2: Wrap Chain
 
 ```python
-from whiteboxai.integrations.langchain import wrap_langchain_chain
+from whiteboxxai.integrations.langchain import wrap_langchain_chain
 
 # Wrap chain for automatic logging
 wrapped_chain = wrap_langchain_chain(chain, monitor)
@@ -316,7 +316,7 @@ monitor = LangChainMonitor(
 callback = monitor.create_callback_handler()
 result = chain.run(input="...", callbacks=[callback])
 
-# Access metrics via WhiteBoxAI dashboard
+# Access metrics via WhiteBoxXAI dashboard
 ```
 
 ### Custom Metadata
@@ -504,7 +504,7 @@ See complete examples in:
 Main class for monitoring LangChain applications.
 
 **Methods**:
-- `register_application()` - Register application with WhiteBoxAI
+- `register_application()` - Register application with WhiteBoxXAI
 - `create_callback_handler()` - Create callback handler
 - `log_chain_execution()` - Log chain execution
 - `log_agent_execution()` - Log agent run
@@ -512,7 +512,7 @@ Main class for monitoring LangChain applications.
 - `log_tool_call()` - Log tool usage
 - `log_rag_retrieval()` - Log RAG retrieval
 
-### WhiteBoxAICallbackHandler
+### WhiteBoxXAICallbackHandler
 
 LangChain callback handler for automatic logging.
 
@@ -529,6 +529,6 @@ Function to wrap chains for automatic logging.
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/whiteboxai/whiteboxai
-- Documentation: https://docs.whiteboxai.com
-- Email: support@whiteboxai.com
+- GitHub Issues: https://github.com/whiteboxxai/whiteboxxai
+- Documentation: https://docs.whiteboxxai.com
+- Email: support@whiteboxxai.com

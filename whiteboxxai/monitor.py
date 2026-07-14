@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 import numpy as np
 
 if TYPE_CHECKING:
-    from whiteboxai.client import WhiteBoxAI
+    from whiteboxxai.client import WhiteBoxXAI
 
 
 class ModelMonitor:
@@ -18,9 +18,9 @@ class ModelMonitor:
 
     Example:
         ```python
-        from whiteboxai import WhiteBoxAI, ModelMonitor
+        from whiteboxxai import WhiteBoxXAI, ModelMonitor
 
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = ModelMonitor(client, model_id=123)
 
         # Log prediction
@@ -39,28 +39,43 @@ class ModelMonitor:
 
     def __init__(
         self,
-        client: "WhiteBoxAI",
+        client: "WhiteBoxXAI",
         model_id: Optional[int] = None,
         model_name: Optional[str] = None,
         auto_explain: bool = False,
         sampling_rate: float = 1.0,
+        buffer_size: Optional[int] = None,
     ):
         """
         Initialize model monitor.
 
         Args:
-            client: WhiteBoxAI client instance
-            model_id: Model ID (if already registered)
+            client: WhiteBoxXAI client instance
+            model_id: Model ID (if already registered; can be set later via
+                register_model())
             model_name: Model name (for registration)
             auto_explain: Automatically generate explanations
             sampling_rate: Prediction sampling rate (0.0-1.0)
+            buffer_size: If set, log_prediction() buffers locally and sends
+                predictions as a batch once the buffer reaches this size (or
+                on flush()/context-manager exit), instead of sending
+                immediately on every call.
         """
         self.client = client
         self.model_id = model_id
         self.model_name = model_name
         self.auto_explain = auto_explain
         self.sampling_rate = sampling_rate
+        self.buffer_size = buffer_size
+        self._buffer: List[Dict[str, Any]] = []
+        self._prediction_count = 0
         self._baseline_data: Optional[np.ndarray] = None
+
+    def __enter__(self) -> "ModelMonitor":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.flush()
 
     def register_model(
         self,
@@ -131,23 +146,38 @@ class ModelMonitor:
             metadata: Additional metadata
 
         Returns:
-            Prediction data if sampled, None if skipped
+            Prediction data if sent immediately, None if buffered or skipped
         """
+        if output is None:
+            raise ValueError("output cannot be None.")
+
         if not self._should_sample():
             return None
 
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
 
+        self._prediction_count += 1
+
+        if self.buffer_size:
+            self._buffer.append({"input_data": inputs, "output_data": output, "metadata": metadata})
+            if len(self._buffer) >= self.buffer_size:
+                self.flush()
+            return None
+
         explain = explain if explain is not None else self.auto_explain
 
-        return self.client.predictions.log(
+        result = self.client.predictions.log(
             model_id=self.model_id,
-            inputs=inputs,
-            outputs=output,
-            explain=explain,
+            input_data=inputs,
+            output_data=output,
             metadata=metadata,
         )
+
+        if explain and isinstance(result, dict) and result.get("id"):
+            result["explanation"] = self.client.explanations.generate(prediction_id=result["id"])
+
+        return result
 
     async def alog_prediction(
         self,
@@ -157,21 +187,51 @@ class ModelMonitor:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Async version of log_prediction()."""
+        if output is None:
+            raise ValueError("output cannot be None.")
+
         if not self._should_sample():
             return None
 
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
 
+        self._prediction_count += 1
+
+        if self.buffer_size:
+            self._buffer.append({"input_data": inputs, "output_data": output, "metadata": metadata})
+            if len(self._buffer) >= self.buffer_size:
+                await self.aflush()
+            return None
+
         explain = explain if explain is not None else self.auto_explain
 
-        return await self.client.predictions.alog(
+        result = await self.client.predictions.alog(
             model_id=self.model_id,
-            inputs=inputs,
-            outputs=output,
-            explain=explain,
+            input_data=inputs,
+            output_data=output,
             metadata=metadata,
         )
+
+        if explain and isinstance(result, dict) and result.get("id"):
+            result["explanation"] = await self.client.explanations.agenerate(
+                prediction_id=result["id"]
+            )
+
+        return result
+
+    @staticmethod
+    def _normalize_batch_item(prediction: Dict[str, Any]) -> Dict[str, Any]:
+        """Map the SDK's `inputs`/`output` shorthand keys to the
+        `input_data`/`output_data` keys the predictions API expects."""
+        if "inputs" in prediction or "output" in prediction:
+            normalized = dict(prediction)
+            if "inputs" in normalized:
+                normalized["input_data"] = normalized.pop("inputs")
+            if "output" in normalized:
+                normalized["output_data"] = normalized.pop("output")
+            return normalized
+        return prediction
 
     def log_batch(
         self,
@@ -181,7 +241,8 @@ class ModelMonitor:
         Log multiple predictions in batch.
 
         Args:
-            predictions: List of prediction dictionaries
+            predictions: List of prediction dictionaries (each with
+                `inputs`/`output` or `input_data`/`output_data` keys)
 
         Returns:
             Batch logging result
@@ -192,6 +253,8 @@ class ModelMonitor:
         # Apply sampling
         if self.sampling_rate < 1.0:
             predictions = self._sample_predictions(predictions)
+
+        predictions = [self._normalize_batch_item(p) for p in predictions]
 
         return self.client.predictions.log_batch(
             model_id=self.model_id,
@@ -210,10 +273,76 @@ class ModelMonitor:
         if self.sampling_rate < 1.0:
             predictions = self._sample_predictions(predictions)
 
+        predictions = [self._normalize_batch_item(p) for p in predictions]
+
         return await self.client.predictions.alog_batch(
             model_id=self.model_id,
             predictions=predictions,
         )
+
+    def flush(self) -> Optional[Dict[str, Any]]:
+        """Send any buffered predictions as a batch and clear the buffer."""
+        if not self._buffer:
+            return None
+        predictions, self._buffer = self._buffer, []
+        return self.client.predictions.log_batch(
+            model_id=self.model_id,
+            predictions=predictions,
+        )
+
+    async def aflush(self) -> Optional[Dict[str, Any]]:
+        """Async version of flush()."""
+        if not self._buffer:
+            return None
+        predictions, self._buffer = self._buffer, []
+        return await self.client.predictions.alog_batch(
+            model_id=self.model_id,
+            predictions=predictions,
+        )
+
+    def get_prediction_count(self) -> int:
+        """Return the number of predictions logged (sent or buffered) by
+        this monitor instance so far."""
+        return self._prediction_count
+
+    def get_drift_reports(self, limit: int = 10, skip: int = 0) -> List[Dict[str, Any]]:
+        """Get persisted drift reports for this model, most recent first."""
+        if self.model_id is None:
+            raise ValueError("Model not registered. Call register_model() first.")
+
+        return self.client.drift.get_reports(model_id=self.model_id, limit=limit, skip=skip)
+
+    def create_alert_rule(
+        self,
+        metric: str,
+        threshold: float,
+        condition: str,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """
+        Create an alert rule for this model.
+
+        Args:
+            metric: Metric to monitor (e.g. "accuracy")
+            threshold: Threshold value that triggers the alert
+            condition: Comparison condition (e.g. "below", "above")
+            **kwargs: Additional alert configuration (name, etc.)
+
+        Returns:
+            Created alert rule data
+        """
+        name = kwargs.pop("name", f"{self.model_id}_{metric}_{condition}_{threshold}")
+        return self.client.alerts.create(
+            name=name,
+            alert_type="threshold",
+            conditions={"metric": metric, "threshold": threshold, "condition": condition},
+            model_id=self.model_id,
+            **kwargs,
+        )
+
+    def get_active_alerts(self) -> List[Dict[str, Any]]:
+        """Get alert rules for this model."""
+        return self.client.alerts.list(model_id=self.model_id)
 
     def set_baseline(self, data: np.ndarray) -> None:
         """
@@ -244,9 +373,9 @@ class ModelMonitor:
 
         return self.client.drift.detect(
             model_id=self.model_id,
-            reference_data=(
-                self._baseline_data.tolist() if self._baseline_data is not None else None
-            ),
+            reference_data=self._baseline_data.tolist()
+            if self._baseline_data is not None
+            else None,
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )
@@ -262,9 +391,9 @@ class ModelMonitor:
 
         return await self.client.drift.adetect(
             model_id=self.model_id,
-            reference_data=(
-                self._baseline_data.tolist() if self._baseline_data is not None else None
-            ),
+            reference_data=self._baseline_data.tolist()
+            if self._baseline_data is not None
+            else None,
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )

@@ -1,5 +1,5 @@
 """
-Offline mode support for WhiteBoxAI SDK.
+Offline mode support for WhiteBoxXAI SDK.
 
 This module provides offline queueing capabilities for the SDK, allowing
 operations to be queued locally when the API is unavailable and synced
@@ -15,11 +15,11 @@ Features:
 Example:
     Enable offline mode:
 
-    >>> from whiteboxai import WhiteBoxAI
-    >>> client = WhiteBoxAI(
+    >>> from whiteboxxai import WhiteBoxXAI
+    >>> client = WhiteBoxXAI(
     ...     api_key="your-api-key",
     ...     enable_offline=True,
-    ...     offline_dir="./whiteboxai_offline"
+    ...     offline_dir="./whiteboxxai_offline"
     ... )
     >>>
     >>> # Operations are queued when offline
@@ -377,7 +377,7 @@ class OfflineQueue:
 
 class OfflineManager:
     """
-    Manages offline mode for WhiteBoxAI SDK.
+    Manages offline mode for WhiteBoxXAI SDK.
 
     Handles automatic queueing when offline and syncing when online.
 
@@ -389,7 +389,7 @@ class OfflineManager:
 
     def __init__(
         self,
-        offline_dir: str = "./whiteboxai_offline",
+        offline_dir: str = "./whiteboxxai_offline",
         max_queue_size: int = 10000,
         auto_sync: bool = True,
         sync_interval: int = 60,
@@ -417,17 +417,17 @@ class OfflineManager:
         self.max_retries = max_retries
         self._sync_thread = None
         self._stop_sync = threading.Event()
-        self._client = None  # Will be set by WhiteBoxAI client
+        self._client = None  # Will be set by WhiteBoxXAI client
 
         if auto_sync:
             self.start_auto_sync()
 
     def set_client(self, client):
         """
-        Set the WhiteBoxAI client for syncing.
+        Set the WhiteBoxXAI client for syncing.
 
         Args:
-            client: WhiteBoxAI client instance
+            client: WhiteBoxXAI client instance
         """
         self._client = client
 

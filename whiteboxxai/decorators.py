@@ -9,7 +9,7 @@ import inspect
 import time
 from typing import Any, Callable, Dict, Optional
 
-from whiteboxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor
 
 
 def monitor_model(
@@ -29,9 +29,9 @@ def monitor_model(
 
     Example:
         ```python
-        from whiteboxai import WhiteBoxAI, ModelMonitor, monitor_model
+        from whiteboxxai import WhiteBoxXAI, ModelMonitor, monitor_model
 
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = ModelMonitor(client, model_id=123)
 
         @monitor_model(monitor, input_keys=["features"], explain=True)
@@ -126,9 +126,9 @@ def monitor_prediction(
 
     Example:
         ```python
-        from whiteboxai import WhiteBoxAI, ModelMonitor, monitor_prediction
+        from whiteboxxai import WhiteBoxXAI, ModelMonitor, monitor_prediction
 
-        client = WhiteBoxAI(api_key="your-api-key")
+        client = WhiteBoxXAI(api_key="your-api-key")
         monitor = ModelMonitor(client, model_id=123)
 
         def extract_inputs(args, kwargs):
@@ -278,7 +278,7 @@ def monitor_performance(threshold_ms: Optional[float] = None):
 
     Example:
         ```python
-        from whiteboxai.decorators import monitor_performance
+        from whiteboxxai.decorators import monitor_performance
 
         @monitor_performance(threshold_ms=1000)
         def slow_function():

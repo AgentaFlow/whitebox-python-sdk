@@ -1,5 +1,5 @@
 """
-CrewAI Integration for WhiteBoxAI
+CrewAI Integration for WhiteBoxXAI
 
 Monitor CrewAI multi-agent workflows with automatic tracking of agents,
 tasks, interactions, and costs.
@@ -7,6 +7,8 @@ tasks, interactions, and costs.
 
 import logging
 from typing import Any, Dict, Optional
+
+from whiteboxxai import WhiteBoxXAI
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +25,7 @@ class CrewAIMonitor:
     - Token usage and costs
 
     Example:
-        >>> from whiteboxai.integrations import CrewAIMonitor
+        >>> from whiteboxxai.integrations import CrewAIMonitor
         >>> from crewai import Agent, Task, Crew
         >>>
         >>> monitor = CrewAIMonitor(api_key="your_api_key")
@@ -75,27 +77,28 @@ class CrewAIMonitor:
     """
 
     def __init__(
-        self, api_key: str, api_url: Optional[str] = None, organization_id: Optional[str] = None
+        self,
+        api_key: str,
+        api_url: Optional[str] = None,
+        organization_id: Optional[str] = None,
     ):
         """
         Initialize CrewAI monitor.
 
         Args:
-            api_key: WhiteBoxAI API key
-            api_url: WhiteBoxAI API URL (optional, defaults to production)
+            api_key: WhiteBoxXAI API key
+            api_url: WhiteBoxXAI API URL (optional, defaults to production)
             organization_id: Organization ID (optional, extracted from token if not provided)
         """
-        from whiteboxai import WhiteBoxAI
-
         self.client = (
-            WhiteBoxAI(api_key=api_key, base_url=api_url)
+            WhiteBoxXAI(api_key=api_key, base_url=api_url)
             if api_url
-            else WhiteBoxAI(api_key=api_key)
+            else WhiteBoxXAI(api_key=api_key)
         )
         self.organization_id = organization_id
         self.workflow_id = None
-        self.agent_map = {}  # Maps CrewAI agent to WhiteBoxAI agent_id
-        self.task_map = {}  # Maps CrewAI task to WhiteBoxAI task_id
+        self.agent_map = {}  # Maps CrewAI agent to WhiteBoxXAI agent_id
+        self.task_map = {}  # Maps CrewAI task to WhiteBoxXAI task_id
         self.execution_map = {}  # Maps agent to execution_id
 
         logger.info("CrewAI Monitor initialized")
@@ -150,7 +153,9 @@ class CrewAIMonitor:
             }
 
             self.client.request(
-                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/start", data=start_data
+                "POST",
+                f"/api/v1/workflows/multi-agent/{self.workflow_id}/start",
+                data=start_data,
             )
 
             return self.workflow_id
@@ -161,7 +166,7 @@ class CrewAIMonitor:
 
     def _register_agent(self, crew_agent: Any) -> str:
         """
-        Register a CrewAI agent with WhiteBoxAI.
+        Register a CrewAI agent with WhiteBoxXAI.
 
         Args:
             crew_agent: CrewAI Agent instance
@@ -177,16 +182,14 @@ class CrewAIMonitor:
                 "goal": getattr(crew_agent, "goal", None),
                 "backstory": getattr(crew_agent, "backstory", None),
                 "tools": [tool.__class__.__name__ for tool in getattr(crew_agent, "tools", [])],
-                "llm_provider": (
-                    getattr(getattr(crew_agent, "llm", None), "model_name", "unknown").split("/")[0]
-                    if hasattr(crew_agent, "llm")
-                    else None
-                ),
-                "model_name": (
-                    getattr(getattr(crew_agent, "llm", None), "model_name", None)
-                    if hasattr(crew_agent, "llm")
-                    else None
-                ),
+                "llm_provider": getattr(
+                    getattr(crew_agent, "llm", None), "model_name", "unknown"
+                ).split("-")[0]
+                if hasattr(crew_agent, "llm")
+                else None,
+                "model_name": getattr(getattr(crew_agent, "llm", None), "model_name", None)
+                if hasattr(crew_agent, "llm")
+                else None,
                 "metadata": {
                     "verbose": getattr(crew_agent, "verbose", False),
                     "allow_delegation": getattr(crew_agent, "allow_delegation", False),
@@ -195,7 +198,9 @@ class CrewAIMonitor:
             }
 
             response = self.client.request(
-                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/agents", data=agent_data
+                "POST",
+                f"/api/v1/workflows/multi-agent/{self.workflow_id}/agents",
+                data=agent_data,
             )
 
             agent_id = response.get("id")
@@ -211,7 +216,7 @@ class CrewAIMonitor:
 
     def _register_task(self, crew_task: Any) -> str:
         """
-        Register a CrewAI task with WhiteBoxAI.
+        Register a CrewAI task with WhiteBoxXAI.
 
         Args:
             crew_task: CrewAI Task instance
@@ -237,7 +242,9 @@ class CrewAIMonitor:
             }
 
             response = self.client.request(
-                "POST", f"/api/v1/workflows/multi-agent/{self.workflow_id}/tasks", data=task_data
+                "POST",
+                f"/api/v1/workflows/multi-agent/{self.workflow_id}/tasks",
+                data=task_data,
             )
 
             task_id = response.get("id")
@@ -324,7 +331,9 @@ class CrewAIMonitor:
             }
 
             self.client.request(
-                "PATCH", f"/api/v1/workflows/multi-agent/tasks/{task_id}", data=update_data
+                "PATCH",
+                f"/api/v1/workflows/multi-agent/tasks/{task_id}",
+                data=update_data,
             )
 
             logger.debug(f"Logged task completion: {task_id} ({status})")
@@ -393,8 +402,15 @@ class CrewAIMonitor:
         Returns:
             Workflow summary with analytics
         """
+        if not self.workflow_id:
+            raise ValueError("No active workflow to complete. Call start_monitoring() first.")
+
         try:
-            complete_data = {"status": status, "outputs": outputs, "error_message": error_message}
+            complete_data = {
+                "status": status,
+                "outputs": outputs,
+                "error_message": error_message,
+            }
 
             self.client.request(
                 "POST",
@@ -407,7 +423,11 @@ class CrewAIMonitor:
             # Get analytics
             analytics = self.get_analytics()
 
-            return {"workflow_id": self.workflow_id, "status": status, "analytics": analytics}
+            return {
+                "workflow_id": self.workflow_id,
+                "status": status,
+                "analytics": analytics,
+            }
 
         except Exception as e:
             logger.error(f"Error completing monitoring: {str(e)}")
@@ -429,7 +449,8 @@ class CrewAIMonitor:
             )
 
             cost_breakdown = self.client.request(
-                "GET", f"/api/v1/workflows/multi-agent/{self.workflow_id}/cost-breakdown"
+                "GET",
+                f"/api/v1/workflows/multi-agent/{self.workflow_id}/cost-breakdown",
             )
 
             return {"metrics": analytics, "cost_breakdown": cost_breakdown}
@@ -453,8 +474,8 @@ def monitor_crew(
     Args:
         crew: CrewAI Crew instance
         workflow_name: Workflow name
-        api_key: WhiteBoxAI API key
-        api_url: WhiteBoxAI API URL (optional)
+        api_key: WhiteBoxXAI API key
+        api_url: WhiteBoxXAI API URL (optional)
         metadata: Workflow metadata (optional)
 
     Returns:

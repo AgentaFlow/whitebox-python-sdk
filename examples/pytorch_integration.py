@@ -9,8 +9,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.pytorch import TorchMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.pytorch import TorchMonitor
 
 
 class SimpleClassifier(nn.Module):
@@ -76,8 +76,8 @@ def main():
     train_model(model, train_loader, epochs=5)
 
     # Setup monitoring
-    print("\nSetting up WhiteBoxAI monitoring...")
-    client = WhiteBoxAI(api_key="your-api-key")
+    print("\nSetting up WhiteBoxXAI monitoring...")
+    client = WhiteBoxXAI(api_key="your-api-key")
     monitor = TorchMonitor(client, model=model)
 
     # Register model

@@ -1,6 +1,6 @@
 # TensorFlow/Keras Integration Guide
 
-Complete guide for integrating WhiteBoxAI monitoring with TensorFlow and Keras models.
+Complete guide for integrating WhiteBoxXAI monitoring with TensorFlow and Keras models.
 
 ## Table of Contents
 
@@ -22,11 +22,11 @@ Complete guide for integrating WhiteBoxAI monitoring with TensorFlow and Keras m
 ```python
 import tensorflow as tf
 from tensorflow import keras
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.tensorflow import KerasMonitor
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.tensorflow import KerasMonitor
 
-# Initialize WhiteBoxAI
-client = WhiteBoxAI(api_key='your-api-key')
+# Initialize WhiteBoxXAI
+client = WhiteBoxXAI(api_key='your-api-key')
 
 # Define Keras model
 model = keras.Sequential([
@@ -111,13 +111,13 @@ monitor = KerasMonitor(model, client, "custom_model")
 
 ## Keras Callbacks
 
-### WhiteBoxAI Training Callback
+### WhiteBoxXAI Training Callback
 
 ```python
-from whiteboxai.integrations.tensorflow import WhiteBoxAICallback
+from whiteboxxai.integrations.tensorflow import WhiteBoxXAICallback
 
 # Create callback
-callback = WhiteBoxAICallback(
+callback = WhiteBoxXAICallback(
     monitor=monitor,
     log_frequency=1,  # Log every epoch
     log_weights=False,
@@ -183,7 +183,7 @@ class PredictionCallback(keras.callbacks.Callback):
             # Make predictions
             predictions = self.model.predict(self.X_val, verbose=0)
 
-            # Log to WhiteBoxAI
+            # Log to WhiteBoxXAI
             self.monitor.log_batch(
                 inputs=self.X_val,
                 predictions=predictions,
@@ -254,7 +254,7 @@ monitor.set_baseline(X_train, y_train)
 
 # Callbacks
 callbacks = [
-    WhiteBoxAICallback(monitor, log_frequency=1),
+    WhiteBoxXAICallback(monitor, log_frequency=1),
     keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True),
     keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5)
 ]
@@ -307,7 +307,7 @@ model.fit(
     X_train, y_train,
     epochs=50,
     callbacks=[
-        WhiteBoxAICallback(monitor),
+        WhiteBoxXAICallback(monitor),
         lr_schedule,
         LRLogger(monitor)
     ]
@@ -324,7 +324,7 @@ model.fit(
 # Save model in SavedModel format
 model.save('saved_model/my_model')
 
-# Register saved model with WhiteBoxAI
+# Register saved model with WhiteBoxXAI
 monitor.register_saved_model(
     model_path='saved_model/my_model',
     metadata={
@@ -415,7 +415,7 @@ model.compile(
 
 # Train with monitoring
 monitor = KerasMonitor(model, client, "mnist_classifier")
-callback = WhiteBoxAICallback(monitor)
+callback = WhiteBoxXAICallback(monitor)
 
 model.fit(
     ds_train,
@@ -496,7 +496,7 @@ model.fit(
     X_train, y_train,
     epochs=50,
     batch_size=32 * strategy.num_replicas_in_sync,
-    callbacks=[WhiteBoxAICallback(monitor)]
+    callbacks=[WhiteBoxXAICallback(monitor)]
 )
 ```
 
@@ -521,7 +521,7 @@ with strategy.scope():
     monitor = KerasMonitor(model, client, "tpu_model")
 
 # Train
-model.fit(ds_train, epochs=10, callbacks=[WhiteBoxAICallback(monitor)])
+model.fit(ds_train, epochs=10, callbacks=[WhiteBoxXAICallback(monitor)])
 ```
 
 ---
@@ -536,7 +536,7 @@ version = 1
 export_path = f'serving/my_model/{version}'
 model.save(export_path, save_format='tf')
 
-# Register with WhiteBoxAI
+# Register with WhiteBoxXAI
 monitor.register_serving_model(
     model_path=export_path,
     version=version,
@@ -571,7 +571,7 @@ def predict_with_serving(inputs):
 
     predictions = response.json()['predictions']
 
-    # Log to WhiteBoxAI
+    # Log to WhiteBoxXAI
     monitor.log_batch(
         inputs=inputs,
         predictions=predictions,
@@ -619,7 +619,7 @@ model.fit(
     callbacks=[
         checkpoint_cb,
         CheckpointLogger(monitor),
-        WhiteBoxAICallback(monitor)
+        WhiteBoxXAICallback(monitor)
     ]
 )
 ```
@@ -634,12 +634,12 @@ tensorboard_cb = keras.callbacks.TensorBoard(
     write_graph=True
 )
 
-# Combine with WhiteBoxAI
+# Combine with WhiteBoxXAI
 model.fit(
     X_train, y_train,
     epochs=50,
     callbacks=[
-        WhiteBoxAICallback(monitor),
+        WhiteBoxXAICallback(monitor),
         tensorboard_cb
     ]
 )
@@ -675,7 +675,7 @@ model.compile(
 
 # Train with monitoring
 monitor = KerasMonitor(model, client, "mixed_precision_model")
-model.fit(X_train, y_train, callbacks=[WhiteBoxAICallback(monitor)])
+model.fit(X_train, y_train, callbacks=[WhiteBoxXAICallback(monitor)])
 ```
 
 ### 4. Data Augmentation
@@ -696,7 +696,7 @@ model.fit(
     datagen.flow(X_train, y_train, batch_size=32),
     epochs=50,
     validation_data=(X_val, y_val),
-    callbacks=[WhiteBoxAICallback(monitor)]
+    callbacks=[WhiteBoxXAICallback(monitor)]
 )
 ```
 
@@ -709,8 +709,8 @@ model.fit(
 ```python
 import tensorflow as tf
 from tensorflow import keras
-from whiteboxai import WhiteBoxAI
-from whiteboxai.integrations.tensorflow import KerasMonitor, WhiteBoxAICallback
+from whiteboxxai import WhiteBoxXAI
+from whiteboxxai.integrations.tensorflow import KerasMonitor, WhiteBoxXAICallback
 
 # Load CIFAR-10
 (X_train, y_train), (X_test, y_test) = keras.datasets.cifar10.load_data()
@@ -750,7 +750,7 @@ model.compile(
 )
 
 # Initialize monitoring
-client = WhiteBoxAI(api_key='your-api-key')
+client = WhiteBoxXAI(api_key='your-api-key')
 monitor = KerasMonitor(
     model=model,
     client=client,
@@ -765,7 +765,7 @@ monitor.set_baseline(X_train[:1000], y_train[:1000])
 
 # Callbacks
 callbacks = [
-    WhiteBoxAICallback(monitor, log_frequency=1),
+    WhiteBoxXAICallback(monitor, log_frequency=1),
     keras.callbacks.EarlyStopping(patience=10, restore_best_weights=True),
     keras.callbacks.ReduceLROnPlateau(factor=0.5, patience=5, min_lr=1e-6)
 ]
@@ -863,7 +863,7 @@ history = model.fit(
     epochs=50,
     batch_size=32,
     validation_split=0.2,
-    callbacks=[WhiteBoxAICallback(monitor)],
+    callbacks=[WhiteBoxXAICallback(monitor)],
     verbose=1
 )
 
@@ -888,7 +888,7 @@ print(f"LSTM model ID: {monitor.model_id}")
 
 ```python
 # Correct
-model.fit(X, y, callbacks=[WhiteBoxAICallback(monitor)])
+model.fit(X, y, callbacks=[WhiteBoxXAICallback(monitor)])
 
 # Incorrect (callback not passed)
 model.fit(X, y)
@@ -924,8 +924,8 @@ model.save('model_dir')
 
 - [TensorFlow Documentation](https://www.tensorflow.org/api_docs)
 - [Keras Guide](https://keras.io/guides/)
-- [WhiteBoxAI API Reference](https://docs.whiteboxai.com/api)
-- [Best Practices](https://docs.whiteboxai.com/best-practices)
+- [WhiteBoxXAI API Reference](https://docs.whiteboxxai.com/api)
+- [Best Practices](https://docs.whiteboxxai.com/best-practices)
 
 ---
 

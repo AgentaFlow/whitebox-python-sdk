@@ -1,6 +1,6 @@
 # Offline Mode
 
-WhiteBoxAI SDK supports offline mode for robust operation when network connectivity is unreliable.
+WhiteBoxXAI SDK supports offline mode for robust operation when network connectivity is unreliable.
 
 ## Overview
 
@@ -14,13 +14,13 @@ Offline mode provides:
 ## Quick Start
 
 ```python
-from whiteboxai import WhiteBoxAI
+from whiteboxxai import WhiteBoxXAI
 
 # Enable offline mode with auto-sync
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key="your-api-key",
     enable_offline=True,
-    offline_dir="./whiteboxai_offline",
+    offline_dir="./whiteboxxai_offline",
     offline_auto_sync=True,
     offline_sync_interval=60
 )
@@ -31,7 +31,7 @@ client = WhiteBoxAI(
 ### Basic Configuration
 
 ```python
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key="your-api-key",
     enable_offline=True,              # Enable offline mode
     offline_dir="./offline_queue",    # Storage directory
@@ -42,7 +42,7 @@ client = WhiteBoxAI(
 ### Auto-Sync Configuration
 
 ```python
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key="your-api-key",
     enable_offline=True,
     offline_auto_sync=True,           # Enable background sync
@@ -123,10 +123,10 @@ except Exception as e:
 For production deployments:
 
 ```python
-client = WhiteBoxAI(
+client = WhiteBoxXAI(
     api_key=os.getenv("WHITEBOXAI_API_KEY"),
     enable_offline=True,
-    offline_dir="/var/lib/whiteboxai/queue",
+    offline_dir="/var/lib/whiteboxxai/queue",
     offline_max_queue_size=50000,
     offline_auto_sync=True,
     offline_sync_interval=30,  # More frequent sync in production

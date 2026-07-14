@@ -1,21 +1,21 @@
 # API Reference
 
-Complete API documentation for WhiteBoxAI SDK.
+Complete API documentation for WhiteBoxXAI SDK.
 
-## WhiteBoxAI Client
+## WhiteBoxXAI Client
 
-Main client for interacting with the WhiteBoxAI API.
+Main client for interacting with the WhiteBoxXAI API.
 
 ### Constructor
 
 ```python
-WhiteBoxAI(
+WhiteBoxXAI(
     api_key: str = None,
-    base_url: str = "https://api.whiteboxai.io",
+    base_url: str = "https://api.whiteboxxai.com",
     timeout: int = 30,
     max_retries: int = 3,
     enable_offline: bool = False,
-    offline_dir: str = "./whiteboxai_offline",
+    offline_dir: str = "./whiteboxxai_offline",
     offline_max_queue_size: int = 10000,
     offline_auto_sync: bool = False,
     offline_sync_interval: int = 60,
@@ -29,7 +29,7 @@ WhiteBoxAI(
 ```
 
 **Parameters:**
-- `api_key` (str): API key for authentication. Can be set via EXPLAINAI_API_KEY env var
+- `api_key` (str): API key for authentication. Can be set via WHITEBOXXAI_API_KEY env var
 - `base_url` (str): Base URL for API endpoint
 - `timeout` (int): Request timeout in seconds
 - `max_retries` (int): Maximum number of retry attempts
@@ -86,7 +86,7 @@ Simplified monitoring interface.
 
 ```python
 ModelMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     model_id: int = None,
     sampling_rate: float = 1.0,
     enable_explanations: bool = False
@@ -188,10 +188,10 @@ Monitor predictions with custom extractors.
 ### SklearnMonitor
 
 ```python
-from whiteboxai.integrations.sklearn import SklearnMonitor
+from whiteboxxai.integrations.sklearn import SklearnMonitor
 
 monitor = SklearnMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     model=None,
     model_name: str = None
 )
@@ -204,10 +204,10 @@ monitor.predict(model, X, y=None, log=True)
 ### TorchMonitor
 
 ```python
-from whiteboxai.integrations.pytorch import TorchMonitor
+from whiteboxxai.integrations.pytorch import TorchMonitor
 
 monitor = TorchMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     model=None,
     model_name: str = None
 )
@@ -219,26 +219,26 @@ monitor.wrap_model(model)
 ### KerasMonitor
 
 ```python
-from whiteboxai.integrations.tensorflow import KerasMonitor, WhiteBoxAICallback
+from whiteboxxai.integrations.tensorflow import KerasMonitor, WhiteBoxXAICallback
 
 monitor = KerasMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     model=None,
     model_name: str = None
 )
 
 monitor.register_from_model(model_type: str, **kwargs) -> int
-callback = WhiteBoxAICallback(monitor, log_frequency=1)
+callback = WhiteBoxXAICallback(monitor, log_frequency=1)
 monitor.predict(X, log=True)
 ```
 
 ### TransformersMonitor
 
 ```python
-from whiteboxai.integrations.transformers import TransformersMonitor
+from whiteboxxai.integrations.transformers import TransformersMonitor
 
 monitor = TransformersMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     pipeline=None,
     model_name: str = None
 )
@@ -250,10 +250,10 @@ monitor.predict(text, log=True)
 ### LangChainMonitor
 
 ```python
-from whiteboxai.integrations.langchain import LangChainMonitor
+from whiteboxxai.integrations.langchain import LangChainMonitor
 
 monitor = LangChainMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     application_name: str,
     track_tokens: bool = True,
     track_cost: bool = True
@@ -266,10 +266,10 @@ callback = monitor.create_callback_handler()
 ### XGBoostMonitor / LightGBMMonitor
 
 ```python
-from whiteboxai.integrations.boosting import XGBoostMonitor, LightGBMMonitor
+from whiteboxxai.integrations.boosting import XGBoostMonitor, LightGBMMonitor
 
 monitor = XGBoostMonitor(
-    client: WhiteBoxAI,
+    client: WhiteBoxXAI,
     model_name: str,
     track_feature_importance: bool = True,
     importance_type: str = "gain"
@@ -282,8 +282,8 @@ monitor.predict(model, X, y=None, log=True)
 ## Exceptions
 
 ```python
-from whiteboxai.exceptions import (
-    WhiteBoxAIError,          # Base exception
+from whiteboxxai.exceptions import (
+    WhiteBoxXAIError,          # Base exception
     AuthenticationError,       # Authentication failed
     APIError,                 # API request error
     ValidationError,          # Validation error
@@ -294,7 +294,7 @@ from whiteboxai.exceptions import (
 ## Privacy
 
 ```python
-from whiteboxai.privacy import mask_data
+from whiteboxxai.privacy import mask_data
 
 masked = mask_data(
     data: dict,

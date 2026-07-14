@@ -1,4 +1,4 @@
-"""Framework integrations for WhiteBoxAI SDK."""
+"""Framework integrations for WhiteBoxXAI SDK."""
 
 # Scikit-learn integration
 try:
@@ -21,12 +21,12 @@ except ImportError:
 
 # TensorFlow/Keras integration
 try:
-    from .tensorflow import KerasMonitor, WhiteBoxAICallback, wrap_keras_model
+    from .tensorflow import KerasMonitor, WhiteBoxXAICallback, wrap_keras_model
 
     if "__all__" in dir():
-        __all__.extend(["KerasMonitor", "WhiteBoxAICallback", "wrap_keras_model"])
+        __all__.extend(["KerasMonitor", "WhiteBoxXAICallback", "wrap_keras_model"])
     else:
-        __all__ = ["KerasMonitor", "WhiteBoxAICallback", "wrap_keras_model"]
+        __all__ = ["KerasMonitor", "WhiteBoxXAICallback", "wrap_keras_model"]
 except ImportError:
     pass
 
@@ -40,7 +40,11 @@ try:
 
     if "__all__" in dir():
         __all__.extend(
-            ["TransformersMonitor", "TransformersPipelineWrapper", "wrap_transformers_pipeline"]
+            [
+                "TransformersMonitor",
+                "TransformersPipelineWrapper",
+                "wrap_transformers_pipeline",
+            ]
         )
     else:
         __all__ = [
@@ -53,12 +57,16 @@ except ImportError:
 
 # LangChain integration
 try:
-    from .langchain import LangChainMonitor, WhiteBoxAICallbackHandler, wrap_langchain_chain
+    from .langchain import LangChainMonitor, WhiteBoxXAICallbackHandler, wrap_langchain_chain
 
     if "__all__" in dir():
-        __all__.extend(["LangChainMonitor", "WhiteBoxAICallbackHandler", "wrap_langchain_chain"])
+        __all__.extend(["LangChainMonitor", "WhiteBoxXAICallbackHandler", "wrap_langchain_chain"])
     else:
-        __all__ = ["LangChainMonitor", "WhiteBoxAICallbackHandler", "wrap_langchain_chain"]
+        __all__ = [
+            "LangChainMonitor",
+            "WhiteBoxXAICallbackHandler",
+            "wrap_langchain_chain",
+        ]
 except ImportError:
     pass
 
@@ -68,10 +76,20 @@ try:
 
     if "__all__" in dir():
         __all__.extend(
-            ["XGBoostMonitor", "LightGBMMonitor", "wrap_xgboost_model", "wrap_lightgbm_model"]
+            [
+                "XGBoostMonitor",
+                "LightGBMMonitor",
+                "wrap_xgboost_model",
+                "wrap_lightgbm_model",
+            ]
         )
     else:
-        __all__ = ["XGBoostMonitor", "LightGBMMonitor", "wrap_xgboost_model", "wrap_lightgbm_model"]
+        __all__ = [
+            "XGBoostMonitor",
+            "LightGBMMonitor",
+            "wrap_xgboost_model",
+            "wrap_lightgbm_model",
+        ]
 except ImportError:
     pass
 
@@ -86,7 +104,7 @@ try:
 except ImportError:
     pass
 
-# LangChain Multi-Agent integration
+# LangChain integration
 try:
     from .langchain_agents import (
         LangGraphMultiAgentMonitor,
@@ -96,7 +114,11 @@ try:
 
     if "__all__" in dir():
         __all__.extend(
-            ["MultiAgentCallbackHandler", "LangGraphMultiAgentMonitor", "monitor_langchain_agent"]
+            [
+                "MultiAgentCallbackHandler",
+                "LangGraphMultiAgentMonitor",
+                "monitor_langchain_agent",
+            ]
         )
     else:
         __all__ = [
