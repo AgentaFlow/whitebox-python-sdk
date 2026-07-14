@@ -77,7 +77,7 @@ class TestConfig:
 
         # Invalid URL (no protocol) - should handle gracefully or raise
         try:
-            config2 = Config(api_key="test-key", base_url="invalid-url")
+            Config(api_key="test-key", base_url="invalid-url")
             # If it accepts, it should add protocol or validate differently
         except ValueError:
             # Acceptable to reject invalid URLs

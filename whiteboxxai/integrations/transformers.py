@@ -5,11 +5,11 @@ Integration for monitoring Hugging Face Transformers models.
 """
 
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 try:
     import transformers
-    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer, pipeline
+    from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer
 
     TRANSFORMERS_AVAILABLE = True
 except ImportError:
@@ -17,8 +17,6 @@ except ImportError:
     PreTrainedModel = object
     PreTrainedTokenizer = object
     Pipeline = object
-
-import numpy as np
 
 from whiteboxxai.monitor import ModelMonitor
 

@@ -4,7 +4,7 @@ Unit tests for CrewAI integration.
 Tests CrewAI monitoring with mocked API calls.
 """
 
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 import pytest

@@ -162,7 +162,7 @@ class TestClientHTTPMethods:
 
         mock_request.side_effect = [mock_response_error, mock_response_success]
 
-        client = WhiteBoxXAI(api_key="test_key", max_retries=2)
+        WhiteBoxXAI(api_key="test_key", max_retries=2)
         # Note: Retry behavior depends on implementation
         # This test verifies the interface exists
 

@@ -85,13 +85,13 @@ def example_xgboost_classification():
     # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Predictions logged to WhiteBoxXAI")
+    print("Predictions logged to WhiteBoxXAI")
 
     # Get feature importance
     importance = model.feature_importances_
     top_features = np.argsort(importance)[-5:][::-1]
     print(f"\nTop 5 features: {top_features.tolist()}")
-    print(f"Feature importance tracked in metadata")
+    print("Feature importance tracked in metadata")
 
 
 def example_xgboost_regression():
@@ -142,7 +142,7 @@ def example_xgboost_regression():
     r2 = r2_score(y_test, predictions)
     print(f"MSE: {mse:.4f}")
     print(f"R² Score: {r2:.4f}")
-    print(f"Predictions automatically logged via wrapper")
+    print("Predictions automatically logged via wrapper")
 
 
 def example_lightgbm_classification():
@@ -199,13 +199,10 @@ def example_lightgbm_classification():
     print("\nMaking predictions...")
     predictions = monitor.predict(model, X_test, y_test)
 
-    # Get probabilities
-    probabilities = model.predict_proba(X_test)
-
     # Calculate metrics
     accuracy = accuracy_score(y_test, predictions)
     print(f"Accuracy: {accuracy:.4f}")
-    print(f"Predictions logged with probabilities")
+    print("Predictions logged with probabilities")
 
     # Feature importance
     importance = model.feature_importances_
@@ -261,7 +258,7 @@ def example_lightgbm_regression():
     r2 = r2_score(y_test, predictions)
     print(f"MSE: {mse:.4f}")
     print(f"R² Score: {r2:.4f}")
-    print(f"Predictions automatically logged via wrapper")
+    print("Predictions automatically logged via wrapper")
 
 
 def example_feature_importance_tracking():

@@ -151,7 +151,7 @@ def example_sequential_chain():
     print("\nRunning sequential chain...")
     result = wrapped_chain({"subject": "artificial intelligence"})
 
-    print(f"\n  Subject: artificial intelligence")
+    print("\n  Subject: artificial intelligence")
     print(f"  Topic: {result['topic'].strip()}")
     print(f"  Paragraph: {result['paragraph'].strip()[:100]}...")
 
@@ -162,7 +162,6 @@ def example_agent():
     """Example using an agent with tools."""
     from langchain.agents import AgentType, Tool, initialize_agent
     from langchain.llms import OpenAI
-    from langchain.utilities import SerpAPIWrapper
 
     print("\n" + "=" * 60)
     print("Agent Example")
@@ -228,12 +227,6 @@ def example_agent():
 
 def example_rag_chain():
     """Example using a RAG (Retrieval-Augmented Generation) chain."""
-    from langchain.chains import RetrievalQA
-    from langchain.embeddings import OpenAIEmbeddings
-    from langchain.llms import OpenAI
-    from langchain.text_splitter import CharacterTextSplitter
-    from langchain.vectorstores import FAISS
-
     print("\n" + "=" * 60)
     print("RAG Chain Example")
     print("=" * 60)

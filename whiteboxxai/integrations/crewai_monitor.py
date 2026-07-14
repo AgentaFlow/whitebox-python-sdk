@@ -6,10 +6,7 @@ tasks, interactions, and costs.
 """
 
 import logging
-import time
-import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from whiteboxxai import WhiteBoxXAI
 
@@ -282,7 +279,7 @@ class CrewAIMonitor:
         try:
             agent_id = self.agent_map.get(id(agent))
             if not agent_id:
-                logger.warning(f"Agent not registered, skipping execution log")
+                logger.warning("Agent not registered, skipping execution log")
                 return
 
             execution_data = {
@@ -324,7 +321,7 @@ class CrewAIMonitor:
         try:
             task_id = self.task_map.get(id(task))
             if not task_id:
-                logger.warning(f"Task not registered, skipping completion log")
+                logger.warning("Task not registered, skipping completion log")
                 return
 
             update_data = {
@@ -415,7 +412,7 @@ class CrewAIMonitor:
                 "error_message": error_message,
             }
 
-            response = self.client.request(
+            self.client.request(
                 "POST",
                 f"/api/v1/workflows/multi-agent/{self.workflow_id}/complete",
                 data=complete_data,

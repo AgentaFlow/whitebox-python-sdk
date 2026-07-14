@@ -6,7 +6,7 @@ Main client class for interacting with the WhiteBoxXAI API.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
 import httpx

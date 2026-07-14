@@ -5,7 +5,7 @@ PII detection and data masking utilities.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Pattern, Union
+from typing import Any, Dict, List, Optional, Pattern
 
 
 class PIIDetector:

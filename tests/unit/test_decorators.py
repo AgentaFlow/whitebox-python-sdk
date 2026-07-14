@@ -5,7 +5,7 @@ Tests for monitoring decorators.
 """
 
 import time
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -42,7 +42,7 @@ class TestMonitorModelDecorator:
         def predict(features):
             return {"prediction": sum(features)}
 
-        result = predict(features=[1, 2, 3])
+        predict(features=[1, 2, 3])
 
         # Verify inputs were extracted
         call_args = mock_monitor.log_prediction.call_args
@@ -56,7 +56,7 @@ class TestMonitorModelDecorator:
         def predict(x):
             return {"prediction": x * 2, "confidence": 0.95}
 
-        result = predict(x=5)
+        predict(x=5)
 
         # Verify output was extracted
         call_args = mock_monitor.log_prediction.call_args
@@ -70,7 +70,7 @@ class TestMonitorModelDecorator:
         def predict(x):
             return x * 2
 
-        result = predict(x=5)
+        predict(x=5)
 
         # Verify explain was passed
         call_args = mock_monitor.log_prediction.call_args
@@ -85,7 +85,7 @@ class TestMonitorModelDecorator:
             time.sleep(0.1)  # Simulate processing
             return x * 2
 
-        result = predict(x=5)
+        predict(x=5)
 
         # Verify metadata includes inference time
         call_args = mock_monitor.log_prediction.call_args

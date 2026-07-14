@@ -34,11 +34,9 @@ import logging
 import os
 import sqlite3
 import threading
-import time
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 logger = logging.getLogger(__name__)
 

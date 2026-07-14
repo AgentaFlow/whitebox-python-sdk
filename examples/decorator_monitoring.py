@@ -17,9 +17,7 @@ monitor = ModelMonitor(client, model_id=123)
 @monitor_model(monitor, input_keys=["features"], explain=True)
 def predict_fraud(features):
     """Predict fraud probability."""
-    # Simulate model prediction
-    model = RandomForestClassifier()
-    # ... (assume model is trained)
+    # Simulate model prediction (assume a RandomForestClassifier is trained)
     prediction = np.random.choice([0, 1])
     probability = np.random.random()
 

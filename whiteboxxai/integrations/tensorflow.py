@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +30,9 @@ except ImportError:
 
     keras = _KerasStub()
 
-import numpy as np
+import numpy as np  # noqa: E402
 
-from whiteboxxai.monitor import ModelMonitor
+from whiteboxxai.monitor import ModelMonitor  # noqa: E402
 
 
 class KerasMonitor(ModelMonitor):

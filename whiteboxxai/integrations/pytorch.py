@@ -6,7 +6,7 @@ Integration for monitoring PyTorch models.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional
 
 try:
     import torch
@@ -24,8 +24,6 @@ except ImportError:
         Module = object
 
     nn = _NNStub()
-
-import numpy as np
 
 from whiteboxxai.monitor import ModelMonitor
 

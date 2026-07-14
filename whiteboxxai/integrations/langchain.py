@@ -6,10 +6,9 @@ Integration for monitoring LangChain applications including chains, agents, and 
 
 from __future__ import annotations
 
-import json
 import time
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 try:
     from langchain.agents import AgentExecutor
