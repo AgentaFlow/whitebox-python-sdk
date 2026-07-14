@@ -42,9 +42,7 @@ class Config:
 
         # Base URL
         self.base_url = (
-            base_url
-            or os.getenv("WHITEBOXXAI_BASE_URL")
-            or "https://api.whiteboxxai.com"
+            base_url or os.getenv("WHITEBOXXAI_BASE_URL") or "https://api.whiteboxxai.com"
         )
 
         # Request settings

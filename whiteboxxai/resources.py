@@ -192,9 +192,7 @@ class ModelsResource(BaseResource):
 
     async def aupdate(self, model_id: str, **kwargs: Any) -> Dict[str, Any]:
         """Async version of update()."""
-        return await self.client.arequest(
-            "PATCH", f"/api/v1/models/{model_id}", data=kwargs
-        )
+        return await self.client.arequest("PATCH", f"/api/v1/models/{model_id}", data=kwargs)
 
     def update_status(self, model_id: str, new_status: str) -> Dict[str, Any]:
         """Update model status (ACTIVE, INACTIVE, DEPRECATED, ARCHIVED)."""
@@ -393,9 +391,7 @@ class PredictionsResource(BaseResource):
     ) -> Dict[str, Any]:
         """Async version of log_batch()."""
         data = {"model_id": model_id, "predictions": predictions}
-        return await self.client.arequest(
-            "POST", "/api/v1/predictions/log/batch", data=data
-        )
+        return await self.client.arequest("POST", "/api/v1/predictions/log/batch", data=data)
 
     def get(self, prediction_id: str) -> Dict[str, Any]:
         """Get a prediction by its ID."""
@@ -444,9 +440,7 @@ class PredictionsResource(BaseResource):
             data["start_time"] = start_time
         if end_time is not None:
             data["end_time"] = end_time
-        return await self.client.arequest(
-            "POST", "/api/v1/predictions/query", data=data
-        )
+        return await self.client.arequest("POST", "/api/v1/predictions/query", data=data)
 
     def get_stats(
         self,
@@ -528,9 +522,7 @@ class ExplanationsResource(BaseResource):
     ) -> Dict[str, Any]:
         """Async version of generate()."""
         data = {"prediction_id": prediction_id, "method": method, **kwargs}
-        return await self.client.arequest(
-            "POST", "/api/v1/explanations/generate", data=data
-        )
+        return await self.client.arequest("POST", "/api/v1/explanations/generate", data=data)
 
     def get(self, explanation_id: int) -> Dict[str, Any]:
         """Get explanation by ID."""
@@ -538,9 +530,7 @@ class ExplanationsResource(BaseResource):
 
     async def aget(self, explanation_id: int) -> Dict[str, Any]:
         """Async version of get()."""
-        return await self.client.arequest(
-            "GET", f"/api/v1/explanations/{explanation_id}"
-        )
+        return await self.client.arequest("GET", f"/api/v1/explanations/{explanation_id}")
 
 
 class DriftResource(BaseResource):
@@ -566,9 +556,7 @@ class DriftResource(BaseResource):
         params: Dict[str, Any] = {"window_size": window_size}
         if feature_names is not None:
             params["feature_names"] = feature_names
-        return self.client.request(
-            "POST", f"/api/v1/drift/detect/{model_id}", params=params
-        )
+        return self.client.request("POST", f"/api/v1/drift/detect/{model_id}", params=params)
 
     async def adetect(
         self,
@@ -580,9 +568,7 @@ class DriftResource(BaseResource):
         params: Dict[str, Any] = {"window_size": window_size}
         if feature_names is not None:
             params["feature_names"] = feature_names
-        return await self.client.arequest(
-            "POST", f"/api/v1/drift/detect/{model_id}", params=params
-        )
+        return await self.client.arequest("POST", f"/api/v1/drift/detect/{model_id}", params=params)
 
     def create_report(self, model_id: str, window_size: int = 1000) -> Dict[str, Any]:
         """Run drift analysis and persist the result as a drift report."""
@@ -592,9 +578,7 @@ class DriftResource(BaseResource):
             params={"model_id": model_id, "window_size": window_size},
         )
 
-    async def acreate_report(
-        self, model_id: str, window_size: int = 1000
-    ) -> Dict[str, Any]:
+    async def acreate_report(self, model_id: str, window_size: int = 1000) -> Dict[str, Any]:
         """Async version of create_report()."""
         return await self.client.arequest(
             "POST",
@@ -602,9 +586,7 @@ class DriftResource(BaseResource):
             params={"model_id": model_id, "window_size": window_size},
         )
 
-    def get_reports(
-        self, model_id: str, limit: int = 10, skip: int = 0
-    ) -> List[Dict[str, Any]]:
+    def get_reports(self, model_id: str, limit: int = 10, skip: int = 0) -> List[Dict[str, Any]]:
         """List drift reports for a model, most recent first."""
         return self.client.request(
             "GET",
@@ -624,21 +606,15 @@ class DriftResource(BaseResource):
 
     def get_report(self, model_id: str, report_id: str) -> Dict[str, Any]:
         """Get a specific drift report with per-feature statistics."""
-        return self.client.request(
-            "GET", f"/api/v1/drift/reports/{model_id}/{report_id}"
-        )
+        return self.client.request("GET", f"/api/v1/drift/reports/{model_id}/{report_id}")
 
     async def aget_report(self, model_id: str, report_id: str) -> Dict[str, Any]:
         """Async version of get_report()."""
-        return await self.client.arequest(
-            "GET", f"/api/v1/drift/reports/{model_id}/{report_id}"
-        )
+        return await self.client.arequest("GET", f"/api/v1/drift/reports/{model_id}/{report_id}")
 
     def get_trend(self, model_id: str, days: int = 7) -> Dict[str, Any]:
         """Get drift trend over time for a model."""
-        return self.client.request(
-            "GET", f"/api/v1/drift/trend/{model_id}", params={"days": days}
-        )
+        return self.client.request("GET", f"/api/v1/drift/trend/{model_id}", params={"days": days})
 
     async def aget_trend(self, model_id: str, days: int = 7) -> Dict[str, Any]:
         """Async version of get_trend()."""
@@ -754,9 +730,7 @@ class FairnessResource(BaseResource):
         params: Dict[str, Any] = {"limit": limit, "offset": offset}
         if model_id is not None:
             params["model_id"] = model_id
-        return await self.client.arequest(
-            "GET", "/api/v1/fairness/audits", params=params
-        )
+        return await self.client.arequest("GET", "/api/v1/fairness/audits", params=params)
 
     def get_bias_history(self, model_id: str, days: int = 30) -> Dict[str, Any]:
         """Get historical bias metrics/trend for a model."""
@@ -774,9 +748,7 @@ class FairnessResource(BaseResource):
             params={"days": days},
         )
 
-    def get_metric_history(
-        self, model_id: str, metric_type: str, days: int = 30
-    ) -> Dict[str, Any]:
+    def get_metric_history(self, model_id: str, metric_type: str, days: int = 30) -> Dict[str, Any]:
         """Get history for a specific fairness metric type."""
         return self.client.request(
             "GET",
@@ -796,15 +768,11 @@ class FairnessResource(BaseResource):
 
     def get_latest_audit(self, model_id: str) -> Dict[str, Any]:
         """Get the most recent bias audit for a model."""
-        return self.client.request(
-            "GET", f"/api/v1/fairness/models/{model_id}/latest-audit"
-        )
+        return self.client.request("GET", f"/api/v1/fairness/models/{model_id}/latest-audit")
 
     async def aget_latest_audit(self, model_id: str) -> Dict[str, Any]:
         """Async version of get_latest_audit()."""
-        return await self.client.arequest(
-            "GET", f"/api/v1/fairness/models/{model_id}/latest-audit"
-        )
+        return await self.client.arequest("GET", f"/api/v1/fairness/models/{model_id}/latest-audit")
 
 
 class AlertsResource(BaseResource):

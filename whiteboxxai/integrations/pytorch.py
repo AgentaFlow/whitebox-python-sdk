@@ -26,6 +26,7 @@ except ImportError:
     nn = _NNStub()
 
 import numpy as np
+
 from whiteboxxai.monitor import ModelMonitor
 
 
@@ -63,9 +64,7 @@ class TorchMonitor(ModelMonitor):
     def __init__(self, client, model: Optional[nn.Module] = None, **kwargs):
         """Initialize PyTorch monitor."""
         if not TORCH_AVAILABLE:
-            raise ImportError(
-                "PyTorch is not installed. Install with: pip install torch"
-            )
+            raise ImportError("PyTorch is not installed. Install with: pip install torch")
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -154,9 +153,7 @@ class TorchMonitor(ModelMonitor):
 
         # Count parameters
         total_params = sum(p.numel() for p in self.model.parameters())
-        trainable_params = sum(
-            p.numel() for p in self.model.parameters() if p.requires_grad
-        )
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
         metadata["total_parameters"] = total_params
         metadata["trainable_parameters"] = trainable_params
@@ -198,9 +195,7 @@ class TorchWrapper(nn.Module):
 
         return output
 
-    def _log_batch_predictions(
-        self, inputs: torch.Tensor, outputs: torch.Tensor
-    ) -> None:
+    def _log_batch_predictions(self, inputs: torch.Tensor, outputs: torch.Tensor) -> None:
         """Log batch of predictions."""
         # Convert to numpy/lists
         inputs_np = inputs.detach().cpu().numpy()

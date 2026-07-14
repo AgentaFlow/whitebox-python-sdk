@@ -19,6 +19,7 @@ except ImportError:
     Pipeline = object
 
 import numpy as np
+
 from whiteboxxai.monitor import ModelMonitor
 
 
@@ -245,9 +246,7 @@ class TransformersMonitor(ModelMonitor):
                 # Single prediction
                 self.log_prediction_transformers(
                     input_text=inputs,
-                    prediction=predictions
-                    if isinstance(predictions, dict)
-                    else predictions[0],
+                    prediction=predictions if isinstance(predictions, dict) else predictions[0],
                     actual=actuals,
                 )
 

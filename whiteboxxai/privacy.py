@@ -24,9 +24,7 @@ class PIIDetector:
         """Initialize PII detector with regex patterns."""
         self.patterns: Dict[str, Pattern] = {
             "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
-            "phone": re.compile(
-                r"\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"
-            ),
+            "phone": re.compile(r"\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
             "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
             "credit_card": re.compile(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b"),
             "ip_address": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
@@ -206,9 +204,7 @@ def mask_pii(text: str, mask_char: str = "*") -> str:
     return _pii_detector.mask(text, mask_char=mask_char)
 
 
-def mask_data(
-    data: Any, mask_pii: bool = True, mask_sensitive_keys: bool = True
-) -> Any:
+def mask_data(data: Any, mask_pii: bool = True, mask_sensitive_keys: bool = True) -> Any:
     """
     Mask sensitive data using global masker.
 

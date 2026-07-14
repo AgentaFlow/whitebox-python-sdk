@@ -57,16 +57,10 @@ except ImportError:
 
 # LangChain integration
 try:
-    from .langchain import (
-        LangChainMonitor,
-        WhiteBoxXAICallbackHandler,
-        wrap_langchain_chain,
-    )
+    from .langchain import LangChainMonitor, WhiteBoxXAICallbackHandler, wrap_langchain_chain
 
     if "__all__" in dir():
-        __all__.extend(
-            ["LangChainMonitor", "WhiteBoxXAICallbackHandler", "wrap_langchain_chain"]
-        )
+        __all__.extend(["LangChainMonitor", "WhiteBoxXAICallbackHandler", "wrap_langchain_chain"])
     else:
         __all__ = [
             "LangChainMonitor",
@@ -78,12 +72,7 @@ except ImportError:
 
 # XGBoost/LightGBM integration
 try:
-    from .boosting import (
-        LightGBMMonitor,
-        XGBoostMonitor,
-        wrap_lightgbm_model,
-        wrap_xgboost_model,
-    )
+    from .boosting import LightGBMMonitor, XGBoostMonitor, wrap_lightgbm_model, wrap_xgboost_model
 
     if "__all__" in dir():
         __all__.extend(

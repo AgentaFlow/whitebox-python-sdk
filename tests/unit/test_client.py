@@ -11,12 +11,7 @@ import pytest
 
 from whiteboxxai.client import WhiteBoxXAI
 from whiteboxxai.config import Config
-from whiteboxxai.exceptions import (
-    APIError,
-    AuthenticationError,
-    RateLimitError,
-    ValidationError,
-)
+from whiteboxxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
 
 
 class TestWhiteBoxXAIClient:

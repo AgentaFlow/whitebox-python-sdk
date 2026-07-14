@@ -161,9 +161,7 @@ class ModelMonitor:
         self._prediction_count += 1
 
         if self.buffer_size:
-            self._buffer.append(
-                {"input_data": inputs, "output_data": output, "metadata": metadata}
-            )
+            self._buffer.append({"input_data": inputs, "output_data": output, "metadata": metadata})
             if len(self._buffer) >= self.buffer_size:
                 self.flush()
             return None
@@ -178,9 +176,7 @@ class ModelMonitor:
         )
 
         if explain and isinstance(result, dict) and result.get("id"):
-            result["explanation"] = self.client.explanations.generate(
-                prediction_id=result["id"]
-            )
+            result["explanation"] = self.client.explanations.generate(prediction_id=result["id"])
 
         return result
 
@@ -204,9 +200,7 @@ class ModelMonitor:
         self._prediction_count += 1
 
         if self.buffer_size:
-            self._buffer.append(
-                {"input_data": inputs, "output_data": output, "metadata": metadata}
-            )
+            self._buffer.append({"input_data": inputs, "output_data": output, "metadata": metadata})
             if len(self._buffer) >= self.buffer_size:
                 await self.aflush()
             return None
@@ -312,16 +306,12 @@ class ModelMonitor:
         this monitor instance so far."""
         return self._prediction_count
 
-    def get_drift_reports(
-        self, limit: int = 10, skip: int = 0
-    ) -> List[Dict[str, Any]]:
+    def get_drift_reports(self, limit: int = 10, skip: int = 0) -> List[Dict[str, Any]]:
         """Get persisted drift reports for this model, most recent first."""
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
 
-        return self.client.drift.get_reports(
-            model_id=self.model_id, limit=limit, skip=skip
-        )
+        return self.client.drift.get_reports(model_id=self.model_id, limit=limit, skip=skip)
 
     def create_alert_rule(
         self,
@@ -415,9 +405,7 @@ class ModelMonitor:
             return True
         return np.random.random() < self.sampling_rate
 
-    def _sample_predictions(
-        self, predictions: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    def _sample_predictions(self, predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Sample predictions based on sampling rate."""
         n_samples = int(len(predictions) * self.sampling_rate)
         if n_samples == 0:

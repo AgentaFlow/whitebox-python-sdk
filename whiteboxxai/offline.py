@@ -74,9 +74,7 @@ class OfflineQueue:
         auto_sync: Whether to automatically sync when connection available
     """
 
-    def __init__(
-        self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True
-    ):
+    def __init__(self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True):
         """
         Initialize offline queue.
 
@@ -147,9 +145,7 @@ class OfflineQueue:
             if self.max_queue_size > 0:
                 current_size = self.get_queue_size()
                 if current_size >= self.max_queue_size:
-                    raise ValueError(
-                        f"Queue is full ({current_size}/{self.max_queue_size})"
-                    )
+                    raise ValueError(f"Queue is full ({current_size}/{self.max_queue_size})")
 
             # Insert operation
             with sqlite3.connect(self.db_path) as conn:
@@ -166,9 +162,7 @@ class OfflineQueue:
             logger.info(f"Queued operation {op_id}: {operation_type.value}")
             return op_id
 
-    def dequeue(
-        self, limit: int = 100
-    ) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
+    def dequeue(self, limit: int = 100) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
         """
         Get pending operations from queue.
 
@@ -197,9 +191,7 @@ class OfflineQueue:
                 operations = []
                 for row in cursor.fetchall():
                     op_id, op_type, data_json = row
-                    operations.append(
-                        (op_id, OperationType(op_type), json.loads(data_json))
-                    )
+                    operations.append((op_id, OperationType(op_type), json.loads(data_json)))
 
                 return operations
 
@@ -288,9 +280,7 @@ class OfflineQueue:
         """
         with sqlite3.connect(self.db_path) as conn:
             if status:
-                cursor = conn.execute(
-                    "SELECT COUNT(*) FROM queue WHERE status = ?", (status,)
-                )
+                cursor = conn.execute("SELECT COUNT(*) FROM queue WHERE status = ?", (status,))
             else:
                 cursor = conn.execute("SELECT COUNT(*) FROM queue")
 
@@ -342,9 +332,7 @@ class OfflineQueue:
                 conn.commit()
 
         if deleted > 0:
-            logger.info(
-                f"Cleared {deleted} completed operations older than {older_than_days} days"
-            )
+            logger.info(f"Cleared {deleted} completed operations older than {older_than_days} days")
 
     def clear_all(self):
         """Clear all operations from queue (use with caution)."""
@@ -449,9 +437,7 @@ class OfflineManager:
         """Start automatic sync thread."""
         if self._sync_thread is None or not self._sync_thread.is_alive():
             self._stop_sync.clear()
-            self._sync_thread = threading.Thread(
-                target=self._auto_sync_loop, daemon=True
-            )
+            self._sync_thread = threading.Thread(target=self._auto_sync_loop, daemon=True)
             self._sync_thread.start()
             logger.info("Started automatic sync thread")
 

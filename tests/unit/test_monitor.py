@@ -167,9 +167,7 @@ class TestDriftMonitoring:
         """Test getting drift reports."""
         mock_client = Mock(spec=WhiteBoxXAI)
         mock_client.drift = Mock()
-        mock_client.drift.get_reports = Mock(
-            return_value=[{"id": "report-1", "drift_score": 0.8}]
-        )
+        mock_client.drift.get_reports = Mock(return_value=[{"id": "report-1", "drift_score": 0.8}])
 
         monitor = ModelMonitor(client=mock_client, model_id="model-123")
 
@@ -191,9 +189,7 @@ class TestAlertManagement:
 
         monitor = ModelMonitor(client=mock_client, model_id="model-123")
 
-        rule = monitor.create_alert_rule(
-            metric="accuracy", threshold=0.8, condition="below"
-        )
+        rule = monitor.create_alert_rule(metric="accuracy", threshold=0.8, condition="below")
 
         # Verify alert rule was created
         assert rule["id"] == "rule-1"
@@ -274,9 +270,7 @@ class TestMonitorStatistics:
         """Test getting performance metrics."""
         mock_client = Mock(spec=WhiteBoxXAI)
         mock_client.metrics = Mock()
-        mock_client.metrics.get = Mock(
-            return_value={"accuracy": 0.95, "precision": 0.93}
-        )
+        mock_client.metrics.get = Mock(return_value={"accuracy": 0.95, "precision": 0.93})
 
         monitor = ModelMonitor(client=mock_client, model_id="model-123")
 

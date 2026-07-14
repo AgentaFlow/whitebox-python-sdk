@@ -31,6 +31,7 @@ except ImportError:
     keras = _KerasStub()
 
 import numpy as np
+
 from whiteboxxai.monitor import ModelMonitor
 
 
@@ -85,9 +86,7 @@ class KerasMonitor(ModelMonitor):
             **kwargs: Additional arguments for ModelMonitor
         """
         if not TENSORFLOW_AVAILABLE:
-            raise ImportError(
-                "TensorFlow is not installed. Install with: pip install tensorflow"
-            )
+            raise ImportError("TensorFlow is not installed. Install with: pip install tensorflow")
 
         super().__init__(client, **kwargs)
         self.model = model
@@ -408,9 +407,7 @@ class WhiteBoxXAICallback(keras.callbacks.Callback):
         self.monitor.log_custom_metric(
             "training_complete",
             {
-                "final_metrics": {
-                    k: float(v) if v is not None else None for k, v in logs.items()
-                },
+                "final_metrics": {k: float(v) if v is not None else None for k, v in logs.items()},
             },
         )
 

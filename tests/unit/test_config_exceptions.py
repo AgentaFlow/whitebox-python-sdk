@@ -140,9 +140,7 @@ class TestValidationError:
 
     def test_validation_error_with_fields(self):
         """Test validation error with field details."""
-        error = ValidationError(
-            "Validation failed", fields={"email": ["Invalid email format"]}
-        )
+        error = ValidationError("Validation failed", fields={"email": ["Invalid email format"]})
         assert "Validation failed" in str(error)
 
 
@@ -161,9 +159,7 @@ class TestNotFoundError:
 
     def test_not_found_error_with_resource(self):
         """Test not found error with resource details."""
-        error = NotFoundError(
-            "Resource not found", resource_type="model", resource_id="123"
-        )
+        error = NotFoundError("Resource not found", resource_type="model", resource_id="123")
         assert "Resource not found" in str(error)
 
 
@@ -182,9 +178,7 @@ class TestRateLimitError:
 
     def test_rate_limit_error_with_retry(self):
         """Test rate limit error with retry information."""
-        error = RateLimitError(
-            "Too many requests", retry_after=60, limit=100, remaining=0
-        )
+        error = RateLimitError("Too many requests", retry_after=60, limit=100, remaining=0)
         assert "Too many requests" in str(error)
 
 
@@ -203,9 +197,7 @@ class TestAPIError:
 
     def test_api_error_with_status(self):
         """Test API error with status code."""
-        error = APIError(
-            "Server error", status_code=500, response={"error": "Internal error"}
-        )
+        error = APIError("Server error", status_code=500, response={"error": "Internal error"})
         assert "Server error" in str(error)
 
     def test_api_error_with_request_id(self):

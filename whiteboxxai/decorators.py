@@ -254,9 +254,7 @@ def _extract_inputs(
         return _default_input_extractor(func, args, kwargs)
 
 
-def _default_input_extractor(
-    func: Callable, args: tuple, kwargs: dict
-) -> Dict[str, Any]:
+def _default_input_extractor(func: Callable, args: tuple, kwargs: dict) -> Dict[str, Any]:
     """Default input extractor."""
     sig = inspect.signature(func)
     bound_args = sig.bind(*args, **kwargs)

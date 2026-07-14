@@ -11,13 +11,9 @@ from urllib.parse import urljoin
 
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from whiteboxxai.config import Config
-from whiteboxxai.exceptions import (
-    APIError,
-    AuthenticationError,
-    RateLimitError,
-    ValidationError,
-)
+from whiteboxxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
 from whiteboxxai.resources import (
     AlertsResource,
     DriftResource,

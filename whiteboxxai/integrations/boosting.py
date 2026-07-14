@@ -41,6 +41,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
+
 from whiteboxxai.monitor import ModelMonitor
 
 logger = logging.getLogger(__name__)
@@ -106,9 +107,7 @@ class XGBoostMonitor(ModelMonitor):
             **kwargs: Additional arguments passed to ModelMonitor
         """
         if not XGBOOST_AVAILABLE:
-            raise ImportError(
-                "XGBoost is not installed. Install with: pip install xgboost"
-            )
+            raise ImportError("XGBoost is not installed. Install with: pip install xgboost")
 
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
@@ -290,9 +289,7 @@ class XGBoostMonitor(ModelMonitor):
             # Try get_booster for sklearn API
             if hasattr(model, "get_booster"):
                 booster = model.get_booster()
-                importance_dict = booster.get_score(
-                    importance_type=self.importance_type
-                )
+                importance_dict = booster.get_score(importance_type=self.importance_type)
                 return {k: float(v) for k, v in importance_dict.items()}
 
             return None
@@ -343,9 +340,7 @@ class LightGBMMonitor(ModelMonitor):
             **kwargs: Additional arguments passed to ModelMonitor
         """
         if not LIGHTGBM_AVAILABLE:
-            raise ImportError(
-                "LightGBM is not installed. Install with: pip install lightgbm"
-            )
+            raise ImportError("LightGBM is not installed. Install with: pip install lightgbm")
 
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
@@ -523,9 +518,7 @@ class LightGBMMonitor(ModelMonitor):
 
             # Try feature_importance method (native LightGBM)
             if hasattr(model, "feature_importance"):
-                importances = model.feature_importance(
-                    importance_type=self.importance_type
-                )
+                importances = model.feature_importance(importance_type=self.importance_type)
                 if self._feature_names and len(importances) == len(self._feature_names):
                     return dict(zip(self._feature_names, importances.tolist()))
                 else:
@@ -534,9 +527,7 @@ class LightGBMMonitor(ModelMonitor):
             # Try booster
             if hasattr(model, "booster_"):
                 booster = model.booster_
-                importances = booster.feature_importance(
-                    importance_type=self.importance_type
-                )
+                importances = booster.feature_importance(importance_type=self.importance_type)
                 feature_names = booster.feature_name()
                 if len(importances) == len(feature_names):
                     return dict(zip(feature_names, importances.tolist()))
@@ -547,9 +538,7 @@ class LightGBMMonitor(ModelMonitor):
 
 
 # Unified wrapper functions
-def wrap_xgboost_model(
-    model: Any, monitor: XGBoostMonitor, auto_register: bool = True
-) -> Any:
+def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool = True) -> Any:
     """
     Wrap an XGBoost model for automatic monitoring.
 
@@ -615,9 +604,7 @@ def wrap_xgboost_model(
     return model
 
 
-def wrap_lightgbm_model(
-    model: Any, monitor: LightGBMMonitor, auto_register: bool = True
-) -> Any:
+def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: bool = True) -> Any:
     """
     Wrap a LightGBM model for automatic monitoring.
 

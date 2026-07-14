@@ -91,9 +91,7 @@ class LangChainMonitor(ModelMonitor):
             **kwargs: Additional arguments for ModelMonitor
         """
         if not LANGCHAIN_AVAILABLE:
-            raise ImportError(
-                "langchain is not installed. Install with: pip install langchain"
-            )
+            raise ImportError("langchain is not installed. Install with: pip install langchain")
 
         super().__init__(client, **kwargs)
         self._application_name = application_name
@@ -514,9 +512,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                         self.monitor.log_llm_call(
                             prompt="",  # Prompt tracked separately
                             response=response_text,
-                            model=kwargs.get("invocation_params", {}).get(
-                                "model_name", "unknown"
-                            ),
+                            model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
                             tokens_used=tokens_used,
                             latency=latency,
                         )

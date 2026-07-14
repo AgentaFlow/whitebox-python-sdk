@@ -68,9 +68,7 @@ class TestMultiAgentCallbackHandler:
         """Test chain start callback."""
         inputs = {"input": "test query"}
 
-        callback_handler.on_chain_start(
-            serialized={"name": "test_chain"}, inputs=inputs
-        )
+        callback_handler.on_chain_start(serialized={"name": "test_chain"}, inputs=inputs)
 
         assert callback_handler.execution_inputs == inputs
         assert callback_handler.execution_start_time is not None
@@ -129,9 +127,7 @@ class TestMultiAgentCallbackHandler:
         """Test LLM start callback."""
         initial_count = callback_handler.llm_call_count
 
-        callback_handler.on_llm_start(
-            serialized={"name": "test_llm"}, prompts=["test prompt"]
-        )
+        callback_handler.on_llm_start(serialized={"name": "test_llm"}, prompts=["test prompt"])
 
         assert callback_handler.llm_call_count == initial_count + 1
 
@@ -226,9 +222,7 @@ class TestLangGraphMultiAgentMonitor:
         """Test starting workflow monitoring."""
         mock_client.agent_workflows.create.return_value = mock_workflow_response
 
-        monitor = LangGraphMultiAgentMonitor(
-            client=mock_client, workflow_name="Test Workflow"
-        )
+        monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
 
         inputs = {"query": "test"}
         workflow_id = monitor.start_monitoring(inputs=inputs)
@@ -249,9 +243,7 @@ class TestLangGraphMultiAgentMonitor:
         """Test agent registration."""
         mock_client.agent_workflows.create.return_value = mock_workflow_response
 
-        monitor = LangGraphMultiAgentMonitor(
-            client=mock_client, workflow_name="Test Workflow"
-        )
+        monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
         monitor.register_agent(
@@ -274,9 +266,7 @@ class TestLangGraphMultiAgentMonitor:
         """Test getting callbacks for an agent."""
         mock_client.agent_workflows.create.return_value = mock_workflow_response
 
-        monitor = LangGraphMultiAgentMonitor(
-            client=mock_client, workflow_name="Test Workflow"
-        )
+        monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
         callbacks = monitor.get_callbacks("researcher", agent_role="Research Agent")
@@ -294,9 +284,7 @@ class TestLangGraphMultiAgentMonitor:
         """Test logging agent-to-agent handoff."""
         mock_client.agent_workflows.create.return_value = mock_workflow_response
 
-        monitor = LangGraphMultiAgentMonitor(
-            client=mock_client, workflow_name="Test Workflow"
-        )
+        monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
         monitor.log_handoff(
@@ -324,9 +312,7 @@ class TestLangGraphMultiAgentMonitor:
             "total_tokens": 750,
         }
 
-        monitor = LangGraphMultiAgentMonitor(
-            client=mock_client, workflow_name="Test Workflow"
-        )
+        monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
         outputs = {"result": "completed successfully"}
@@ -338,9 +324,7 @@ class TestLangGraphMultiAgentMonitor:
         )
 
         # Verify analytics were retrieved
-        mock_client.agent_workflows.get_analytics.assert_called_once_with(
-            "workflow_123"
-        )
+        mock_client.agent_workflows.get_analytics.assert_called_once_with("workflow_123")
 
         assert summary["workflow_id"] == "workflow_123"
         assert summary["status"] == "completed"
@@ -420,9 +404,7 @@ class TestErrorHandling:
 
     def test_callback_api_error_handling(self, mock_client):
         """Test that API errors don't crash the callback."""
-        mock_client.agent_workflows.create_execution.side_effect = Exception(
-            "API Error"
-        )
+        mock_client.agent_workflows.create_execution.side_effect = Exception("API Error")
 
         handler = MultiAgentCallbackHandler(
             client=mock_client, workflow_id="workflow_123", agent_name="test"

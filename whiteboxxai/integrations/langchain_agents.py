@@ -93,8 +93,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         """
         if WhiteBoxXAI is None:
             raise ImportError(
-                "whiteboxxai package not installed. "
-                "Install with: pip install whiteboxxai"
+                "whiteboxxai package not installed. " "Install with: pip install whiteboxxai"
             )
 
         self.client = client
@@ -153,9 +152,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
             # Reset state
             self.execution_start_time = None
 
-    def on_chain_error(
-        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
-    ) -> None:
+    def on_chain_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
         """Run when chain errors."""
         if self.execution_start_time:
             duration_ms = int(
@@ -179,9 +176,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
 
             self.execution_start_time = None
 
-    def on_llm_start(
-        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
-    ) -> None:
+    def on_llm_start(self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any) -> None:
         """Run when LLM starts."""
         self.llm_call_count += 1
 
@@ -226,9 +221,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         # This is called when the agent completes its reasoning
         pass
 
-    def on_tool_start(
-        self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
-    ) -> None:
+    def on_tool_start(self, serialized: Dict[str, Any], input_str: str, **kwargs: Any) -> None:
         """Run when tool starts."""
         pass
 
@@ -247,9 +240,7 @@ class MultiAgentCallbackHandler(BaseCallbackHandler):
         except Exception as e:
             print(f"Warning: Failed to log tool result: {e}")
 
-    def on_tool_error(
-        self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any
-    ) -> None:
+    def on_tool_error(self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any) -> None:
         """Run when tool errors."""
         try:
             self.client.agent_workflows.create_interaction(
@@ -322,8 +313,7 @@ class LangGraphMultiAgentMonitor:
         """
         if WhiteBoxXAI is None:
             raise ImportError(
-                "whiteboxxai package not installed. "
-                "Install with: pip install whiteboxxai"
+                "whiteboxxai package not installed. " "Install with: pip install whiteboxxai"
             )
 
         self.client = client
@@ -539,9 +529,7 @@ def monitor_langchain_agent(
         return {"result": result, "workflow_id": workflow_id, "status": "completed"}
     except Exception as e:
         # Log failure
-        client.agent_workflows.complete(
-            workflow_id, outputs={"error": str(e)}, status="failed"
-        )
+        client.agent_workflows.complete(workflow_id, outputs={"error": str(e)}, status="failed")
 
         return {
             "result": None,

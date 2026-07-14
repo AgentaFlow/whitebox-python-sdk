@@ -52,9 +52,7 @@ class TestMonitorModelDecorator:
         """Test that decorator extracts output correctly."""
         mock_monitor = Mock(spec=ModelMonitor)
 
-        @monitor_model(
-            mock_monitor, input_keys=["x"], output_key="prediction", explain=False
-        )
+        @monitor_model(mock_monitor, input_keys=["x"], output_key="prediction", explain=False)
         def predict(x):
             return {"prediction": x * 2, "confidence": 0.95}
 

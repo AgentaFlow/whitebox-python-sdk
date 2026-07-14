@@ -301,9 +301,7 @@ def deserialize_numpy(data: List) -> np.ndarray:
     return np.array(data)
 
 
-def compute_metrics(
-    y_true: Any, y_pred: Any, task: str = "classification"
-) -> Dict[str, float]:
+def compute_metrics(y_true: Any, y_pred: Any, task: str = "classification") -> Dict[str, float]:
     """
     Compute basic metrics for predictions.
 
@@ -319,9 +317,7 @@ def compute_metrics(
         ValueError: If task is not recognized, or y_true/y_pred lengths differ
     """
     if task not in ("classification", "regression"):
-        raise ValueError(
-            f"Unsupported task: {task!r}. Must be 'classification' or 'regression'."
-        )
+        raise ValueError(f"Unsupported task: {task!r}. Must be 'classification' or 'regression'.")
 
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
@@ -344,12 +340,8 @@ def compute_metrics(
             actual_positive = np.sum(y_true == cls)
             true_positive = np.sum((y_pred == cls) & (y_true == cls))
 
-            precisions.append(
-                true_positive / predicted_positive if predicted_positive > 0 else 0.0
-            )
-            recalls.append(
-                true_positive / actual_positive if actual_positive > 0 else 0.0
-            )
+            precisions.append(true_positive / predicted_positive if predicted_positive > 0 else 0.0)
+            recalls.append(true_positive / actual_positive if actual_positive > 0 else 0.0)
 
         metrics["precision"] = float(np.mean(precisions))
         metrics["recall"] = float(np.mean(recalls))

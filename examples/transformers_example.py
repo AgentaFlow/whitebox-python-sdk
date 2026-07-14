@@ -7,10 +7,7 @@ This example demonstrates how to use WhiteBoxXAI to monitor Hugging Face Transfo
 import os
 
 from whiteboxxai import WhiteBoxXAI
-from whiteboxxai.integrations.transformers import (
-    TransformersMonitor,
-    wrap_transformers_pipeline,
-)
+from whiteboxxai.integrations.transformers import TransformersMonitor, wrap_transformers_pipeline
 
 # Optional: Set API key
 os.environ["WHITEBOXXAI_API_KEY"] = "your-api-key-here"
@@ -88,14 +85,10 @@ def example_ner():
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client, pipeline=ner_pipeline, model_name="ner_model_v1"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=ner_pipeline, model_name="ner_model_v1")
 
     # Register model
-    model_id = monitor.register_from_model(
-        name="BERT NER Model", version="1.0.0", task="ner"
-    )
+    model_id = monitor.register_from_model(name="BERT NER Model", version="1.0.0", task="ner")
     print(f"✓ Model registered with ID: {model_id}")
 
     # Test text
@@ -107,9 +100,7 @@ def example_ner():
 
     print("\nDetected entities:")
     for entity in result:
-        print(
-            f"  - {entity['word']}: {entity['entity_group']} (score: {entity['score']:.3f})"
-        )
+        print(f"  - {entity['word']}: {entity['entity_group']} (score: {entity['score']:.3f})")
 
     print("\n✓ NER monitoring complete!")
 
@@ -131,9 +122,7 @@ def example_text_generation():
     generator = pipeline("text-generation", model="gpt2")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client, pipeline=generator, model_name="gpt2_generator"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=generator, model_name="gpt2_generator")
 
     # Register model
     model_id = monitor.register_from_model(
@@ -220,9 +209,7 @@ def example_batch_prediction():
     classifier = pipeline("sentiment-analysis")
 
     # Create monitor
-    monitor = TransformersMonitor(
-        client=client, pipeline=classifier, model_name="batch_classifier"
-    )
+    monitor = TransformersMonitor(client=client, pipeline=classifier, model_name="batch_classifier")
 
     # Register model
     monitor.register_from_model(name="Batch Sentiment Classifier")

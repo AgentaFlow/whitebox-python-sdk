@@ -151,9 +151,7 @@ class CrewAIMonitor:
                 "inputs": {
                     "agent_count": len(crew.agents),
                     "task_count": len(crew.tasks),
-                    "process": str(crew.process)
-                    if hasattr(crew, "process")
-                    else "sequential",
+                    "process": str(crew.process) if hasattr(crew, "process") else "sequential",
                 }
             }
 
@@ -186,17 +184,13 @@ class CrewAIMonitor:
                 "agent_type": "crewai_agent",
                 "goal": getattr(crew_agent, "goal", None),
                 "backstory": getattr(crew_agent, "backstory", None),
-                "tools": [
-                    tool.__class__.__name__ for tool in getattr(crew_agent, "tools", [])
-                ],
+                "tools": [tool.__class__.__name__ for tool in getattr(crew_agent, "tools", [])],
                 "llm_provider": getattr(
                     getattr(crew_agent, "llm", None), "model_name", "unknown"
                 ).split("-")[0]
                 if hasattr(crew_agent, "llm")
                 else None,
-                "model_name": getattr(
-                    getattr(crew_agent, "llm", None), "model_name", None
-                )
+                "model_name": getattr(getattr(crew_agent, "llm", None), "model_name", None)
                 if hasattr(crew_agent, "llm")
                 else None,
                 "metadata": {
@@ -245,10 +239,7 @@ class CrewAIMonitor:
                 "expected_output": getattr(crew_task, "expected_output", None),
                 "agent_id": agent_id,
                 "context": {
-                    "tools": [
-                        tool.__class__.__name__
-                        for tool in getattr(crew_task, "tools", [])
-                    ],
+                    "tools": [tool.__class__.__name__ for tool in getattr(crew_task, "tools", [])],
                     "async_execution": getattr(crew_task, "async_execution", False),
                 },
             }
@@ -262,9 +253,7 @@ class CrewAIMonitor:
             task_id = response.get("id")
             self.task_map[id(crew_task)] = task_id
 
-            logger.debug(
-                f"Registered task: {task_data['task_name'][:50]}... ({task_id})"
-            )
+            logger.debug(f"Registered task: {task_data['task_name'][:50]}... ({task_id})")
 
             return task_id
 

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 from uuid import uuid4
 
 import pytest
+
 from whiteboxxai.integrations.crewai_monitor import CrewAIMonitor, monitor_crew
 
 
@@ -130,9 +131,7 @@ class TestCrewAIMonitor:
 
             # Check start workflow call
             assert calls[5][0][0] == "POST"
-            assert (
-                calls[5][0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/start"
-            )
+            assert calls[5][0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/start"
 
     def test_register_agent(self, mock_client, mock_crew):
         """Test agent registration."""
@@ -156,9 +155,7 @@ class TestCrewAIMonitor:
             # Verify API call
             call_args = mock_client.request.call_args
             assert call_args[0][0] == "POST"
-            assert (
-                call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/agents"
-            )
+            assert call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/agents"
 
             agent_data = call_args[1]["data"]
             assert agent_data["name"] == "Research Analyst"
@@ -194,9 +191,7 @@ class TestCrewAIMonitor:
             # Verify API call
             call_args = mock_client.request.call_args
             assert call_args[0][0] == "POST"
-            assert (
-                call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/tasks"
-            )
+            assert call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/tasks"
 
             task_data = call_args[1]["data"]
             assert task_data["task_name"] == "Research AI safety regulations"
@@ -230,10 +225,7 @@ class TestCrewAIMonitor:
             # Verify API call
             call_args = mock_client.request.call_args
             assert call_args[0][0] == "POST"
-            assert (
-                call_args[0][1]
-                == f"/api/v1/workflows/multi-agent/{workflow_id}/executions"
-            )
+            assert call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/executions"
 
             execution_data = call_args[1]["data"]
             assert execution_data["agent_id"] == agent_id
@@ -298,10 +290,7 @@ class TestCrewAIMonitor:
             # Verify API call
             call_args = mock_client.request.call_args
             assert call_args[0][0] == "POST"
-            assert (
-                call_args[0][1]
-                == f"/api/v1/workflows/multi-agent/{workflow_id}/interactions"
-            )
+            assert call_args[0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/interactions"
 
             interaction_data = call_args[1]["data"]
             assert interaction_data["interaction_type"] == "delegation"
@@ -326,9 +315,7 @@ class TestCrewAIMonitor:
             monitor = CrewAIMonitor(api_key="test_api_key")
             monitor.workflow_id = workflow_id
 
-            result = monitor.complete_monitoring(
-                status="completed", outputs={"article": "content"}
-            )
+            result = monitor.complete_monitoring(status="completed", outputs={"article": "content"})
 
             assert result["workflow_id"] == workflow_id
             assert result["status"] == "completed"
@@ -337,10 +324,7 @@ class TestCrewAIMonitor:
             # Verify complete call
             calls = mock_client.request.call_args_list
             assert calls[0][0][0] == "POST"
-            assert (
-                calls[0][0][1]
-                == f"/api/v1/workflows/multi-agent/{workflow_id}/complete"
-            )
+            assert calls[0][0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/complete"
 
             complete_data = calls[0][1]["data"]
             assert complete_data["status"] == "completed"
@@ -369,14 +353,8 @@ class TestCrewAIMonitor:
 
             # Verify calls
             calls = mock_client.request.call_args_list
-            assert (
-                calls[0][0][1]
-                == f"/api/v1/workflows/multi-agent/{workflow_id}/analytics"
-            )
-            assert (
-                calls[1][0][1]
-                == f"/api/v1/workflows/multi-agent/{workflow_id}/cost-breakdown"
-            )
+            assert calls[0][0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/analytics"
+            assert calls[1][0][1] == f"/api/v1/workflows/multi-agent/{workflow_id}/cost-breakdown"
 
 
 class TestMonitorCrewHelper:
@@ -436,9 +414,7 @@ class TestErrorHandling:
             monitor.workflow_id = str(uuid4())
 
             # Should not raise exception, just log warning
-            monitor.log_agent_execution(
-                agent=mock_crew.agents[0], inputs={"test": "data"}
-            )
+            monitor.log_agent_execution(agent=mock_crew.agents[0], inputs={"test": "data"})
 
             # No API call should be made
             mock_client.request.assert_not_called()

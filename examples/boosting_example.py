@@ -46,9 +46,7 @@ def example_xgboost_classification():
     X, y = make_classification(
         n_samples=1000, n_features=20, n_informative=15, n_redundant=5, random_state=42
     )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
@@ -63,9 +61,7 @@ def example_xgboost_classification():
 
     # Train XGBoost model
     print("Training XGBoost classifier...")
-    model = xgb.XGBClassifier(
-        n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
-    )
+    model = xgb.XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
     # Register model with WhiteBoxXAI
@@ -116,9 +112,7 @@ def example_xgboost_regression():
     X, y = make_regression(
         n_samples=1000, n_features=10, n_informative=8, noise=10, random_state=42
     )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
@@ -132,9 +126,7 @@ def example_xgboost_regression():
 
     # Train XGBoost regressor
     print("Training XGBoost regressor...")
-    model = xgb.XGBRegressor(
-        n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
-    )
+    model = xgb.XGBRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
     # Wrap model for automatic monitoring
@@ -171,9 +163,7 @@ def example_lightgbm_classification():
     X, y = make_classification(
         n_samples=1000, n_features=20, n_informative=15, n_redundant=5, random_state=42
     )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
@@ -188,9 +178,7 @@ def example_lightgbm_classification():
 
     # Train LightGBM model
     print("Training LightGBM classifier...")
-    model = lgb.LGBMClassifier(
-        n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
-    )
+    model = lgb.LGBMClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
     # Register model with WhiteBoxXAI
@@ -243,9 +231,7 @@ def example_lightgbm_regression():
     X, y = make_regression(
         n_samples=1000, n_features=10, n_informative=8, noise=10, random_state=42
     )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
@@ -259,16 +245,12 @@ def example_lightgbm_regression():
 
     # Train LightGBM regressor
     print("Training LightGBM regressor...")
-    model = lgb.LGBMRegressor(
-        n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
-    )
+    model = lgb.LGBMRegressor(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     model.fit(X_train, y_train)
 
     # Wrap model for automatic monitoring
     print("Wrapping model for automatic monitoring...")
-    wrapped_model = wrap_lightgbm_model(
-        model=model, monitor=monitor, auto_register=True
-    )
+    wrapped_model = wrap_lightgbm_model(model=model, monitor=monitor, auto_register=True)
 
     # Predictions automatically logged
     print("\nMaking predictions (auto-logged)...")
@@ -300,17 +282,13 @@ def example_feature_importance_tracking():
     # Generate synthetic data with feature names
     import pandas as pd
 
-    X, y = make_classification(
-        n_samples=1000, n_features=10, n_informative=7, random_state=42
-    )
+    X, y = make_classification(n_samples=1000, n_features=10, n_informative=7, random_state=42)
 
     # Create DataFrame with feature names
     feature_names = [f"feature_{i}" for i in range(10)]
     X_df = pd.DataFrame(X, columns=feature_names)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_df, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X_df, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
@@ -333,9 +311,7 @@ def example_feature_importance_tracking():
         # Get importance
         importance_dict = monitor._get_feature_importance(xgb_model)
         if importance_dict:
-            sorted_features = sorted(
-                importance_dict.items(), key=lambda x: x[1], reverse=True
-            )[:5]
+            sorted_features = sorted(importance_dict.items(), key=lambda x: x[1], reverse=True)[:5]
             for feat, score in sorted_features:
                 print(f"  {feat}: {score:.4f}")
 
@@ -357,9 +333,7 @@ def example_feature_importance_tracking():
         # Get importance
         importance_dict = monitor._get_feature_importance(lgb_model)
         if importance_dict:
-            sorted_features = sorted(
-                importance_dict.items(), key=lambda x: x[1], reverse=True
-            )[:5]
+            sorted_features = sorted(importance_dict.items(), key=lambda x: x[1], reverse=True)[:5]
             for feat, score in sorted_features:
                 print(f"  {feat}: {score:.4f}")
 
@@ -380,21 +354,15 @@ def example_model_comparison():
         return
 
     # Generate synthetic data
-    X, y = make_classification(
-        n_samples=1000, n_features=20, n_informative=15, random_state=42
-    )
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X, y = make_classification(n_samples=1000, n_features=20, n_informative=15, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Initialize WhiteBoxXAI client
     client = WhiteBoxXAI(api_key="demo-api-key")
 
     # Train and monitor XGBoost
     print("Training XGBoost model...")
-    xgb_model = xgb.XGBClassifier(
-        n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42
-    )
+    xgb_model = xgb.XGBClassifier(n_estimators=100, max_depth=5, learning_rate=0.1, random_state=42)
     xgb_model.fit(X_train, y_train)
 
     xgb_monitor = XGBoostMonitor(client=client, model_name="xgb_comparison")

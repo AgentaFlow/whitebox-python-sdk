@@ -38,9 +38,7 @@ def main():
     )
 
     # Split data
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42
-    )
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Standardize features
     scaler = StandardScaler()
@@ -149,9 +147,7 @@ def main():
         prob = predictions[i][0]
         pred_class = 1 if prob > 0.5 else 0
         actual = y_test[i]
-        print(
-            f"   Sample {i+1}: Predicted={pred_class} (prob={prob:.3f}), Actual={actual}"
-        )
+        print(f"   Sample {i+1}: Predicted={pred_class} (prob={prob:.3f}), Actual={actual}")
 
     # Save model
     print("\n9. Saving model...")
