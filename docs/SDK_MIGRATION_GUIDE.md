@@ -662,13 +662,13 @@ Visit http://localhost:3000 to see real-time monitoring, drift detection, and ex
 
 ## For Developers
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for platform development setup.
+See `DEVELOPMENT.md` in the main platform repository for platform development setup.
 
 ## Documentation
 
 - **SDK Documentation**: https://github.com/AgentaFlow/whiteboxxai-python-sdk
-- **Platform Documentation**: [docs/](docs/)
-- **API Reference**: [API_REFERENCE.md](docs/API_REFERENCE.md)
+- **Platform Documentation**: `docs/` in the main platform repository
+- **API Reference**: `API_REFERENCE.md` in the main platform repository
 
 ## License
 
@@ -939,10 +939,10 @@ pip install whiteboxxai[all]  # All integrations
 
 ## Next Steps
 
-- [Installation Guide](getting-started/installation.md)
-- [Quick Start Tutorial](getting-started/quickstart.md)
-- [Framework Integrations](integrations/sklearn.md)
-- [API Reference](api/client.md)
+- Installation Guide: `getting-started/installation.md`
+- Quick Start Tutorial: `getting-started/quickstart.md`
+- Framework Integrations: `integrations/sklearn.md`
+- API Reference: `api/client.md`
 EOF
 ```
 
@@ -1121,7 +1121,7 @@ pytest tests/integration/
 - **Discord**: https://discord.gg/whiteboxxai (if available)
 
 ### Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+See `CONTRIBUTING.md` for contribution guidelines.
 
 ---
 
