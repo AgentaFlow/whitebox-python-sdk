@@ -208,3 +208,6 @@ __marimo__/
 
 # Internal migration notes
 MIGRATION_SUMMARY.md
+
+# Claude Code local tooling/config (session state, skills) - not part of the package
+.claude/
