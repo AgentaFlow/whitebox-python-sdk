@@ -64,6 +64,31 @@ except ImportError:
     lgb = None
 
 
+def _build_prediction_batch(
+    inputs: np.ndarray,
+    predictions: np.ndarray,
+    actuals: Optional[np.ndarray] = None,
+    probabilities: Optional[np.ndarray] = None,
+) -> List[Dict[str, Any]]:
+    """Build per-sample dicts for ModelMonitor.log_batch() from parallel arrays."""
+
+    def _item(value: Any) -> Any:
+        return value.tolist() if isinstance(value, np.ndarray) else value
+
+    batch = []
+    for i in range(len(inputs)):
+        item: Dict[str, Any] = {
+            "inputs": _item(inputs[i]),
+            "output": _item(predictions[i]),
+        }
+        if actuals is not None:
+            item["actual"] = _item(actuals[i])
+        if probabilities is not None:
+            item["probability"] = _item(probabilities[i])
+        batch.append(item)
+    return batch
+
+
 class XGBoostMonitor(ModelMonitor):
     """
     Monitor for XGBoost models.
@@ -241,23 +266,13 @@ class XGBoostMonitor(ModelMonitor):
 
         # Log predictions
         if log_predictions:
-            pred_metadata = metadata or {}
-
-            # Add feature importance for this batch if enabled
-            if self.track_feature_importance:
-                try:
-                    importance = self._get_feature_importance(model)
-                    if importance:
-                        pred_metadata["feature_importance"] = importance
-                except Exception as e:
-                    warnings.warn(f"Failed to extract feature importance: {e}")
-
-            self.log_predictions(
-                inputs=X,
-                predictions=predictions,
-                actuals=y_true,
-                probabilities=probabilities,
-                metadata=pred_metadata,
+            self.log_batch(
+                _build_prediction_batch(
+                    inputs=X,
+                    predictions=predictions,
+                    actuals=y_true,
+                    probabilities=probabilities,
+                )
             )
 
         return predictions
@@ -476,23 +491,13 @@ class LightGBMMonitor(ModelMonitor):
 
         # Log predictions
         if log_predictions:
-            pred_metadata = metadata or {}
-
-            # Add feature importance for this batch if enabled
-            if self.track_feature_importance:
-                try:
-                    importance = self._get_feature_importance(model)
-                    if importance:
-                        pred_metadata["feature_importance"] = importance
-                except Exception as e:
-                    warnings.warn(f"Failed to extract feature importance: {e}")
-
-            self.log_predictions(
-                inputs=X,
-                predictions=predictions,
-                actuals=y_true,
-                probabilities=probabilities,
-                metadata=pred_metadata,
+            self.log_batch(
+                _build_prediction_batch(
+                    inputs=X,
+                    predictions=predictions,
+                    actuals=y_true,
+                    probabilities=probabilities,
+                )
             )
 
         return predictions
@@ -558,7 +563,7 @@ def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool 
         >>> wrapped_model = wrap_xgboost_model(model, monitor)
         >>> predictions = wrapped_model.predict(X_test)  # Auto-logged
     """
-    if auto_register and not monitor._model_id:
+    if auto_register and not monitor.model_id:
         monitor.register_from_model(model)
 
     # Store original methods
@@ -574,7 +579,7 @@ def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool 
 
         # Log predictions
         try:
-            monitor.log_predictions(inputs=X, predictions=predictions)
+            monitor.log_batch(_build_prediction_batch(inputs=X, predictions=predictions))
         except Exception as e:
             warnings.warn(f"Failed to log predictions: {e}")
 
@@ -589,8 +594,10 @@ def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool 
             # Log with probabilities
             try:
                 predictions = np.argmax(probabilities, axis=1)
-                monitor.log_predictions(
-                    inputs=X, predictions=predictions, probabilities=probabilities
+                monitor.log_batch(
+                    _build_prediction_batch(
+                        inputs=X, predictions=predictions, probabilities=probabilities
+                    )
                 )
             except Exception as e:
                 warnings.warn(f"Failed to log predictions: {e}")
@@ -624,7 +631,7 @@ def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: boo
         >>> wrapped_model = wrap_lightgbm_model(model, monitor)
         >>> predictions = wrapped_model.predict(X_test)  # Auto-logged
     """
-    if auto_register and not monitor._model_id:
+    if auto_register and not monitor.model_id:
         monitor.register_from_model(model)
 
     # Store original methods
@@ -640,7 +647,7 @@ def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: boo
 
         # Log predictions
         try:
-            monitor.log_predictions(inputs=X, predictions=predictions)
+            monitor.log_batch(_build_prediction_batch(inputs=X, predictions=predictions))
         except Exception as e:
             warnings.warn(f"Failed to log predictions: {e}")
 
@@ -655,8 +662,10 @@ def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: boo
             # Log with probabilities
             try:
                 predictions = np.argmax(probabilities, axis=1)
-                monitor.log_predictions(
-                    inputs=X, predictions=predictions, probabilities=probabilities
+                monitor.log_batch(
+                    _build_prediction_batch(
+                        inputs=X, predictions=predictions, probabilities=probabilities
+                    )
                 )
             except Exception as e:
                 warnings.warn(f"Failed to log predictions: {e}")

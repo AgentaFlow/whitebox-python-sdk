@@ -70,6 +70,7 @@ class ModelMonitor:
         self._buffer: List[Dict[str, Any]] = []
         self._prediction_count = 0
         self._baseline_data: Optional[np.ndarray] = None
+        self._baseline_labels: Optional[np.ndarray] = None
 
     def __enter__(self) -> "ModelMonitor":
         return self
@@ -344,14 +345,16 @@ class ModelMonitor:
         """Get alert rules for this model."""
         return self.client.alerts.list(model_id=self.model_id)
 
-    def set_baseline(self, data: np.ndarray) -> None:
+    def set_baseline(self, data: np.ndarray, labels: Optional[np.ndarray] = None) -> None:
         """
         Set baseline data for drift detection.
 
         Args:
             data: Baseline data array
+            labels: Baseline labels/predictions, if available (optional)
         """
         self._baseline_data = data
+        self._baseline_labels = labels
 
     def detect_drift(
         self,

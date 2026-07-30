@@ -10,21 +10,40 @@ import time
 import warnings
 from typing import Any, Dict, List, Optional
 
+# langchain_core is the modern, lighter-weight home for these types and may
+# be installed without the full legacy langchain package. Try it first, then
+# fall back to the legacy langchain.callbacks.base/langchain.schema locations.
 try:
-    from langchain.agents import AgentExecutor
-    from langchain.callbacks.base import BaseCallbackHandler
-    from langchain.chains.base import Chain
-    from langchain.schema import AgentAction, AgentFinish, LLMResult
+    from langchain_core.agents import AgentAction, AgentFinish
+    from langchain_core.callbacks import BaseCallbackHandler
+    from langchain_core.outputs import LLMResult
 
     LANGCHAIN_AVAILABLE = True
 except ImportError:
-    LANGCHAIN_AVAILABLE = False
-    BaseCallbackHandler = object
-    Chain = object
+    try:
+        from langchain.callbacks.base import BaseCallbackHandler
+        from langchain.schema import AgentAction, AgentFinish, LLMResult
+
+        LANGCHAIN_AVAILABLE = True
+    except ImportError:
+        LANGCHAIN_AVAILABLE = False
+        BaseCallbackHandler = object
+        AgentAction = object
+        AgentFinish = object
+        LLMResult = object
+
+# AgentExecutor/Chain are higher-level `langchain` package abstractions, not
+# part of langchain_core, so they may be unavailable even when langchain_core
+# (and thus LANGCHAIN_AVAILABLE) is -- probe them separately.
+try:
+    from langchain.agents import AgentExecutor
+except ImportError:
     AgentExecutor = object
-    AgentAction = object
-    AgentFinish = object
-    LLMResult = object
+
+try:
+    from langchain.chains.base import Chain
+except ImportError:
+    Chain = object
 
 from whiteboxxai.monitor import ModelMonitor
 
@@ -198,7 +217,7 @@ class LangChainMonitor(ModelMonitor):
         # Log as prediction
         self.log_prediction(
             inputs=inputs,
-            prediction=outputs,
+            output=outputs,
             metadata=metadata,
         )
 
@@ -233,7 +252,7 @@ class LangChainMonitor(ModelMonitor):
         # Log as prediction
         self.log_prediction(
             inputs=inputs,
-            prediction=outputs,
+            output=outputs,
             metadata=metadata,
         )
 
@@ -269,7 +288,7 @@ class LangChainMonitor(ModelMonitor):
 
         self.log_prediction(
             inputs={"prompt": prompt},
-            prediction={"response": response},
+            output={"response": response},
             metadata=metadata,
         )
 
@@ -299,7 +318,7 @@ class LangChainMonitor(ModelMonitor):
 
         self.log_prediction(
             inputs={"tool_input": tool_input},
-            prediction={"tool_output": tool_output},
+            output={"tool_output": tool_output},
             metadata=metadata,
         )
 
@@ -332,7 +351,7 @@ class LangChainMonitor(ModelMonitor):
 
         self.log_prediction(
             inputs={"query": query},
-            prediction={"documents": documents},
+            output={"documents": documents},
             metadata=metadata,
         )
 

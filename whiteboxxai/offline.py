@@ -322,7 +322,7 @@ class OfflineQueue:
                     """
                     DELETE FROM queue
                     WHERE status = 'completed'
-                    AND created_at < datetime('now', '-' || ? || ' days')
+                    AND created_at <= datetime('now', '-' || ? || ' days')
                     """,
                     (older_than_days,),
                 )

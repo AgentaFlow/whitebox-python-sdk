@@ -211,22 +211,26 @@ class KerasMonitor(ModelMonitor):
             # Determine if batch or single
             if len(inputs_np.shape) == 1 or inputs_np.shape[0] == 1:
                 # Single prediction
+                metadata = dict(kwargs) if kwargs else {}
+                if actuals is not None:
+                    metadata["actual"] = actuals[0]
                 self.log_prediction(
                     inputs=inputs_np[0] if len(inputs_np.shape) > 1 else inputs_np,
-                    prediction=predictions_np[0]
-                    if len(predictions_np.shape) > 1
-                    else predictions_np,
-                    actual=actuals[0] if actuals is not None else None,
-                    **kwargs,
+                    output=(predictions_np[0] if len(predictions_np.shape) > 1 else predictions_np),
+                    metadata=metadata or None,
                 )
             else:
                 # Batch prediction
-                self.log_batch(
-                    inputs=inputs_np,
-                    predictions=predictions_np,
-                    actuals=actuals,
-                    **kwargs,
-                )
+                batch = []
+                for i in range(len(inputs_np)):
+                    item: Dict[str, Any] = {
+                        "inputs": inputs_np[i],
+                        "output": predictions_np[i],
+                    }
+                    if actuals is not None:
+                        item["actual"] = actuals[i]
+                    batch.append(item)
+                self.log_batch(batch)
 
         return predictions_np
 
@@ -258,6 +262,19 @@ class KerasMonitor(ModelMonitor):
 
         # Set baseline through parent class
         super().set_baseline(baseline_data, baseline_predictions)
+
+    def log_custom_metric(self, name: str, data: Dict[str, Any]) -> None:
+        """
+        Log a custom named metric (e.g. training epoch, checkpoint).
+
+        There is no dedicated backend endpoint for arbitrary custom metrics
+        yet, so this logs locally rather than silently dropping the call.
+
+        Args:
+            name: Metric name/category
+            data: Metric payload
+        """
+        logger.info(f"[{name}] {data}")
 
     def log_epoch(
         self,
@@ -319,13 +336,20 @@ class KerasMonitor(ModelMonitor):
             metadata: Additional metadata
         """
         model_metadata = {
+            "framework": "tensorflow",
             "model_path": model_path,
             "format": "SavedModel",
             **(metadata or {}),
         }
 
         if not self._registered:
-            self.register_from_model(**model_metadata)
+            self.model_id = self.client.register_model(
+                name=self._model_name or "saved_model",
+                model_type=self._model_type,
+                framework="tensorflow",
+                metadata=model_metadata,
+            )
+            self._registered = True
 
 
 class WhiteBoxXAICallback(keras.callbacks.Callback):
@@ -467,10 +491,7 @@ def wrap_keras_model(
             else:
                 pred_np = predictions
 
-            monitor.log_batch(
-                inputs=x_np,
-                predictions=pred_np,
-            )
+            monitor.log_batch([{"inputs": x_np[i], "output": pred_np[i]} for i in range(len(x_np))])
         except Exception as e:
             warnings.warn(f"Failed to log predictions: {e}")
 

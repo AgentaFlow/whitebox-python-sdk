@@ -11,8 +11,16 @@ Enhanced callback handler for monitoring multi-agent LangChain workflows includi
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-from langchain.callbacks.base import BaseCallbackHandler
-from langchain.schema import AgentAction, AgentFinish, LLMResult
+# langchain_core is the modern, lighter-weight home for these types; fall
+# back to the legacy langchain.schema.* locations for older installs (mirrors
+# the version-tolerant pattern in integrations/langchain.py).
+try:
+    from langchain_core.agents import AgentAction, AgentFinish
+    from langchain_core.callbacks import BaseCallbackHandler
+    from langchain_core.outputs import LLMResult
+except ImportError:
+    from langchain.callbacks.base import BaseCallbackHandler
+    from langchain.schema import AgentAction, AgentFinish, LLMResult
 
 try:
     from whiteboxxai import WhiteBoxXAI

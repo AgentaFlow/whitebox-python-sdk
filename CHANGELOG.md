@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-30
+
+Ports integration fixes and compatibility improvements developed in the
+`whitebox-xai-azure` monorepo's `sdk/` directory since the 1.0.0 cut.
+
+### Fixed
+- **XGBoost/LightGBM**: `XGBoostMonitor.predict()`/`LightGBMMonitor.predict()`
+  and `wrap_xgboost_model()`/`wrap_lightgbm_model()` called a nonexistent
+  `log_predictions()` method (raising `AttributeError`) instead of
+  `ModelMonitor.log_batch()` — the primary documented usage of both
+  integrations was broken.
+- **TensorFlow/Keras**: `KerasMonitor.predict()` called `log_prediction()`/
+  `log_batch()` with invalid keyword arguments (`prediction=`, `actual=`,
+  `predictions=`, `actuals=`), raising `TypeError` on every call.
+  `KerasMonitor.log_epoch()`/`log_checkpoint()` (and the
+  `WhiteBoxXAICallback` training callback) called a `log_custom_metric()`
+  method that didn't exist, raising `AttributeError`.
+  `KerasMonitor.set_baseline()` raised `TypeError` when computing baseline
+  predictions, since it called the parent `ModelMonitor.set_baseline()`
+  with two positional arguments against a signature that only accepted one
+  (see the `ModelMonitor.set_baseline()` fix below).
+  `register_saved_model()` raised `ValueError` unless `self.model` was set,
+  even though it exists specifically to register a model saved to disk.
+  `wrap_keras_model()` also called `log_batch()` with invalid keyword
+  arguments.
+- **Hugging Face Transformers**: `TransformersMonitor.log_prediction_transformers()`/
+  `log_batch_transformers()` called `log_prediction()`/`log_batch()` with
+  invalid keyword arguments, raising `TypeError` on every prediction.
+  `TransformersMonitor.set_baseline()` had the same `ModelMonitor.set_baseline()`
+  argument-count crash as `KerasMonitor` above.
+  `wrap_transformers_pipeline()` reassigned `pipeline.__call__` on a pipeline
+  *instance*, which Python never actually invokes (dunder-method lookup
+  happens on the type, not the instance) — wrapped pipelines silently never
+  logged any predictions.
+- **LangChain**: `LangChainMonitor.log_chain_execution()`,
+  `log_agent_execution()`, `log_llm_call()`, `log_tool_call()`, and
+  `log_rag_retrieval()` all passed `prediction=` to `log_prediction()`,
+  which only accepts `output=` — all five convenience-logging methods
+  raised `TypeError`.
+- `OfflineQueue.clear_completed()` used an exclusive day-boundary comparison
+  (`created_at < ...`), so a completed record exactly `older_than_days` old
+  was never cleared. Now inclusive (`<=`).
+
+### Added
+- `whiteboxxai.integrations.langchain`/`langchain_agents` now try
+  `langchain_core.*` first (the modern, lighter-weight package) and fall
+  back to the legacy `langchain.callbacks.base`/`langchain.schema.*`
+  locations, so the SDK works with `langchain-core`-only installs.
+  `AgentExecutor`/`Chain` (higher-level `langchain`-only abstractions) are
+  probed independently so their absence no longer disables the rest of the
+  integration.
+- `ModelMonitor.set_baseline()` accepts an optional `labels` argument for
+  baseline predictions/labels.
+- `KerasMonitor.log_custom_metric()`.
+
 ## [1.0.0] - 2026-07-14
 
 First stable, production release. This release realigns the SDK with the
@@ -153,6 +208,9 @@ from the git history between the `0.2.0` and `0.2.1` tags:
 - PII detection and masking
 - Secure API key handling
 
-[Unreleased]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/AgentaFlow/whitebox-python-sdk/releases/tag/v0.1.0
+[Unreleased]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/1.0.0...1.1.0
+[1.0.0]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/0.2.1...1.0.0
+[0.2.1]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/0.2.0...0.2.1
+[0.2.0]: https://github.com/AgentaFlow/whitebox-python-sdk/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/AgentaFlow/whitebox-python-sdk/releases/tag/0.1.0
