@@ -141,7 +141,7 @@ log_batch(predictions: List[dict])
 Log multiple predictions.
 
 ```python
-set_baseline(data: np.ndarray, **kwargs)
+set_baseline(data: np.ndarray, labels: Optional[np.ndarray] = None)
 ```
 Set baseline data for drift detection.
 

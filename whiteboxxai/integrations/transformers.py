@@ -275,11 +275,11 @@ class TransformersMonitor(ModelMonitor):
         # Log to WhiteBoxXAI
         self.log_prediction(
             inputs={"text": input_text},
-            prediction=pred_value,
-            actual=actual,
+            output=pred_value,
             metadata={
                 "task": self._task,
                 "raw_prediction": str(prediction),
+                "actual": actual,
                 **kwargs,
             },
         )
@@ -301,22 +301,23 @@ class TransformersMonitor(ModelMonitor):
             **kwargs: Additional metadata
         """
         # Prepare batch data
-        batch_inputs = [{"text": text} for text in inputs]
         batch_predictions = [
             self._extract_prediction_value(pred) if isinstance(pred, dict) else pred
             for pred in predictions
         ]
 
+        batch = []
+        for i, text in enumerate(inputs):
+            item: Dict[str, Any] = {
+                "inputs": {"text": text},
+                "output": batch_predictions[i],
+            }
+            if actuals is not None:
+                item["actual"] = actuals[i]
+            batch.append(item)
+
         # Log batch
-        self.log_batch(
-            inputs=batch_inputs,
-            predictions=batch_predictions,
-            actuals=actuals,
-            metadata={
-                "task": self._task,
-                **kwargs,
-            },
-        )
+        self.log_batch(batch)
 
     def _extract_prediction_value(self, prediction: Dict) -> Any:
         """Extract the main prediction value from a pipeline output."""
@@ -494,34 +495,43 @@ def wrap_transformers_pipeline(
         result = wrapped("Great product!")
         ```
     """
-    original_call = pipeline.__call__
+    # Python looks up special methods like __call__ on the type, not the
+    # instance, so `pipeline.__call__ = logged_call` would never actually
+    # change what `pipeline(...)` does. Wrap in a small object whose own
+    # __call__ is a real class method instead.
+    return _LoggedPipelineCall(pipeline, monitor)
 
-    def logged_call(*args, **kwargs):
-        # Make prediction
-        result = original_call(*args, **kwargs)
 
-        # Log to WhiteBoxXAI
+class _LoggedPipelineCall:
+    """Callable wrapper that logs each pipeline call before returning its result."""
+
+    def __init__(self, pipeline: Pipeline, monitor: "TransformersMonitor"):
+        self._pipeline = pipeline
+        self._monitor = monitor
+
+    def __call__(self, *args, **kwargs):
+        result = self._pipeline(*args, **kwargs)
+
         try:
             inputs = args[0] if args else kwargs.get("inputs")
 
             if isinstance(inputs, list):
-                monitor.log_batch_transformers(
+                self._monitor.log_batch_transformers(
                     inputs=inputs,
                     predictions=result,
                 )
             else:
-                monitor.log_prediction_transformers(
+                self._monitor.log_prediction_transformers(
                     input_text=inputs,
                     prediction=result,
                 )
         except Exception as e:
-            warnings.warn(f"Failed to log predictions: {e}")
+            warnings.warn(f"Failed to log prediction: {e}")
 
         return result
 
-    # Replace __call__ method
-    pipeline.__call__ = logged_call
-    return pipeline
+    def __getattr__(self, name):
+        return getattr(self._pipeline, name)
 
 
 __all__ = [
