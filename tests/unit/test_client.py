@@ -11,7 +11,14 @@ import pytest
 
 from whiteboxxai.client import WhiteBoxXAI
 from whiteboxxai.config import Config
-from whiteboxxai.exceptions import APIError, AuthenticationError, RateLimitError, ValidationError
+from whiteboxxai.exceptions import (
+    APIConnectionError,
+    APIError,
+    AuthenticationError,
+    RateLimitError,
+    ServerError,
+    ValidationError,
+)
 
 
 class TestWhiteBoxXAIClient:
@@ -167,6 +174,80 @@ class TestClientHTTPMethods:
         # This test verifies the interface exists
 
 
+class TestRetryClassification:
+    """Only transient failures (connection errors, 5xx, 429) should be
+    retried -- a 4xx that will never succeed on replay must raise
+    immediately instead of burning attempts on backoff (PR6)."""
+
+    @patch("httpx.Client.request")
+    def test_non_retryable_4xx_is_only_attempted_once(self, mock_request):
+        """A 404 (or any other non-retryable 4xx) must not be retried."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.json.return_value = {"detail": "Not found"}
+        mock_response.text = "Not found"
+        mock_response.headers = {}
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(APIError):
+            client.request("GET", "/models/does-not-exist")
+
+        assert mock_request.call_count == 1
+
+    @patch("httpx.Client.request")
+    def test_connection_error_is_wrapped_and_retried(self, mock_request):
+        """A transport-level failure (never reached the server) must be
+        wrapped as APIConnectionError, distinct from a generic APIError,
+        and retried up to the configured attempt limit."""
+        mock_request.side_effect = httpx.ConnectError("Connection refused")
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(APIConnectionError):
+            client.request("GET", "/models")
+
+        assert mock_request.call_count == 3
+
+    @patch("httpx.Client.request")
+    def test_5xx_is_retried_up_to_the_stop_limit(self, mock_request):
+        """A 500 is a transient-failure classification and should be retried
+        up to the configured attempt limit (3) before finally raising."""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.json.return_value = {"detail": "Internal error"}
+        mock_response.text = "Internal error"
+        mock_response.headers = {}
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(ServerError):
+            client.request("GET", "/models")
+
+        assert mock_request.call_count == 3
+
+    def test_retry_wait_honors_rate_limit_retry_after(self):
+        """_retry_wait must use RateLimitError.retry_after verbatim when the
+        server provided one, instead of falling back to exponential backoff."""
+        from whiteboxxai.client import _retry_wait
+
+        fake_state = Mock()
+        fake_state.outcome.exception.return_value = RateLimitError("Rate limited", retry_after=42)
+        assert _retry_wait(fake_state) == 42.0
+
+    def test_retry_wait_falls_back_to_backoff_without_retry_after(self):
+        """Without a Retry-After hint, falls back to exponential backoff
+        rather than crashing or waiting 0s."""
+        from whiteboxxai.client import _retry_wait
+
+        fake_state = Mock()
+        fake_state.outcome.exception.return_value = RateLimitError("Rate limited")
+        # wait_exponential() (the fallback) needs a real attempt number.
+        fake_state.attempt_number = 1
+        wait_seconds = _retry_wait(fake_state)
+        assert wait_seconds != 42.0
+        assert wait_seconds >= 0
+
+
 class TestClientConfiguration:
     """Tests for client configuration."""
 
@@ -222,3 +303,56 @@ class TestClientResourceIntegration:
         client = WhiteBoxXAI(api_key="test_key")
         assert hasattr(client.alerts, "list")
         assert hasattr(client.alerts, "create")
+
+    def test_risk_register_resource_access(self):
+        """Test accessing risk register resource."""
+        client = WhiteBoxXAI(api_key="test_key")
+        assert hasattr(client.risk_register, "list")
+        assert hasattr(client.risk_register, "get")
+        assert hasattr(client.risk_register, "portfolio")
+
+    def test_governance_resource_access(self):
+        """Test accessing governance resource."""
+        client = WhiteBoxXAI(api_key="test_key")
+        assert hasattr(client.governance, "list_boards")
+        assert hasattr(client.governance, "list_review_requests")
+        assert hasattr(client.governance, "raci_grid")
+
+    @patch("httpx.Client.request")
+    def test_risk_register_list_calls_expected_endpoint(self, mock_request):
+        """Test that risk_register.list() hits /api/v1/risk-register with filters."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "items": [],
+            "total": 0,
+            "skip": 0,
+            "limit": 50,
+        }
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        result = client.risk_register.list(severity="high")
+
+        assert result["total"] == 0
+        called_kwargs = mock_request.call_args.kwargs
+        assert called_kwargs["method"] == "GET"
+        assert called_kwargs["url"].endswith("/api/v1/risk-register")
+        assert called_kwargs["params"]["severity"] == "high"
+
+    @patch("httpx.Client.request")
+    def test_governance_raci_grid_calls_expected_endpoint(self, mock_request):
+        """Test that governance.raci_grid() hits the raci-grid endpoint."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"rows": []}
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        result = client.governance.raci_grid(board_id="board-123")
+
+        assert result == {"rows": []}
+        called_kwargs = mock_request.call_args.kwargs
+        assert called_kwargs["method"] == "GET"
+        assert called_kwargs["url"].endswith("/api/v1/governance/review-boards/raci-grid")
+        assert called_kwargs["params"]["board_id"] == "board-123"

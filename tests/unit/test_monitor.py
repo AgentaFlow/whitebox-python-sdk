@@ -6,7 +6,6 @@ Tests for model monitoring functionality.
 
 from unittest.mock import AsyncMock, Mock, patch
 
-import numpy as np
 import pytest
 
 from whiteboxxai.client import WhiteBoxXAI
@@ -177,33 +176,6 @@ class TestDriftMonitoring:
         # Verify reports were retrieved
         assert len(reports) == 1
         assert reports[0]["drift_score"] == 0.8
-
-
-class TestBaselineData:
-    """Tests for ModelMonitor.set_baseline()."""
-
-    def test_set_baseline_data_only(self):
-        """Test setting baseline data without labels."""
-        mock_client = Mock(spec=WhiteBoxXAI)
-        monitor = ModelMonitor(client=mock_client, model_id="model-123")
-        data = np.array([[1.0, 2.0], [3.0, 4.0]])
-
-        monitor.set_baseline(data)
-
-        assert monitor._baseline_data is data
-        assert monitor._baseline_labels is None
-
-    def test_set_baseline_with_labels(self):
-        """Test setting baseline data with labels."""
-        mock_client = Mock(spec=WhiteBoxXAI)
-        monitor = ModelMonitor(client=mock_client, model_id="model-123")
-        data = np.array([[1.0, 2.0], [3.0, 4.0]])
-        labels = np.array([0, 1])
-
-        monitor.set_baseline(data, labels=labels)
-
-        assert monitor._baseline_data is data
-        assert monitor._baseline_labels is labels
 
 
 class TestAlertManagement:

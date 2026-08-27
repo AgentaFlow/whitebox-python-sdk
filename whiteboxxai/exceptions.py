@@ -31,6 +31,29 @@ class APIError(WhiteBoxXAIError):
         self.request_id = request_id
 
 
+class APIConnectionError(APIError):
+    """The request never reached the server (DNS/connect/timeout/TLS failure).
+
+    Distinct from a generic APIError so callers -- and the offline queue in
+    offline.py, which enqueues on exactly this exception -- can tell "the
+    server is unreachable" apart from "the server responded with an error".
+    """
+
+    pass
+
+
+class ServerError(APIError):
+    """The server responded with a 5xx status.
+
+    Distinct from a generic 4xx APIError so retry logic (client.py) and the
+    offline queue can treat transient server failures the same way as
+    connection failures, without also retrying/queuing on a client error
+    (4xx) that will never succeed no matter how many times it's replayed.
+    """
+
+    pass
+
+
 class AuthenticationError(WhiteBoxXAIError):
     """Authentication error."""
 

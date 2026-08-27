@@ -52,7 +52,16 @@ client.models          # Models resource
 client.predictions     # Predictions resource
 client.explanations    # Explanations resource
 client.drift           # Drift detection resource
+client.fairness        # Bias/fairness auditing resource
 client.alerts          # Alerts resource
+client.risk_register   # ISO 42001 risk register resource
+client.governance      # Governance boards and review requests resource
+client.llm             # LLM call logging and cost/usage analytics resource
+client.rag             # RAG retrieval and evaluation resource
+client.safety          # Content safety analysis resource
+client.llm_xai         # LLM explainability resource
+client.agent_workflows # Multi-agent workflow tracking resource
+client.metrics         # Model performance metrics resource
 ```
 
 ### Methods

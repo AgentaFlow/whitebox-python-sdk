@@ -5,7 +5,33 @@ PII detection and data masking utilities.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Pattern
+from typing import Any, Callable, Dict, List, Optional, Pattern
+
+
+def _luhn_ok(digits: str) -> bool:
+    """Validate a digit string against the Luhn checksum algorithm.
+
+    Used to reject regex matches that merely *look* like a card number
+    (any 13-19 digit run in the right grouping) but aren't -- e.g. a
+    phone/account/reference number that happens to be 16 digits long.
+    """
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        d = int(ch)
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
+
+
+def _valid_ipv4(value: str) -> bool:
+    """Reject octets outside 0-255 (the bare regex would match 999.999.999.999)."""
+    octets = value.split(".")
+    if len(octets) != 4:
+        return False
+    return all(octet.isdigit() and 0 <= int(octet) <= 255 for octet in octets)
 
 
 class PIIDetector:
@@ -23,11 +49,19 @@ class PIIDetector:
     def __init__(self):
         """Initialize PII detector with regex patterns."""
         self.patterns: Dict[str, Pattern] = {
-            "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
             "phone": re.compile(r"\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
             "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
             "credit_card": re.compile(r"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b"),
             "ip_address": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
+        }
+        # Extra validation beyond what the regex alone can express, run
+        # against the matched text before it's accepted as a real
+        # detection. A type with no entry here is accepted on regex match
+        # alone (as before).
+        self.validators: Dict[str, Callable[[str], bool]] = {
+            "credit_card": lambda v: _luhn_ok(re.sub(r"[-\s]", "", v)),
+            "ip_address": _valid_ipv4,
         }
 
     def detect(self, text: str) -> List[Dict[str, Any]]:
@@ -43,7 +77,10 @@ class PIIDetector:
         detections = []
 
         for pii_type, pattern in self.patterns.items():
+            validator = self.validators.get(pii_type)
             for match in pattern.finditer(text):
+                if validator is not None and not validator(match.group()):
+                    continue
                 detections.append(
                     {
                         "type": pii_type,

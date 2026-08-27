@@ -326,17 +326,34 @@ class ModelMonitor:
         Args:
             metric: Metric to monitor (e.g. "accuracy")
             threshold: Threshold value that triggers the alert
-            condition: Comparison condition (e.g. "below", "above")
-            **kwargs: Additional alert configuration (name, etc.)
+            condition: Comparison condition ("below", "above", "below_or_equal",
+                "above_or_equal", "equal", "not_equal")
+            **kwargs: Additional alert configuration (name, severity, etc.)
 
         Returns:
             Created alert rule data
         """
         name = kwargs.pop("name", f"{self.model_id}_{metric}_{condition}_{threshold}")
+        severity = kwargs.pop("severity", "medium")
+        operator = {
+            "below": "lt",
+            "above": "gt",
+            "below_or_equal": "lte",
+            "above_or_equal": "gte",
+            "equal": "eq",
+            "not_equal": "ne",
+        }.get(condition, condition)
         return self.client.alerts.create(
             name=name,
             alert_type="threshold",
-            conditions={"metric": metric, "threshold": threshold, "condition": condition},
+            severity=severity,
+            conditions=[
+                {
+                    "metric_name": metric,
+                    "operator": operator,
+                    "threshold": threshold,
+                }
+            ],
             model_id=self.model_id,
             **kwargs,
         )
@@ -376,9 +393,9 @@ class ModelMonitor:
 
         return self.client.drift.detect(
             model_id=self.model_id,
-            reference_data=self._baseline_data.tolist()
-            if self._baseline_data is not None
-            else None,
+            reference_data=(
+                self._baseline_data.tolist() if self._baseline_data is not None else None
+            ),
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )
@@ -394,9 +411,9 @@ class ModelMonitor:
 
         return await self.client.drift.adetect(
             model_id=self.model_id,
-            reference_data=self._baseline_data.tolist()
-            if self._baseline_data is not None
-            else None,
+            reference_data=(
+                self._baseline_data.tolist() if self._baseline_data is not None else None
+            ),
             current_data=current_data.tolist() if current_data is not None else None,
             **kwargs,
         )

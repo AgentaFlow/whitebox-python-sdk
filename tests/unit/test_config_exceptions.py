@@ -8,10 +8,12 @@ import pytest
 
 from whiteboxxai.config import Config
 from whiteboxxai.exceptions import (
+    APIConnectionError,
     APIError,
     AuthenticationError,
     NotFoundError,
     RateLimitError,
+    ServerError,
     ValidationError,
     WhiteBoxXAIError,
 )
@@ -204,6 +206,28 @@ class TestAPIError:
         """Test API error with request ID."""
         error = APIError("Request failed", request_id="req-abc-123")
         assert "Request failed" in str(error)
+
+
+class TestAPIConnectionErrorAndServerError:
+    """Tests for APIConnectionError and ServerError (connection vs 5xx split)."""
+
+    def test_api_connection_error_is_an_api_error(self):
+        """APIConnectionError must be catchable as APIError (broad handlers still work)."""
+        error = APIConnectionError("Connection failed: timed out")
+        assert isinstance(error, APIError)
+        assert "Connection failed" in str(error)
+
+    def test_server_error_is_an_api_error(self):
+        """ServerError must be catchable as APIError (broad handlers still work)."""
+        error = ServerError("Server error (503): unavailable", status_code=503)
+        assert isinstance(error, APIError)
+        assert error.status_code == 503
+
+    def test_api_connection_error_and_server_error_are_distinct(self):
+        """The two must not be interchangeable -- callers rely on telling
+        "never reached the server" apart from "server responded with 5xx"."""
+        assert not isinstance(APIConnectionError("x"), ServerError)
+        assert not isinstance(ServerError("x"), APIConnectionError)
 
 
 class TestExceptionRaising:

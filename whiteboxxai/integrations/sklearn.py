@@ -202,8 +202,10 @@ class SklearnWrapper:
         predictions = []
         for i in range(len(inputs)):
             pred = {
-                "inputs": inputs[i].tolist() if isinstance(inputs[i], np.ndarray) else inputs[i],
-                "output": outputs[i].tolist() if isinstance(outputs[i], np.ndarray) else outputs[i],
+                "inputs": (inputs[i].tolist() if isinstance(inputs[i], np.ndarray) else inputs[i]),
+                "output": (
+                    outputs[i].tolist() if isinstance(outputs[i], np.ndarray) else outputs[i]
+                ),
             }
             predictions.append(pred)
 
