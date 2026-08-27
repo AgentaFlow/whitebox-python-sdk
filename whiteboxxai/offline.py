@@ -72,6 +72,15 @@ class OfflineQueue:
         auto_sync: Whether to automatically sync when connection available
     """
 
+    # A live dequeue() claim never stays 'processing' for long -- sync()
+    # replays a batch against the API and immediately calls
+    # mark_success()/mark_failure(). A claim still sitting in 'processing'
+    # after this long is far more likely orphaned by a crash than
+    # genuinely in-progress, which is what makes it safe for _ensure_db()
+    # to reclaim it even while sibling OfflineQueue instances (other
+    # threads/processes sharing this db file) may be actively mid-sync.
+    _STALE_CLAIM_MINUTES = 30
+
     def __init__(self, db_path: str, max_queue_size: int = 10000, auto_sync: bool = True):
         """
         Initialize offline queue.
@@ -103,10 +112,18 @@ class OfflineQueue:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     retry_count INTEGER DEFAULT 0,
                     last_error TEXT,
-                    status TEXT DEFAULT 'pending'
+                    status TEXT DEFAULT 'pending',
+                    claimed_at TIMESTAMP
                 )
             """
             )
+
+            # Backward-compat: a queue.db from before this column existed.
+            # SQLite has no "ADD COLUMN IF NOT EXISTS", so probe for it.
+            try:
+                conn.execute("ALTER TABLE queue ADD COLUMN claimed_at TIMESTAMP")
+            except sqlite3.OperationalError:
+                pass  # already has the column
 
             # Create index for efficient querying
             conn.execute(
@@ -115,6 +132,32 @@ class OfflineQueue:
                 ON queue(status, priority DESC, created_at ASC)
             """
             )
+
+            # Rows can be left in 'processing' forever if a previous process
+            # crashed (or was killed) between dequeue() claiming them and
+            # mark_success()/mark_failure() releasing the claim. Only
+            # reclaiming claims older than _STALE_CLAIM_MINUTES (rather
+            # than every 'processing' row unconditionally) is what makes
+            # this safe when multiple OfflineQueue instances share this db
+            # file at once -- an unconditional reset would also steal a
+            # claim a sibling instance had just legitimately taken.
+            reset = conn.execute(
+                """
+                UPDATE queue
+                SET status = 'pending', claimed_at = NULL
+                WHERE status = 'processing'
+                  AND (claimed_at IS NULL OR claimed_at < datetime('now', ?))
+                """,
+                (f"-{self._STALE_CLAIM_MINUTES} minutes",),
+            )
+            if reset.rowcount:
+                logger.warning(
+                    "Reset %d stale 'processing' operation(s) to 'pending' "
+                    "(claimed more than %d minutes ago -- likely left over "
+                    "from a previous crash)",
+                    reset.rowcount,
+                    self._STALE_CLAIM_MINUTES,
+                )
 
             conn.commit()
 
@@ -162,7 +205,20 @@ class OfflineQueue:
 
     def dequeue(self, limit: int = 100) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
         """
-        Get pending operations from queue.
+        Claim up to `limit` pending operations, atomically marking them
+        'processing' so they can't also be claimed by a second, concurrent
+        dequeue() call -- a different thread, process, or OfflineQueue
+        instance pointed at this same db file.
+
+        `BEGIN IMMEDIATE` takes SQLite's write lock at the start of the
+        transaction (rather than lazily on the first write), which is what
+        makes this safe across separate connections/processes -- a plain
+        `self._lock` (threading.Lock) only protects concurrent callers
+        within this one Python process.
+
+        Callers must follow up with mark_success()/mark_failure() to
+        release the claim; a claim orphaned by a crash is reclaimed by
+        _ensure_db() the next time this queue is opened.
 
         Returns operations ordered by priority (highest first) and
         creation time (oldest first).
@@ -174,24 +230,43 @@ class OfflineQueue:
             List of (id, operation_type, data) tuples
         """
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    SELECT id, operation_type, data
-                    FROM queue
-                    WHERE status = 'pending'
-                    ORDER BY priority DESC, created_at ASC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                )
+            with sqlite3.connect(self.db_path, isolation_level=None) as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    cursor = conn.execute(
+                        """
+                        SELECT id, operation_type, data
+                        FROM queue
+                        WHERE status = 'pending'
+                        ORDER BY priority DESC, created_at ASC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    )
+                    rows = cursor.fetchall()
 
-                operations = []
-                for row in cursor.fetchall():
-                    op_id, op_type, data_json = row
-                    operations.append((op_id, OperationType(op_type), json.loads(data_json)))
+                    ids = [row[0] for row in rows]
+                    if ids:
+                        # placeholders is just a "?,?,?" run derived from
+                        # len(ids) (an int) -- the actual values are bound
+                        # separately below, never interpolated into the SQL.
+                        placeholders = ",".join("?" * len(ids))
+                        conn.execute(
+                            f"UPDATE queue SET status = 'processing', "  # nosec B608
+                            f"claimed_at = CURRENT_TIMESTAMP "
+                            f"WHERE id IN ({placeholders})",
+                            ids,
+                        )
 
-                return operations
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+                    raise
+
+                return [
+                    (op_id, OperationType(op_type), json.loads(data_json))
+                    for op_id, op_type, data_json in rows
+                ]
 
     def mark_success(self, operation_id: int):
         """
@@ -216,7 +291,13 @@ class OfflineQueue:
 
     def mark_failure(self, operation_id: int, error: str, max_retries: int = 3):
         """
-        Mark operation as failed and increment retry count.
+        Record a failed sync attempt and either release or exhaust the
+        operation's dequeue() claim.
+
+        A single UPDATE...CASE releases the claim back to 'pending' (so
+        the next sync() picks it up again) when retries remain, or
+        exhausts it to 'failed' once max_retries is hit -- either way,
+        the row never gets stuck in 'processing'.
 
         Args:
             operation_id: Operation ID
@@ -225,46 +306,45 @@ class OfflineQueue:
         """
         with self._lock:
             with sqlite3.connect(self.db_path) as conn:
-                # Increment retry count
-                cursor = conn.execute(
+                # Not using SQLite's RETURNING clause (3.35+, 2021): this
+                # SDK runs on arbitrary customer machines with whatever
+                # sqlite3 build their Python ships, not a controlled
+                # server -- a plain SELECT after the UPDATE, still inside
+                # this same connection's transaction (so no other writer
+                # can interleave), is the portable equivalent.
+                conn.execute(
                     """
                     UPDATE queue
                     SET retry_count = retry_count + 1,
-                        last_error = ?
+                        last_error = ?,
+                        status = CASE
+                            WHEN retry_count + 1 >= ? THEN 'failed'
+                            ELSE 'pending'
+                        END
                     WHERE id = ?
                     """,
-                    (error, operation_id),
+                    (error, max_retries, operation_id),
                 )
-
-                # Check if max retries exceeded
                 cursor = conn.execute(
-                    """
-                    SELECT retry_count FROM queue WHERE id = ?
-                    """,
+                    "SELECT retry_count, status FROM queue WHERE id = ?",
                     (operation_id,),
                 )
-                retry_count = cursor.fetchone()[0]
-
-                if retry_count >= max_retries:
-                    conn.execute(
-                        """
-                        UPDATE queue
-                        SET status = 'failed'
-                        WHERE id = ?
-                        """,
-                        (operation_id,),
-                    )
-                    logger.error(
-                        f"Operation {operation_id} permanently failed after "
-                        f"{retry_count} retries: {error}"
-                    )
-                else:
-                    logger.warning(
-                        f"Operation {operation_id} failed (retry {retry_count}/"
-                        f"{max_retries}): {error}"
-                    )
-
+                row = cursor.fetchone()
                 conn.commit()
+
+        if row is None:  # pragma: no cover - operation_id didn't exist
+            return
+
+        retry_count, new_status = row
+        if new_status == "failed":
+            logger.error(
+                f"Operation {operation_id} permanently failed after "
+                f"{retry_count} retries: {error}"
+            )
+        else:
+            logger.warning(
+                f"Operation {operation_id} failed (retry {retry_count}/" f"{max_retries}): {error}"
+            )
 
     def get_queue_size(self, status: str = "pending") -> int:
         """
@@ -300,7 +380,13 @@ class OfflineQueue:
                 """
             )
 
-            stats = {"total": 0, "pending": 0, "completed": 0, "failed": 0}
+            stats = {
+                "total": 0,
+                "pending": 0,
+                "processing": 0,
+                "completed": 0,
+                "failed": 0,
+            }
 
             for row in cursor.fetchall():
                 status, count = row

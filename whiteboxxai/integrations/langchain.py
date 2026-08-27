@@ -261,35 +261,50 @@ class LangChainMonitor(ModelMonitor):
         prompt: str,
         response: str,
         model: str,
+        provider: Optional[str] = None,
+        prompt_tokens: Optional[int] = None,
+        completion_tokens: Optional[int] = None,
         tokens_used: Optional[int] = None,
-        cost: Optional[float] = None,
         latency: Optional[float] = None,
+        finish_reason: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
-        Log an LLM call.
+        Log an LLM call to WhiteBoxXAI's real LLM monitoring endpoint
+        (POST /api/v1/llm/logs), instead of the generic prediction-logging
+        endpoint -- token/cost/latency data logged this way is queryable via
+        client.llm.get_stats() and shows up on the LLM observability
+        dashboard, rather than sitting as opaque metadata on a prediction
+        record. Cost is computed server-side from tokens (see
+        backend/llm/token_counter.py's pricing table), so it's not accepted
+        here.
 
         Args:
             prompt: Input prompt
             response: LLM response
             model: Model name
-            tokens_used: Number of tokens used
-            cost: API cost
-            latency: Response latency (seconds)
-            **kwargs: Additional metadata
+            provider: LLM provider name (openai, anthropic, etc.); defaults
+                to "langchain" when the specific provider isn't known
+            prompt_tokens: Number of tokens in the prompt, if known
+            completion_tokens: Number of tokens in the completion, if known
+            tokens_used: Legacy combined token count -- used as
+                completion_tokens when completion_tokens isn't given
+                separately
+            latency: Response latency, in seconds
+            finish_reason: Why the LLM stopped (stop, length, etc.)
+            **kwargs: Additional data, stored as response metadata
         """
-        metadata = {
-            "model": model,
-            "tokens_used": tokens_used,
-            "cost": cost,
-            "latency": latency,
-            **kwargs,
-        }
-
-        self.log_prediction(
-            inputs={"prompt": prompt},
-            output={"response": response},
-            metadata=metadata,
+        self.client.llm.log_call(
+            provider=provider or "langchain",
+            model_name=model,
+            prompt=prompt,
+            completion=response,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=(completion_tokens if completion_tokens is not None else tokens_used),
+            latency_ms=(latency * 1000) if latency is not None else 0.0,
+            finish_reason=finish_reason,
+            model_id=self.model_id,
+            response_metadata=kwargs or None,
         )
 
     def log_tool_call(
@@ -329,30 +344,57 @@ class LangChainMonitor(ModelMonitor):
         num_retrieved: int,
         retrieval_time: Optional[float] = None,
         relevance_scores: Optional[List[float]] = None,
+        ground_truth_ids: Optional[List[str]] = None,
+        answer: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
-        Log a RAG retrieval operation.
+        Log a RAG retrieval operation to WhiteBoxXAI's real RAG monitoring
+        endpoint (POST /api/v1/rag/retrievals), instead of the generic
+        prediction-logging endpoint. When ground_truth_ids is supplied, the
+        backend computes real precision/recall/MRR/NDCG at log time.
 
         Args:
             query: Query text
-            documents: Retrieved documents
-            num_retrieved: Number of documents retrieved
-            retrieval_time: Time taken to retrieve (seconds)
-            relevance_scores: Relevance scores for documents
-            **kwargs: Additional metadata
+            documents: Retrieved documents; each dict may carry "id"
+                (falls back to its index if absent), "text"/"content", and
+                "score"/"metadata"
+            num_retrieved: Number of documents retrieved (used as top_k)
+            retrieval_time: Time taken to retrieve, in seconds
+            relevance_scores: Per-document relevance scores, same order as
+                documents -- overrides each document's own "score" when given
+            ground_truth_ids: Relevant document IDs, to compute precision/
+                recall/MRR/NDCG at log time
+            answer: Generated answer, if a generation step was included
+            **kwargs: Additional data, stored as retrieval metadata
         """
-        metadata = {
-            "num_retrieved": num_retrieved,
-            "retrieval_time": retrieval_time,
-            "relevance_scores": relevance_scores,
-            **kwargs,
-        }
+        results = []
+        for idx, doc in enumerate(documents):
+            score = (
+                relevance_scores[idx]
+                if relevance_scores and idx < len(relevance_scores)
+                else doc.get("score", 0.0)
+            )
+            results.append(
+                {
+                    "document_id": str(doc.get("id", idx)),
+                    "document_content": doc.get("text") or doc.get("content"),
+                    "document_metadata": doc.get("metadata"),
+                    "rank": idx + 1,
+                    "score": score,
+                }
+            )
 
-        self.log_prediction(
-            inputs={"query": query},
-            output={"documents": documents},
-            metadata=metadata,
+        self.client.rag.log_retrieval(
+            query=query,
+            results=results,
+            top_k=num_retrieved,
+            retrieval_method="langchain",
+            retrieval_latency_ms=(retrieval_time * 1000 if retrieval_time is not None else None),
+            ground_truth_ids=ground_truth_ids,
+            answer=answer,
+            model_id=self.model_id,
+            metadata=kwargs or None,
         )
 
 
@@ -425,7 +467,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                     execution_time=execution_time,
                 )
             except Exception as e:
-                warnings.warn(f"Failed to log chain execution: {e}")
+                warnings.warn(f"Failed to log chain execution: {e}", stacklevel=2)
 
             # Cleanup
             del self._chain_start_times[run_id]
@@ -485,7 +527,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                     steps=steps,
                 )
             except Exception as e:
-                warnings.warn(f"Failed to log agent execution: {e}")
+                warnings.warn(f"Failed to log agent execution: {e}", stacklevel=2)
 
             # Cleanup
             del self._agent_start_times[run_id]
@@ -519,10 +561,28 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                 generation = response.generations[0][0]
                 response_text = generation.text
 
-                # Extract token usage if available
-                tokens_used = None
-                if response.llm_output and "token_usage" in response.llm_output:
-                    tokens_used = response.llm_output["token_usage"].get("total_tokens")
+                # Extract real prompt/completion token counts, provider-
+                # agnostically. Prefer LangChain's modern usage_metadata,
+                # which every current chat model (OpenAI, Anthropic, Gemini,
+                # ...) populates the same way on generation.message -- unlike
+                # the legacy llm_output["token_usage"] shape below, which is
+                # OpenAI-specific and absent for other providers. Fall back
+                # to that legacy shape only for non-chat (plain Generation,
+                # no .message) LLMs. If neither is present, pass None
+                # through rather than guessing -- POST /llm/logs already
+                # estimates prompt tokens server-side when they're absent.
+                prompt_tokens = None
+                completion_tokens = None
+                usage_metadata = getattr(
+                    getattr(generation, "message", None), "usage_metadata", None
+                )
+                if usage_metadata:
+                    prompt_tokens = usage_metadata.get("input_tokens")
+                    completion_tokens = usage_metadata.get("output_tokens")
+                elif response.llm_output and "token_usage" in response.llm_output:
+                    token_usage = response.llm_output["token_usage"]
+                    prompt_tokens = token_usage.get("prompt_tokens")
+                    completion_tokens = token_usage.get("completion_tokens")
 
                 # Log LLM call (if configured)
                 if self.monitor._track_tokens or self.monitor._track_cost:
@@ -531,11 +591,12 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                             prompt="",  # Prompt tracked separately
                             response=response_text,
                             model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
-                            tokens_used=tokens_used,
+                            prompt_tokens=prompt_tokens,
+                            completion_tokens=completion_tokens,
                             latency=latency,
                         )
                     except Exception as e:
-                        warnings.warn(f"Failed to log LLM call: {e}")
+                        warnings.warn(f"Failed to log LLM call: {e}", stacklevel=2)
 
             # Cleanup
             del self._llm_start_times[run_id]
@@ -579,7 +640,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                     execution_time=execution_time,
                 )
             except Exception as e:
-                warnings.warn(f"Failed to log tool call: {e}")
+                warnings.warn(f"Failed to log tool call: {e}", stacklevel=2)
 
             # Cleanup
             del self._tool_start_times[run_id]

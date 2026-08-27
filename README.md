@@ -508,6 +508,14 @@ Main client for API interaction.
 - `drift` - Drift detection resource
 - `fairness` - Bias/fairness auditing resource
 - `alerts` - Alerts resource
+- `risk_register` - ISO 42001 risk register resource
+- `governance` - Governance boards and review requests resource
+- `llm` - LLM call logging and cost/usage analytics resource
+- `rag` - RAG retrieval and evaluation resource
+- `safety` - Content safety analysis resource
+- `llm_xai` - LLM explainability (attention, token importance, counterfactuals) resource
+- `agent_workflows` - Multi-agent workflow tracking resource
+- `metrics` - Model performance metrics resource
 
 ### ModelMonitor
 

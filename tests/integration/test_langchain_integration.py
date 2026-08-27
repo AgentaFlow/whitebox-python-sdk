@@ -5,13 +5,18 @@ from unittest.mock import Mock
 
 import pytest
 
-# NOTE: this requires the real `langchain` package (see the `langchain` extra
-# in sdk/pyproject.toml) to be installed. langchain_agents.py subclasses
-# langchain's real BaseCallbackHandler at class-definition time, so faking
-# out sys.modules["langchain.callbacks.base"] etc. here (as this file
-# previously did) makes that inheritance operate on a Mock instead of a
-# real class, producing undefined/garbage behavior.
-from whiteboxxai.integrations.langchain_agents import (
+# NOTE: this requires langchain_core (preferred) or the real legacy
+# `langchain` package (see the `langchain` extra in sdk/pyproject.toml) to be
+# installed. langchain_agents.py subclasses the real BaseCallbackHandler at
+# class-definition time, so faking out sys.modules["langchain.callbacks.base"]
+# etc. here (as this file previously did) makes that inheritance operate on a
+# Mock instead of a real class, producing undefined/garbage behavior. Skip
+# cleanly (rather than erroring at collection) in environments -- like the
+# root "Unit Tests" CI job, which installs requirements-dev.txt and does not
+# pull in the SDK's langchain extra -- where neither is importable.
+pytest.importorskip("langchain_core", reason="langchain_core is an optional dependency")
+
+from whiteboxxai.integrations.langchain_agents import (  # noqa: E402
     LangGraphMultiAgentMonitor,
     MultiAgentCallbackHandler,
     monitor_langchain_agent,

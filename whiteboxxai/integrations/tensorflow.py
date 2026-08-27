@@ -493,7 +493,7 @@ def wrap_keras_model(
 
             monitor.log_batch([{"inputs": x_np[i], "output": pred_np[i]} for i in range(len(x_np))])
         except Exception as e:
-            warnings.warn(f"Failed to log predictions: {e}")
+            warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
         return predictions
 

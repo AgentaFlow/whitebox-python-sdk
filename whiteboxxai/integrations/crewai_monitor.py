@@ -148,7 +148,7 @@ class CrewAIMonitor:
                 "inputs": {
                     "agent_count": len(crew.agents),
                     "task_count": len(crew.tasks),
-                    "process": str(crew.process) if hasattr(crew, "process") else "sequential",
+                    "process": (str(crew.process) if hasattr(crew, "process") else "sequential"),
                 }
             }
 
@@ -182,14 +182,16 @@ class CrewAIMonitor:
                 "goal": getattr(crew_agent, "goal", None),
                 "backstory": getattr(crew_agent, "backstory", None),
                 "tools": [tool.__class__.__name__ for tool in getattr(crew_agent, "tools", [])],
-                "llm_provider": getattr(
-                    getattr(crew_agent, "llm", None), "model_name", "unknown"
-                ).split("-")[0]
-                if hasattr(crew_agent, "llm")
-                else None,
-                "model_name": getattr(getattr(crew_agent, "llm", None), "model_name", None)
-                if hasattr(crew_agent, "llm")
-                else None,
+                "llm_provider": (
+                    getattr(getattr(crew_agent, "llm", None), "model_name", "unknown").split("-")[0]
+                    if hasattr(crew_agent, "llm")
+                    else None
+                ),
+                "model_name": (
+                    getattr(getattr(crew_agent, "llm", None), "model_name", None)
+                    if hasattr(crew_agent, "llm")
+                    else None
+                ),
                 "metadata": {
                     "verbose": getattr(crew_agent, "verbose", False),
                     "allow_delegation": getattr(crew_agent, "allow_delegation", False),

@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-08-27
+
+Ports the MCP server M2 domain-coverage work (issue #141), the ISO 42001
+governance alignment, the Fable security audit's PII-detection hardening,
+and the async-explanation-generation feature (issue #137) developed in the
+`whitebox-xai-azure` monorepo's `sdk/` directory since the 1.1.0 cut.
+
+### Fixed
+- **Offline mode was completely non-functional**: `OfflineManager.sync()`
+  called `client._api_predict()`/`_api_log_batch()`/`_api_register_model()`/
+  `_api_update_baseline()`, none of which existed on `WhiteBoxXAI`, and
+  `ModelsResource.register()`/`update_baseline()`/`PredictionsResource.log()`/
+  `log_batch()` never enqueued on a connection failure in the first place
+  (there was no `APIConnectionError` exception type to catch, and
+  `BaseResource._request_or_queue()` didn't exist). All four write paths now
+  enqueue through the offline queue on connection failure, and
+  `OfflineManager.sync()` can actually replay them.
+- `OfflineQueue.dequeue()` used a plain `SELECT` with no locking, so two
+  concurrent callers (threads/processes sharing the same queue.db) could
+  claim and double-process the same row. Now claims rows atomically via
+  `BEGIN IMMEDIATE`, and a claim left in `processing` for more than 30
+  minutes (a crashed process) is automatically reclaimed as `pending` the
+  next time the queue is opened.
+- **PII detection**: the credit-card pattern had no Luhn checksum
+  validation (any 16-digit run matched, e.g. a phone/account number), and
+  the IPv4 pattern had no octet-range validation (`999.999.999.999`
+  matched). The email pattern's TLD character class contained a literal
+  `|` (`[A-Z|a-z]{2,}`), fixed to `[A-Za-z]{2,}`.
+- `integrations.langchain_agents`'s `MultiAgentCallbackHandler`,
+  `LangGraphMultiAgentMonitor`, and `monitor_langchain_agent()` called
+  `client.agent_workflows.*`, which didn't exist on `WhiteBoxXAI` — every
+  real invocation raised `AttributeError`. Fixed by adding
+  `AgentWorkflowsResource` (see Added).
+- `integrations.transformers` only caught `ImportError` around the
+  `transformers` import; a tokenizers/transformers version mismatch raises
+  `RuntimeError` from transformers' lazy-module loader instead, which, left
+  uncaught, aborted the rest of `integrations/__init__.py` mid-sequence and
+  silently dropped every integration registered after it (crewai, boosting,
+  langchain_agents). Now also caught.
+- `ModelMonitor.create_alert_rule()` called `AlertsResource.create()` with
+  the old request shape (no `severity`, `conditions` as a dict); updated
+  for the rewritten `AlertsResource.create()` signature below.
+
+### Added
+- `client.risk_register`, `client.governance` (ISO 42001 alignment),
+  `client.llm`, `client.rag`, `client.safety`, `client.llm_xai`,
+  `client.agent_workflows`, `client.metrics` — 8 new resource classes
+  backed by their corresponding `backend/api/v1/*` routers.
+- `ExplanationsResource.generate_async()`/`agenerate_async()`: starts
+  non-blocking SHAP/LIME computation on a Celery task and returns
+  immediately with a `pending` explanation record; poll `get()`/`aget()`
+  for the result.
+- `integrations.langchain`'s `log_llm_call()`/`log_rag_retrieval()` now
+  route to the real `client.llm.log_call()`/`client.rag.log_retrieval()`
+  observability endpoints (queryable via `client.llm.get_stats()` and the
+  LLM/RAG dashboards) instead of the generic prediction-logging fallback.
+
+### Changed
+- **BREAKING**: `AlertsResource.create()` now requires a `severity` argument
+  and takes `conditions` as a `List[Dict]` (previously an unstructured
+  `Dict`); `create()`/`list()` now target `/api/v1/alerts/rules` instead of
+  `/api/v1/alerts` (the old endpoint didn't exist on a live backend).
+  `AlertsResource` also gains `get_rule()`, `update_rule()`, `delete_rule()`,
+  `evaluate_rule()`, `list_instances()`, `get_instance()`, `acknowledge()`,
+  `resolve()`, `snooze()`, and `statistics()`.
+
 ## [1.1.0] - 2026-07-30
 
 Ports integration fixes and compatibility improvements developed in the

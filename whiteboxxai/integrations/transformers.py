@@ -12,7 +12,12 @@ try:
     from transformers import Pipeline, PreTrainedModel, PreTrainedTokenizer
 
     TRANSFORMERS_AVAILABLE = True
-except ImportError:
+except (ImportError, RuntimeError):
+    # transformers' top-level API is a lazy module (_LazyModule); a tokenizers/transformers
+    # version mismatch surfaces from its _get_module() as RuntimeError, not ImportError. Left
+    # uncaught, that exception escapes this module and aborts the rest of integrations/__init__.py
+    # mid-sequence, silently dropping every integration registered after this one (crewai,
+    # boosting, langchain_agents).
     TRANSFORMERS_AVAILABLE = False
     PreTrainedModel = object
     PreTrainedTokenizer = object
@@ -244,7 +249,7 @@ class TransformersMonitor(ModelMonitor):
                 # Single prediction
                 self.log_prediction_transformers(
                     input_text=inputs,
-                    prediction=predictions if isinstance(predictions, dict) else predictions[0],
+                    prediction=(predictions if isinstance(predictions, dict) else predictions[0]),
                     actual=actuals,
                 )
 
@@ -465,7 +470,7 @@ class TransformersPipelineWrapper:
                     prediction=result,
                 )
         except Exception as e:
-            warnings.warn(f"Failed to log prediction: {e}")
+            warnings.warn(f"Failed to log prediction: {e}", stacklevel=2)
 
         return result
 
@@ -526,7 +531,7 @@ class _LoggedPipelineCall:
                     prediction=result,
                 )
         except Exception as e:
-            warnings.warn(f"Failed to log prediction: {e}")
+            warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
         return result
 

@@ -203,7 +203,7 @@ class XGBoostMonitor(ModelMonitor):
                 if importance:
                     model_metadata["feature_importance"] = importance
             except Exception as e:
-                warnings.warn(f"Failed to extract feature importance: {e}")
+                warnings.warn(f"Failed to extract feature importance: {e}", stacklevel=2)
 
         # Detect model type
         if model_type is None:
@@ -428,7 +428,7 @@ class LightGBMMonitor(ModelMonitor):
                 if importance:
                     model_metadata["feature_importance"] = importance
             except Exception as e:
-                warnings.warn(f"Failed to extract feature importance: {e}")
+                warnings.warn(f"Failed to extract feature importance: {e}", stacklevel=2)
 
         # Detect model type
         if model_type is None:
@@ -581,7 +581,7 @@ def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool 
         try:
             monitor.log_batch(_build_prediction_batch(inputs=X, predictions=predictions))
         except Exception as e:
-            warnings.warn(f"Failed to log predictions: {e}")
+            warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
         return predictions
 
@@ -600,7 +600,7 @@ def wrap_xgboost_model(model: Any, monitor: XGBoostMonitor, auto_register: bool 
                     )
                 )
             except Exception as e:
-                warnings.warn(f"Failed to log predictions: {e}")
+                warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
             return probabilities
 
@@ -649,7 +649,7 @@ def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: boo
         try:
             monitor.log_batch(_build_prediction_batch(inputs=X, predictions=predictions))
         except Exception as e:
-            warnings.warn(f"Failed to log predictions: {e}")
+            warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
         return predictions
 
@@ -668,7 +668,7 @@ def wrap_lightgbm_model(model: Any, monitor: LightGBMMonitor, auto_register: boo
                     )
                 )
             except Exception as e:
-                warnings.warn(f"Failed to log predictions: {e}")
+                warnings.warn(f"Failed to log predictions: {e}", stacklevel=2)
 
             return probabilities
 
