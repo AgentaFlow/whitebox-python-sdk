@@ -32,6 +32,45 @@ class TestWhiteBoxXAIClient:
         assert client.config.timeout == 30
         assert client.config.max_retries == 3
 
+    def test_client_reads_its_api_key_and_base_url_from_the_environment(self, monkeypatch):
+        """README: "api_key ... or WHITEBOX_API_KEY env var". WhiteBoxXAI() used to
+        raise TypeError (api_key was a required argument), so Config's environment
+        fallback could never be reached through the client."""
+        monkeypatch.setenv("WHITEBOX_API_KEY", "env-key")
+        monkeypatch.setenv("WHITEBOX_BASE_URL", "https://env.example.com")
+
+        client = WhiteBoxXAI()
+
+        assert client.config.api_key == "env-key"
+        assert client.config.base_url == "https://env.example.com"
+
+    def test_client_still_reads_the_1_2_0_environment_names(self, monkeypatch):
+        for name in ("WHITEBOX_API_KEY", "WHITEBOX_BASE_URL"):
+            monkeypatch.delenv(name, raising=False)
+        monkeypatch.setenv("WHITEBOXXAI_API_KEY", "legacy-key")
+        monkeypatch.setenv("WHITEBOXXAI_BASE_URL", "https://legacy.example.com")
+
+        client = WhiteBoxXAI()
+
+        assert client.config.api_key == "legacy-key"
+        assert client.config.base_url == "https://legacy.example.com"
+
+    def test_client_arguments_win_over_the_environment(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOX_API_KEY", "env-key")
+        monkeypatch.setenv("WHITEBOX_BASE_URL", "https://env.example.com")
+
+        client = WhiteBoxXAI(api_key="arg-key", base_url="https://arg.example.com")
+
+        assert client.config.api_key == "arg-key"
+        assert client.config.base_url == "https://arg.example.com"
+
+    def test_client_without_any_api_key_names_the_variable(self, monkeypatch):
+        monkeypatch.delenv("WHITEBOX_API_KEY", raising=False)
+        monkeypatch.delenv("WHITEBOXXAI_API_KEY", raising=False)
+
+        with pytest.raises(ValueError, match="WHITEBOX_API_KEY"):
+            WhiteBoxXAI()
+
     def test_client_custom_config(self):
         """Test client with custom configuration."""
         client = WhiteBoxXAI(
@@ -144,6 +183,23 @@ class TestClientHTTPMethods:
             client.request("GET", "/models")
 
     @patch("httpx.Client.request")
+    def test_rate_limit_error_keeps_the_backends_explanation(self, mock_request):
+        """A 429 is not always a plan quota: a locked-out two-factor attempt is
+        one too, and the backend's own words are the only way to tell."""
+        mock_response = Mock()
+        mock_response.status_code = 429
+        mock_response.headers = {"Retry-After": "840"}
+        mock_response.json.return_value = {"detail": "Too many incorrect codes. Try again later."}
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(RateLimitError) as limited:
+            client.request("GET", "/models")
+
+        assert "Too many incorrect codes" in str(limited.value)
+        assert limited.value.retry_after == 840
+
+    @patch("httpx.Client.request")
     def test_request_server_error(self, mock_request):
         """Test server error handling."""
         mock_response = Mock()
@@ -207,6 +263,42 @@ class TestRetryClassification:
             client.request("GET", "/models")
 
         assert mock_request.call_count == 3
+
+    @staticmethod
+    def _rate_limited(retry_after: str) -> Mock:
+        response = Mock()
+        response.status_code = 429
+        response.headers = {"Retry-After": retry_after}
+        response.json.return_value = {"detail": "Slow down"}
+        return response
+
+    @patch("tenacity.nap.time.sleep")
+    @patch("httpx.Client.request")
+    def test_a_long_rate_limit_wait_is_raised_not_slept_on(self, mock_request, mock_sleep):
+        """A lockout asks for ~15 minutes. Sleeping through that, twice, would
+        hold an interactive call (a governance vote) far longer than any caller
+        would wait; it is raised at once with retry_after for the caller."""
+        mock_request.return_value = self._rate_limited("840")
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(RateLimitError) as limited:
+            client.request("POST", "/votes")
+
+        assert mock_request.call_count == 1
+        mock_sleep.assert_not_called()
+        assert limited.value.retry_after == 840
+
+    @patch("tenacity.nap.time.sleep")
+    @patch("httpx.Client.request")
+    def test_a_short_rate_limit_wait_is_still_retried(self, mock_request, mock_sleep):
+        mock_request.return_value = self._rate_limited("5")
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(RateLimitError):
+            client.request("GET", "/models")
+
+        assert mock_request.call_count == 3
+        assert [c.args[0] for c in mock_sleep.call_args_list] == [5.0, 5.0]
 
     @patch("httpx.Client.request")
     def test_5xx_is_retried_up_to_the_stop_limit(self, mock_request):

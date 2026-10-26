@@ -4,7 +4,9 @@ Scikit-learn Integration
 Integration for monitoring scikit-learn models.
 """
 
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any
 
 try:
     import sklearn
@@ -17,7 +19,23 @@ except ImportError:
 
 import numpy as np
 
+from whiteboxxai.integrations._registration import positional_feature_names, registration_fields
 from whiteboxxai.monitor import ModelMonitor
+
+
+def _default_model_type(estimator: Any) -> str:
+    """Map an estimator to the nearest API model type (``custom`` if none fits)."""
+    module = type(estimator).__module__
+    class_name = type(estimator).__name__
+    if module.startswith(("sklearn.ensemble", "sklearn.tree")) and (
+        "Forest" in class_name or "Tree" in class_name
+    ):
+        return "random_forest"
+    if module.startswith("sklearn.linear_model"):
+        return "linear_model"
+    if module.startswith("sklearn.neural_network"):
+        return "neural_network"
+    return "custom"
 
 
 class SklearnMonitor(ModelMonitor):
@@ -37,7 +55,9 @@ class SklearnMonitor(ModelMonitor):
         # Setup monitoring
         client = WhiteBoxXAI(api_key="your-api-key")
         monitor = SklearnMonitor(client, model=model)
-        monitor.register_from_model(model_type="classification")
+        monitor.register_from_model(
+            version="1.0.0", baseline_metrics={"accuracy": 0.94}
+        )
 
         # Wrap model for automatic monitoring
         monitored_model = monitor.wrap_model(model)
@@ -47,7 +67,7 @@ class SklearnMonitor(ModelMonitor):
         ```
     """
 
-    def __init__(self, client, model: Optional[BaseEstimator] = None, **kwargs):
+    def __init__(self, client, model: BaseEstimator | None = None, **kwargs):
         """Initialize sklearn monitor."""
         if not SKLEARN_AVAILABLE:
             raise ImportError(
@@ -59,9 +79,11 @@ class SklearnMonitor(ModelMonitor):
 
     def register_from_model(
         self,
-        name: Optional[str] = None,
-        model_type: str = "classification",
-        version: Optional[str] = None,
+        name: str | None = None,
+        model_type: str | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """
@@ -69,40 +91,54 @@ class SklearnMonitor(ModelMonitor):
 
         Args:
             name: Model name (default: class name)
-            model_type: Model type (classification, regression, clustering)
-            version: Model version
+            model_type: One of the API's model types (``xgboost``,
+                ``random_forest``, ``neural_network``, ``linear_model``, ``llm``,
+                ``custom``). Default: inferred from the estimator's class. A task
+                name such as ``"classification"`` is kept as ``task`` metadata.
+            version: Model version (default ``1.0.0``)
+            features: Feature names (default: the estimator's
+                ``feature_names_in_``, else ``feature_0..feature_{n-1}`` from
+                ``n_features_in_``)
+            baseline_metrics: Baseline metrics, e.g. ``{"accuracy": 0.94}``
             **kwargs: Additional metadata
 
         Returns:
             Model ID
+
+        Raises:
+            ValueError: No model, an invalid ``model_type``, or no feature names
+                could be determined.
         """
-        if self.model is None:
-            raise ValueError("No model provided")
-
-        # Generate name from model class
-        if name is None:
-            name = self.model.__class__.__name__
-
-        # Extract model metadata
-        metadata = self._extract_model_metadata()
-        metadata.update(kwargs)
-
-        return self.register_model(
-            name=name,
-            model_type=model_type,
-            framework="sklearn",
-            version=version,
-            **metadata,
+        name, fields, metadata = self._prepare_registration(
+            name, model_type, version, features, baseline_metrics, kwargs
         )
+        return self.register_model(name=name, framework="sklearn", **fields, **metadata)
 
     async def aregister_from_model(
         self,
-        name: Optional[str] = None,
-        model_type: str = "classification",
-        version: Optional[str] = None,
+        name: str | None = None,
+        model_type: str | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """Async version of register_from_model()."""
+        name, fields, metadata = self._prepare_registration(
+            name, model_type, version, features, baseline_metrics, kwargs
+        )
+        return await self.aregister_model(name=name, framework="sklearn", **fields, **metadata)
+
+    def _prepare_registration(
+        self,
+        name: str | None,
+        model_type: str | None,
+        version: str | None,
+        features: list[str] | None,
+        baseline_metrics: dict[str, Any] | None,
+        extra_metadata: dict[str, Any],
+    ) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        """Resolve (name, API-required fields, metadata) for registration."""
         if self.model is None:
             raise ValueError("No model provided")
 
@@ -110,15 +146,22 @@ class SklearnMonitor(ModelMonitor):
             name = self.model.__class__.__name__
 
         metadata = self._extract_model_metadata()
-        metadata.update(kwargs)
+        metadata.update(extra_metadata)
 
-        return await self.aregister_model(
-            name=name,
+        inferred = metadata.get("feature_names")
+        if not inferred and metadata.get("n_features"):
+            inferred = positional_feature_names(metadata["n_features"])
+
+        fields = registration_fields(
             model_type=model_type,
-            framework="sklearn",
+            default_model_type=_default_model_type(self.model),
             version=version,
-            **metadata,
+            features=features,
+            inferred_features=inferred,
+            baseline_metrics=baseline_metrics,
+            metadata=metadata,
         )
+        return name, fields, metadata
 
     def wrap_model(self, model: BaseEstimator) -> "SklearnWrapper":
         """
@@ -132,7 +175,7 @@ class SklearnMonitor(ModelMonitor):
         """
         return SklearnWrapper(model, self)
 
-    def _extract_model_metadata(self) -> Dict[str, Any]:
+    def _extract_model_metadata(self) -> dict[str, Any]:
         """Extract metadata from sklearn model."""
         metadata = {}
 

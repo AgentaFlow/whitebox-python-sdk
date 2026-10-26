@@ -20,7 +20,7 @@ from whiteboxxai.offline import OfflineManager, OfflineQueue, OperationType
 
 @pytest.fixture
 def offline_dir(tmp_path):
-    return str(tmp_path / "whiteboxxai_offline")
+    return str(tmp_path / "WHITEBOX_offline")
 
 
 @pytest.fixture
@@ -173,6 +173,54 @@ class TestConcurrentDequeue:
         )
 
 
+class TestDefaultOfflineDirectory:
+    """The default queue directory is ./WHITEBOX_offline, but a queue SDK 1.2.0
+    left in ./whiteboxxai_offline must not be orphaned by upgrading."""
+
+    @pytest.fixture(autouse=True)
+    def in_tmp_cwd(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+    def test_fresh_install_uses_the_new_default(self):
+        manager = OfflineManager(auto_sync=False)
+
+        assert manager.offline_dir == Path("./WHITEBOX_offline")
+        assert Path("WHITEBOX_offline", "queue.db").exists()
+        assert not Path("whiteboxxai_offline").exists()
+
+    def test_an_existing_1_2_0_queue_is_reused(self):
+        legacy = OfflineManager(offline_dir="./whiteboxxai_offline", auto_sync=False)
+        legacy.queue.enqueue(OperationType.PREDICT, {"data": {"model_id": "m1"}})
+
+        manager = OfflineManager(auto_sync=False)
+
+        assert manager.offline_dir == Path("./whiteboxxai_offline")
+        assert manager.queue.get_queue_size() == 1
+        assert not Path("WHITEBOX_offline").exists()
+
+    def test_the_new_directory_wins_when_both_exist(self):
+        OfflineManager(offline_dir="./whiteboxxai_offline", auto_sync=False)
+        OfflineManager(offline_dir="./WHITEBOX_offline", auto_sync=False)
+
+        assert OfflineManager(auto_sync=False).offline_dir == Path("./WHITEBOX_offline")
+
+    def test_an_explicit_directory_is_never_second_guessed(self):
+        OfflineManager(offline_dir="./whiteboxxai_offline", auto_sync=False)
+
+        manager = OfflineManager(offline_dir="./elsewhere", auto_sync=False)
+
+        assert manager.offline_dir == Path("./elsewhere")
+
+    def test_the_client_uses_the_same_default(self):
+        legacy = OfflineManager(offline_dir="./whiteboxxai_offline", auto_sync=False)
+        legacy.queue.enqueue(OperationType.PREDICT, {"data": {}})
+
+        client = WhiteBoxXAI(api_key="k", enable_offline=True, offline_auto_sync=False)
+
+        assert client.get_offline_status()["offline_dir"].endswith("whiteboxxai_offline")
+        assert client.get_offline_status()["queue_stats"]["pending"] == 1
+
+
 class TestOfflineManagerSync:
     """OfflineManager.sync() must replay each operation type against the
     matching WhiteBoxXAI._api_* method with the exact enqueued kwargs."""
@@ -228,6 +276,21 @@ class TestOfflineManagerSync:
             data={"model_id": "m1", "predictions": []}
         )
 
+    def test_sync_replays_llm_log_via_api_llm_log(self, offline_dir):
+        manager = OfflineManager(offline_dir=offline_dir, auto_sync=False)
+        mock_client = Mock()
+        manager.set_client(mock_client)
+        manager.queue.enqueue(
+            OperationType.LLM_LOG, {"data": {"provider": "openai", "prompt": "hi"}}
+        )
+
+        stats = manager.sync()
+
+        mock_client._api_llm_log.assert_called_once_with(
+            data={"provider": "openai", "prompt": "hi"}
+        )
+        assert stats["synced"] == 1
+
     def test_sync_marks_success_and_clears_the_queue(self, offline_dir):
         manager = OfflineManager(offline_dir=offline_dir, auto_sync=False)
         mock_client = Mock()
@@ -264,6 +327,57 @@ class TestClientConnectionFailureQueuesInsteadOfRaising:
 
         assert result["status"] == "queued"
         assert client.get_offline_status()["queue_stats"]["pending"] == 1
+
+    @patch("httpx.Client.request")
+    def test_llm_log_call_queues_on_connection_error_and_replays(self, mock_request, offline_dir):
+        """llm.log_call used to POST straight to /api/v1/llm/logs, so offline
+        mode raised for the LangChain handler's main logging path."""
+        mock_request.side_effect = httpx.ConnectError("Connection refused")
+
+        client = WhiteBoxXAI(
+            api_key="test_key",
+            enable_offline=True,
+            offline_dir=offline_dir,
+            offline_auto_sync=False,
+        )
+
+        result = client.llm.log_call(
+            provider="openai",
+            model_name="gpt-4o",
+            prompt="hello",
+            completion="hi there",
+            latency_ms=12.5,
+        )
+
+        assert result["status"] == "queued"
+        assert client.get_offline_status()["queue_stats"]["pending"] == 1
+
+        # Back online: the queued call replays to the same endpoint, same body
+        mock_request.reset_mock(side_effect=True)
+        mock_request.return_value = httpx.Response(200, json={"id": "log-1", "message": "ok"})
+
+        stats = client.sync_offline_queue()
+
+        assert stats["synced"] == 1
+        assert stats["pending"] == 0
+        request = mock_request.call_args
+        assert request.kwargs["method"] == "POST"
+        assert request.kwargs["url"].endswith("/api/v1/llm/logs")
+        assert request.kwargs["json"]["prompt"] == "hello"
+        assert request.kwargs["json"]["completion"] == "hi there"
+
+    @patch("httpx.Client.request")
+    def test_llm_log_call_reraises_when_offline_mode_disabled(self, mock_request):
+        mock_request.side_effect = httpx.ConnectError("Connection refused")
+
+        client = WhiteBoxXAI(api_key="test_key")
+
+        from whiteboxxai.exceptions import APIConnectionError
+
+        with pytest.raises(APIConnectionError):
+            client.llm.log_call(
+                provider="openai", model_name="gpt-4o", prompt="hello", latency_ms=1.0
+            )
 
     @patch("httpx.Client.request")
     def test_connection_error_reraised_when_offline_mode_disabled(self, mock_request):

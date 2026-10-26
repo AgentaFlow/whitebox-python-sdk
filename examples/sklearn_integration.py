@@ -42,7 +42,6 @@ def main():
     # Register model with automatic metadata extraction
     model_id = monitor.register_from_model(
         name="fraud_classifier_rf",
-        model_type="classification",
         version="1.0.0",
     )
     print(f"Model registered with ID: {model_id}")

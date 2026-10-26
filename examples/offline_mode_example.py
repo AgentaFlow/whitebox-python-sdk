@@ -23,7 +23,7 @@ def example_1_basic_offline_mode():
 
     # Initialize client with offline mode enabled
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=True,  # Auto-sync every 60 seconds
@@ -54,7 +54,7 @@ def example_2_manual_sync():
 
     # Initialize with auto-sync disabled for manual control
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,  # Disable auto-sync
@@ -108,7 +108,7 @@ def example_3_priority_based_syncing():
     print("=" * 80)
 
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -166,7 +166,7 @@ def example_4_queue_management():
     print("=" * 80)
 
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -214,7 +214,7 @@ def example_5_ml_model_with_offline():
 
     # Initialize client with offline mode
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./ml_offline_queue",
         offline_auto_sync=True,
@@ -253,7 +253,7 @@ def example_6_error_handling():
     print("=" * 80)
 
     client = WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=False,
@@ -308,7 +308,7 @@ def example_7_context_manager():
     print("  - Ensures resource cleanup")
 
     with WhiteBoxXAI(
-        api_key=os.getenv("WHITEBOXXAI_API_KEY", "test_key"),
+        api_key=os.getenv("WHITEBOX_API_KEY", "test_key"),
         enable_offline=True,
         offline_dir="./offline_queue",
         offline_auto_sync=True,
@@ -359,8 +359,8 @@ def run_all_examples():
 
 if __name__ == "__main__":
     # Set environment variable if not set
-    if "WHITEBOXXAI_API_KEY" not in os.environ:
-        print("Note: WHITEBOXXAI_API_KEY not set, using 'test_key' for examples")
-        print("Set your API key: export WHITEBOXXAI_API_KEY=your_key_here\n")
+    if "WHITEBOX_API_KEY" not in os.environ:
+        print("Note: WHITEBOX_API_KEY not set, using 'test_key' for examples")
+        print("Set your API key: export WHITEBOX_API_KEY=your_key_here\n")
 
     run_all_examples()

@@ -2,13 +2,15 @@
 SDK Exceptions
 """
 
-from typing import Any, Dict, Optional
+from __future__ import annotations
+
+from typing import Any
 
 
 class WhiteBoxXAIError(Exception):
     """Base exception for WhiteBoxXAI SDK."""
 
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+    def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message)
         self.message = message
         self.details = details or {}
@@ -20,9 +22,9 @@ class APIError(WhiteBoxXAIError):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        response: Optional[Dict[str, Any]] = None,
-        request_id: Optional[str] = None,
+        status_code: int | None = None,
+        response: dict[str, Any] | None = None,
+        request_id: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -39,8 +41,6 @@ class APIConnectionError(APIError):
     server is unreachable" apart from "the server responded with an error".
     """
 
-    pass
-
 
 class ServerError(APIError):
     """The server responded with a 5xx status.
@@ -51,8 +51,6 @@ class ServerError(APIError):
     (4xx) that will never succeed no matter how many times it's replayed.
     """
 
-    pass
-
 
 class AuthenticationError(WhiteBoxXAIError):
     """Authentication error."""
@@ -60,8 +58,8 @@ class AuthenticationError(WhiteBoxXAIError):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        response: Optional[Dict[str, Any]] = None,
+        status_code: int | None = None,
+        response: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -75,9 +73,9 @@ class RateLimitError(WhiteBoxXAIError):
     def __init__(
         self,
         message: str,
-        retry_after: Optional[int] = None,
-        limit: Optional[int] = None,
-        remaining: Optional[int] = None,
+        retry_after: int | None = None,
+        limit: int | None = None,
+        remaining: int | None = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -92,7 +90,7 @@ class ValidationError(WhiteBoxXAIError):
     def __init__(
         self,
         message: str,
-        fields: Optional[Dict[str, Any]] = None,
+        fields: dict[str, Any] | None = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -105,8 +103,8 @@ class NotFoundError(WhiteBoxXAIError):
     def __init__(
         self,
         message: str,
-        resource_type: Optional[str] = None,
-        resource_id: Optional[str] = None,
+        resource_type: str | None = None,
+        resource_id: str | None = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
@@ -117,16 +115,10 @@ class NotFoundError(WhiteBoxXAIError):
 class ConfigurationError(WhiteBoxXAIError):
     """Configuration error."""
 
-    pass
-
 
 class IntegrationError(WhiteBoxXAIError):
     """Framework integration error."""
 
-    pass
-
 
 class CacheError(WhiteBoxXAIError):
     """Cache operation error."""
-
-    pass

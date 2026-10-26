@@ -37,11 +37,15 @@ client = WhiteBoxXAI(api_key="your-api-key")
 # Create monitor
 monitor = ModelMonitor(client)
 
-# Register model
+# Register model. model_type is one of xgboost, random_forest, neural_network,
+# linear_model, llm, custom; version, features and baseline_metrics are required.
 model_id = monitor.register_model(
     name="fraud_detection",
-    model_type="classification",
-    framework="sklearn"
+    model_type="random_forest",
+    framework="sklearn",
+    version="1.0.0",
+    features=["amount", "merchant"],
+    baseline_metrics={"accuracy": 0.94},
 )
 
 # Log predictions
@@ -65,7 +69,7 @@ model.fit(X_train, y_train)
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = SklearnMonitor(client, model=model)
-monitor.register_from_model(model_type="classification")
+monitor.register_from_model(version="1.0.0")
 
 # Wrap model for automatic monitoring
 monitored_model = monitor.wrap_model(model)
@@ -92,7 +96,7 @@ model = nn.Sequential(
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = TorchMonitor(client, model=model)
-monitor.register_from_model(model_type="classification")
+monitor.register_from_model(version="1.0.0")
 
 # Wrap model
 monitored_model = monitor.wrap_model(model)
@@ -119,7 +123,7 @@ model.compile(optimizer='adam', loss='mse')
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = KerasMonitor(client, model=model, model_name="keras_model")
-monitor.register_from_model(model_type="regression")
+monitor.register_from_model(version="1.0.0")
 
 # Train with monitoring callback
 callback = WhiteBoxXAICallback(monitor, log_frequency=1)
@@ -180,7 +184,7 @@ monitor = LangChainMonitor(
 )
 
 # Register application
-monitor.register_application(name="Q&A Bot", version="1.0.0")
+monitor.register_application(name="QA Bot", version="1.0.0")
 
 # Create chain
 llm = OpenAI(temperature=0.7)
@@ -275,7 +279,10 @@ async def main():
         # Register model
         model_id = await monitor.aregister_model(
             name="async_model",
-            model_type="classification"
+            model_type="custom",
+            version="1.0.0",
+            features=["feature1"],
+            baseline_metrics={},
         )
 
         # Log prediction
@@ -320,7 +327,7 @@ from whiteboxxai import WhiteBoxXAI
 client = WhiteBoxXAI(
     api_key="your-api-key",
     enable_offline=True,
-    offline_dir="./whiteboxxai_offline",
+    offline_dir="./WHITEBOX_offline",
     offline_auto_sync=True,
     offline_sync_interval=60  # Sync every 60 seconds
 )
@@ -427,14 +434,14 @@ The SDK can be configured via constructor parameters or environment variables:
 from whiteboxxai import WhiteBoxXAI
 
 client = WhiteBoxXAI(
-    api_key="your-api-key",              # or WHITEBOXXAI_API_KEY env var
-    base_url="https://api.whiteboxxai.com", # Custom API endpoint, or WHITEBOXXAI_BASE_URL env var
+    api_key="your-api-key",              # or WHITEBOX_API_KEY env var
+    base_url="https://api.whiteboxxai.com", # Custom API endpoint, or WHITEBOX_BASE_URL env var
     timeout=30,                           # Request timeout (seconds)
     max_retries=3,                        # Retry attempts
 
     # Offline mode
     enable_offline=True,                  # Enable offline queueing
-    offline_dir="./whiteboxxai_offline",  # Queue storage directory
+    offline_dir="./WHITEBOX_offline",  # Queue storage directory
     offline_max_queue_size=10000,         # Max queued operations
     offline_auto_sync=True,               # Auto-sync in background
     offline_sync_interval=60,             # Sync interval (seconds)
@@ -449,16 +456,14 @@ client = WhiteBoxXAI(
 
 ### Authentication
 
-The `api_key` parameter (or `WHITEBOXXAI_API_KEY` env var) is sent as a
-bearer token: `Authorization: Bearer <api_key>`. As of this SDK's current
-release, the WhiteBoxXAI backend validates this token as a standard JWT
-obtained via account login (`/api/v1/auth/login`), not a separate,
-dedicated API-key entity — there is no self-service API key issuance/
-management endpoint yet. In practice: log in through your WhiteBoxXAI
-account (dashboard or the `/auth/login` endpoint) and use the returned
-token as `api_key`. This also matches how the companion MCP server
-authenticates (see below) and will be updated here once dedicated,
-long-lived API keys ship on the backend.
+The `api_key` parameter (or `WHITEBOX_API_KEY` env var) is sent as a
+bearer token: `Authorization: Bearer <api_key>`. The SDK requires a scoped,
+long-lived API key which you can generate from the API Keys tab in your
+WhiteBoxXAI settings dashboard. Short-lived session JWTs are not supported
+for programmatic SDK access.
+
+`WHITEBOXXAI_API_KEY` and `WHITEBOXXAI_BASE_URL`, the names SDK 1.2.0 read, are still
+accepted when the `WHITEBOX_*` ones are not set.
 
 ## Using WhiteBoxXAI from Other Languages (MCP)
 
@@ -471,10 +476,9 @@ LangChain, custom agent harnesses), use the companion
 ```bash
 pip install whiteboxxai-mcp
 
-# Configure a service-account credential, then run the stdio server
+# Configure an API key credential, then run the stdio server
 export WHITEBOXXAI_MCP_API_BASE_URL="https://api.whiteboxxai.com"
-export WHITEBOXXAI_MCP_EMAIL="mcp-service@yourorg.com"
-export WHITEBOXXAI_MCP_PASSWORD="..."
+export WHITEBOXXAI_MCP_API_KEY="wbx_live_..."
 whiteboxxai-mcp
 ```
 
@@ -483,39 +487,38 @@ Point any MCP-compatible client at this command (e.g. Claude Desktop's
 client-agnostic protocol, so this is the recommended path for non-Python
 integrations.
 
-**Current limitations** (as of this SDK's release): only models,
-predictions, drift, and bias/fairness tools are available; explanations,
-LLM/RAG observability, safety, alerts, and multi-agent workflow tools are
-tracked as follow-on milestones, and `whitebox_explanations_generate`
-currently returns placeholder feature-importance values rather than real
-SHAP/LIME output. Auth uses the same username/password (or short-lived
-JWT) mechanism described above — there is no long-lived API-key/
-service-account system yet.
-
 See the `whiteboxxai-mcp` package's own README for full setup and its
-tool reference.
+tool reference across all 18 domains (197 tools).
 
 ## API Reference
 
 ### WhiteBoxXAI Client
 
-Main client for API interaction.
+Main client for API interaction (`from whiteboxxai import WhiteBoxXAI, governance_run`).
 
-**Methods:**
-- `models` - Models resource
-- `predictions` - Predictions resource
-- `explanations` - Explanations resource
-- `drift` - Drift detection resource
-- `fairness` - Bias/fairness auditing resource
-- `alerts` - Alerts resource
-- `risk_register` - ISO 42001 risk register resource
-- `governance` - Governance boards and review requests resource
-- `llm` - LLM call logging and cost/usage analytics resource
-- `rag` - RAG retrieval and evaluation resource
-- `safety` - Content safety analysis resource
-- `llm_xai` - LLM explainability (attention, token importance, counterfactuals) resource
-- `agent_workflows` - Multi-agent workflow tracking resource
-- `metrics` - Model performance metrics resource
+**Resources:**
+- `models` - Models resource and Git-backed model diffing
+- `predictions` - Predictions resource and batch ingestion
+- `explanations` - SHAP/LIME and DiCE counterfactual explanations. Explanations run on the
+  model artifact stored on the platform, so they only work for models registered through
+  GitHub auto-registration with `storage_mode: full`. A model registered through the SDK or
+  the dashboard stores metadata only, and its explanation request ends in a failed explanation.
+- `drift` - Drift detection and report management
+- `fairness` - Bias/fairness auditing and protected group disparity analysis
+- `alerts` - Core alert rules, instances, and triage
+- `governance` - Review boards, review requests, and two-factor voting
+- `compliance` - ISO/IEC 42001 readiness, gap analysis, and control catalog
+- `risk_register` - AI Risk Register queries, mitigations, and heat maps
+- `reports` - Report Studio generation, types, and templates
+- `prompts` - Prompt template registry, versioning, and drift
+- `llm` - LLM call monitoring, tokens, cost, and latency
+- `llm_xai` - LLM explainability and token importance
+- `rag` - RAG pipeline monitoring and retrieval evaluation
+- `safety` - Content safety, toxicity, and bias analysis
+- `agent_workflows` - Multi-agent workflow traces and bottlenecks
+- `metrics` - Model and operational performance metrics
+- `alert_intelligence` - ML-driven alert correlation and root-cause analysis
+- `alert_management` - Alert escalation policies, routing, and lifecycle
 
 ### ModelMonitor
 
@@ -569,7 +572,6 @@ See the `examples/` directory for more examples:
 
 - Documentation: https://docs.whiteboxxai.com
 - Issues: https://github.com/AgentaFlow/whitebox-python-sdk/issues
-- Email: support@whiteboxxai.com
 
 ## License
 

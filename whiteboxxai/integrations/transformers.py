@@ -4,8 +4,10 @@ Hugging Face Transformers Integration
 Integration for monitoring Hugging Face Transformers models.
 """
 
+from __future__ import annotations
+
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 try:
     import transformers
@@ -23,7 +25,20 @@ except (ImportError, RuntimeError):
     PreTrainedTokenizer = object
     Pipeline = object
 
+
+from whiteboxxai.integrations._registration import registration_fields
 from whiteboxxai.monitor import ModelMonitor
+
+# Pipeline tasks whose models produce text; registered as the API's ``llm`` type.
+_GENERATION_TASKS = frozenset(
+    {
+        "text-generation",
+        "text2text-generation",
+        "translation",
+        "summarization",
+        "conversational",
+    }
+)
 
 
 class TransformersMonitor(ModelMonitor):
@@ -64,11 +79,11 @@ class TransformersMonitor(ModelMonitor):
     def __init__(
         self,
         client,
-        pipeline: Optional[Pipeline] = None,
-        model: Optional[PreTrainedModel] = None,
-        tokenizer: Optional[PreTrainedTokenizer] = None,
-        model_name: Optional[str] = None,
-        task: Optional[str] = None,
+        pipeline: Pipeline | None = None,
+        model: PreTrainedModel | None = None,
+        tokenizer: PreTrainedTokenizer | None = None,
+        model_name: str | None = None,
+        task: str | None = None,
         **kwargs,
     ):
         """
@@ -102,10 +117,13 @@ class TransformersMonitor(ModelMonitor):
 
     def register_from_model(
         self,
-        name: Optional[str] = None,
-        task: Optional[str] = None,
-        version: Optional[str] = None,
-        framework_version: Optional[str] = None,
+        name: str | None = None,
+        task: str | None = None,
+        version: str | None = None,
+        framework_version: str | None = None,
+        model_type: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """
@@ -114,12 +132,20 @@ class TransformersMonitor(ModelMonitor):
         Args:
             name: Model name (default: model class name or pipeline task)
             task: Task type (text-classification, ner, qa, etc.)
-            version: Model version
+            version: Model version (default ``1.0.0``)
             framework_version: Transformers version
+            model_type: One of the API's model types. Default: ``llm`` for
+                generation tasks (text-generation, translation, summarization,
+                ...), else ``neural_network``.
+            features: Feature names (default: ``["text"]``)
+            baseline_metrics: Baseline metrics, e.g. ``{"accuracy": 0.91}``
             **kwargs: Additional metadata
 
         Returns:
             Model ID
+
+        Raises:
+            ValueError: No model or pipeline, or an invalid ``model_type``.
         """
         if self.pipeline is None and self.model is None:
             raise ValueError("No model or pipeline provided")
@@ -165,38 +191,31 @@ class TransformersMonitor(ModelMonitor):
                 metadata["model_type"] = getattr(config, "model_type", None)
                 metadata["num_parameters"] = getattr(config, "num_parameters", None)
 
-        # Map task to model_type
-        model_type_mapping = {
-            "text-classification": "classification",
-            "sentiment-analysis": "classification",
-            "ner": "classification",
-            "token-classification": "classification",
-            "question-answering": "qa",
-            "text-generation": "generation",
-            "translation": "generation",
-            "summarization": "generation",
-        }
-        model_type = model_type_mapping.get(task, "classification")
+        # Map the task to the API's model type; the task itself stays in metadata
+        default_model_type = "llm" if task.split("_")[0] in _GENERATION_TASKS else "neural_network"
 
         # Register model
-        self.model_id = self.client.register_model(
-            name=name,
+        fields = registration_fields(
             model_type=model_type,
-            framework="transformers",
+            default_model_type=default_model_type,
             version=version,
+            features=features,
+            inferred_features=["text"],
+            baseline_metrics=baseline_metrics,
             metadata=metadata,
         )
+        self.register_model(name=name, framework="transformers", metadata=metadata, **fields)
 
         self._registered = True
         return self.model_id
 
     def predict(
         self,
-        inputs: Union[str, List[str]],
+        inputs: str | list[str],
         log: bool = True,
-        actuals: Optional[Union[str, List[str]]] = None,
+        actuals: str | list[str] | None = None,
         **kwargs: Any,
-    ) -> Union[Dict, List[Dict]]:
+    ) -> dict | list[dict]:
         """
         Make predictions and optionally log them.
 
@@ -258,8 +277,8 @@ class TransformersMonitor(ModelMonitor):
     def log_prediction_transformers(
         self,
         input_text: str,
-        prediction: Union[Dict, Any],
-        actual: Optional[Any] = None,
+        prediction: dict | Any,
+        actual: Any | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -291,9 +310,9 @@ class TransformersMonitor(ModelMonitor):
 
     def log_batch_transformers(
         self,
-        inputs: List[str],
-        predictions: List[Union[Dict, Any]],
-        actuals: Optional[List[Any]] = None,
+        inputs: list[str],
+        predictions: list[dict | Any],
+        actuals: list[Any] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -313,7 +332,7 @@ class TransformersMonitor(ModelMonitor):
 
         batch = []
         for i, text in enumerate(inputs):
-            item: Dict[str, Any] = {
+            item: dict[str, Any] = {
                 "inputs": {"text": text},
                 "output": batch_predictions[i],
             }
@@ -324,7 +343,7 @@ class TransformersMonitor(ModelMonitor):
         # Log batch
         self.log_batch(batch)
 
-    def _extract_prediction_value(self, prediction: Dict) -> Any:
+    def _extract_prediction_value(self, prediction: dict) -> Any:
         """Extract the main prediction value from a pipeline output."""
         if isinstance(prediction, list) and len(prediction) > 0:
             prediction = prediction[0]
@@ -348,8 +367,8 @@ class TransformersMonitor(ModelMonitor):
 
     def set_baseline(
         self,
-        baseline_texts: List[str],
-        baseline_labels: Optional[List[Any]] = None,
+        baseline_texts: list[str],
+        baseline_labels: list[Any] | None = None,
     ) -> None:
         """
         Set baseline data for drift detection.
@@ -375,8 +394,8 @@ class TransformersMonitor(ModelMonitor):
         self,
         prompt: str,
         generated_text: str,
-        num_tokens: Optional[int] = None,
-        generation_time: Optional[float] = None,
+        num_tokens: int | None = None,
+        generation_time: float | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -425,7 +444,7 @@ class TransformersPipelineWrapper:
         self,
         pipeline: Pipeline,
         client,
-        model_name: Optional[str] = None,
+        model_name: str | None = None,
         auto_register: bool = True,
     ):
         """

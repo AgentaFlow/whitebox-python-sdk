@@ -19,10 +19,12 @@ from whiteboxxai.client import WhiteBoxXAI
 from whiteboxxai.decorators import monitor_model, monitor_prediction
 from whiteboxxai.git_utils import GitContext, detect_git_context, validate_git_context
 from whiteboxxai.monitor import ModelMonitor
+from whiteboxxai.runs import governance_run
 
 __all__ = [
     "WhiteBoxXAI",
     "ModelMonitor",
+    "governance_run",
     "monitor_model",
     "monitor_prediction",
     "GitContext",

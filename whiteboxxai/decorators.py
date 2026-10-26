@@ -4,18 +4,21 @@ Monitoring Decorators
 Decorators for automatic model and prediction monitoring.
 """
 
+from __future__ import annotations
+
 import functools
 import inspect
 import time
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from whiteboxxai.monitor import ModelMonitor
 
 
 def monitor_model(
     monitor: ModelMonitor,
-    input_keys: Optional[list] = None,
-    output_key: Optional[str] = None,
+    input_keys: list | None = None,
+    output_key: str | None = None,
     explain: bool = False,
 ):
     """
@@ -109,10 +112,10 @@ def monitor_model(
 
 def monitor_prediction(
     monitor: ModelMonitor,
-    input_extractor: Optional[Callable] = None,
-    output_extractor: Optional[Callable] = None,
+    input_extractor: Callable | None = None,
+    output_extractor: Callable | None = None,
     explain: bool = False,
-    metadata_extractor: Optional[Callable] = None,
+    metadata_extractor: Callable | None = None,
 ):
     """
     Decorator to monitor individual predictions with custom extractors.
@@ -234,7 +237,7 @@ def _extract_inputs(
     func: Callable,
     args: tuple,
     kwargs: dict,
-    input_keys: Optional[list] = None,
+    input_keys: list | None = None,
 ) -> Any:
     """Extract inputs from function arguments."""
     if input_keys:
@@ -254,7 +257,7 @@ def _extract_inputs(
         return _default_input_extractor(func, args, kwargs)
 
 
-def _default_input_extractor(func: Callable, args: tuple, kwargs: dict) -> Dict[str, Any]:
+def _default_input_extractor(func: Callable, args: tuple, kwargs: dict) -> dict[str, Any]:
     """Default input extractor."""
     sig = inspect.signature(func)
     bound_args = sig.bind(*args, **kwargs)
@@ -262,14 +265,14 @@ def _default_input_extractor(func: Callable, args: tuple, kwargs: dict) -> Dict[
     return dict(bound_args.arguments)
 
 
-def _extract_output(result: Any, output_key: Optional[str] = None) -> Any:
+def _extract_output(result: Any, output_key: str | None = None) -> Any:
     """Extract output from function result."""
     if output_key and isinstance(result, dict):
         return result.get(output_key)
     return result
 
 
-def monitor_performance(threshold_ms: Optional[float] = None):
+def monitor_performance(threshold_ms: float | None = None):
     """
     Decorator to monitor function performance.
 

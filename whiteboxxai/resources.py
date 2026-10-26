@@ -4,8 +4,10 @@ API Resources
 Resource classes for interacting with different WhiteBoxXAI API endpoints.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, List
 
 from whiteboxxai.exceptions import APIConnectionError
 
@@ -18,7 +20,7 @@ logger = logging.getLogger(__name__)
 class BaseResource:
     """Base class for API resources."""
 
-    def __init__(self, client: "WhiteBoxXAI"):
+    def __init__(self, client: WhiteBoxXAI):
         """Initialize resource with client."""
         self.client = client
 
@@ -27,14 +29,14 @@ class BaseResource:
         method: str,
         endpoint: str,
         operation_type: str,
-        queue_data: Dict[str, Any],
-        data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        queue_data: dict[str, Any],
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """POST/PATCH, falling back to the offline queue on connection failure.
 
-        Only the four sync write methods that mutate server state (model
-        register/update_baseline, prediction log/log_batch) use this --
+        Only the sync write methods that mutate server state (model
+        register/update_baseline, prediction log/log_batch, LLM log_call) use this --
         offline mode's queue is inherently synchronous (SQLite-backed), so
         the async (`a*`) variants are unaffected and simply raise as
         before. `queue_data` must match the kwargs the corresponding
@@ -84,16 +86,24 @@ class ModelsResource(BaseResource):
         self,
         name: str,
         model_type: str,
-        framework: Optional[str],
-        version: Optional[str],
+        framework: str | None,
+        version: str | None,
         auto_detect_git: bool,
         require_clean_git: bool,
-        kwargs: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        kwargs: dict[str, Any],
+    ) -> dict[str, Any]:
         data = {
             "name": name,
             "model_type": model_type,
-            "framework": framework,
+            # The backend's ModelCreate schema field is model_framework, not
+            # framework (backend/schemas/model.py) -- Pydantic silently
+            # drops unrecognized extra fields by default, so sending
+            # "framework" here used to mean a caller's framework=... was
+            # accepted but never actually persisted (issue #227, found via
+            # a real end-to-end integration test). The public parameter
+            # name here stays `framework` for backward compatibility; only
+            # the wire key changes.
+            "model_framework": framework,
             "version": version,
             **kwargs,
         }
@@ -123,18 +133,19 @@ class ModelsResource(BaseResource):
         self,
         name: str,
         model_type: str,
-        framework: Optional[str] = None,
-        version: Optional[str] = None,
+        framework: str | None = None,
+        version: str | None = None,
         auto_detect_git: bool = False,
         require_clean_git: bool = False,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Register a new model.
 
         Args:
             name: Model name
-            model_type: Model type (classification, regression, etc.)
+            model_type: One of xgboost, random_forest, neural_network,
+                linear_model, llm, custom
             framework: ML framework (sklearn, pytorch, tensorflow, etc.)
             version: Model version
             auto_detect_git: Automatically detect Git repository context (commit, branch, etc.)
@@ -147,7 +158,8 @@ class ModelsResource(BaseResource):
         Example:
             >>> client.models.register(
             ...     name="fraud_detector",
-            ...     model_type="classification",
+            ...     version="1.0.0",
+            ...     model_type="random_forest",
             ...     framework="sklearn",
             ...     features=["amount", "merchant_category"],
             ...     baseline_metrics={"accuracy": 0.94},
@@ -174,12 +186,12 @@ class ModelsResource(BaseResource):
         self,
         name: str,
         model_type: str,
-        framework: Optional[str] = None,
-        version: Optional[str] = None,
+        framework: str | None = None,
+        version: str | None = None,
         auto_detect_git: bool = False,
         require_clean_git: bool = False,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of register()."""
         data = self._build_register_data(
             name,
@@ -192,11 +204,11 @@ class ModelsResource(BaseResource):
         )
         return await self.client.arequest("POST", "/api/v1/models/", data=data)
 
-    def get(self, model_id: str) -> Dict[str, Any]:
+    def get(self, model_id: str) -> dict[str, Any]:
         """Get model by ID."""
         return self.client.request("GET", f"/api/v1/models/{model_id}")
 
-    async def aget(self, model_id: str) -> Dict[str, Any]:
+    async def aget(self, model_id: str) -> dict[str, Any]:
         """Async version of get()."""
         return await self.client.arequest("GET", f"/api/v1/models/{model_id}")
 
@@ -204,14 +216,14 @@ class ModelsResource(BaseResource):
         self,
         skip: int = 0,
         limit: int = 100,
-        status_filter: Optional[str] = None,
-        model_type: Optional[str] = None,
-        owner_id: Optional[str] = None,
-        tags: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        status_filter: str | None = None,
+        model_type: str | None = None,
+        owner_id: str | None = None,
+        tags: str | None = None,
+        search: str | None = None,
+    ) -> List[dict[str, Any]]:
         """List registered models with optional filters."""
-        params: Dict[str, Any] = {"skip": skip, "limit": limit}
+        params: dict[str, Any] = {"skip": skip, "limit": limit}
         if status_filter is not None:
             params["status_filter"] = status_filter
         if model_type is not None:
@@ -228,14 +240,14 @@ class ModelsResource(BaseResource):
         self,
         skip: int = 0,
         limit: int = 100,
-        status_filter: Optional[str] = None,
-        model_type: Optional[str] = None,
-        owner_id: Optional[str] = None,
-        tags: Optional[str] = None,
-        search: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        status_filter: str | None = None,
+        model_type: str | None = None,
+        owner_id: str | None = None,
+        tags: str | None = None,
+        search: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of list()."""
-        params: Dict[str, Any] = {"skip": skip, "limit": limit}
+        params: dict[str, Any] = {"skip": skip, "limit": limit}
         if status_filter is not None:
             params["status_filter"] = status_filter
         if model_type is not None:
@@ -248,15 +260,15 @@ class ModelsResource(BaseResource):
             params["search"] = search
         return await self.client.arequest("GET", "/api/v1/models/", params=params)
 
-    def update(self, model_id: str, **kwargs: Any) -> Dict[str, Any]:
+    def update(self, model_id: str, **kwargs: Any) -> dict[str, Any]:
         """Update model metadata (partial update)."""
         return self.client.request("PATCH", f"/api/v1/models/{model_id}", data=kwargs)
 
-    async def aupdate(self, model_id: str, **kwargs: Any) -> Dict[str, Any]:
+    async def aupdate(self, model_id: str, **kwargs: Any) -> dict[str, Any]:
         """Async version of update()."""
         return await self.client.arequest("PATCH", f"/api/v1/models/{model_id}", data=kwargs)
 
-    def update_status(self, model_id: str, new_status: str) -> Dict[str, Any]:
+    def update_status(self, model_id: str, new_status: str) -> dict[str, Any]:
         """Update model status (ACTIVE, INACTIVE, DEPRECATED, ARCHIVED)."""
         return self.client.request(
             "PATCH",
@@ -264,7 +276,7 @@ class ModelsResource(BaseResource):
             params={"new_status": new_status},
         )
 
-    async def aupdate_status(self, model_id: str, new_status: str) -> Dict[str, Any]:
+    async def aupdate_status(self, model_id: str, new_status: str) -> dict[str, Any]:
         """Async version of update_status()."""
         return await self.client.arequest(
             "PATCH",
@@ -274,7 +286,7 @@ class ModelsResource(BaseResource):
 
     def get_versions(
         self, model_name: str, skip: int = 0, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Get all versions of a model by name."""
         return self.client.request(
             "GET",
@@ -284,7 +296,7 @@ class ModelsResource(BaseResource):
 
     async def aget_versions(
         self, model_name: str, skip: int = 0, limit: int = 100
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of get_versions()."""
         return await self.client.arequest(
             "GET",
@@ -292,23 +304,23 @@ class ModelsResource(BaseResource):
             params={"skip": skip, "limit": limit},
         )
 
-    def get_latest(self, model_name: str) -> Dict[str, Any]:
+    def get_latest(self, model_name: str) -> dict[str, Any]:
         """Get the latest version of a model by name."""
         return self.client.request("GET", f"/api/v1/models/{model_name}/latest")
 
-    async def aget_latest(self, model_name: str) -> Dict[str, Any]:
+    async def aget_latest(self, model_name: str) -> dict[str, Any]:
         """Async version of get_latest()."""
         return await self.client.arequest("GET", f"/api/v1/models/{model_name}/latest")
 
     def update_baseline(
         self,
         model_id: str,
-        baseline_metrics: Dict[str, Any],
-        baseline_data_hash: Optional[str] = None,
-        baseline_data_count: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        baseline_metrics: dict[str, Any],
+        baseline_data_hash: str | None = None,
+        baseline_data_count: int | None = None,
+    ) -> dict[str, Any]:
         """Update model baseline metrics/profile (e.g. after retraining)."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if baseline_data_hash is not None:
             params["baseline_data_hash"] = baseline_data_hash
         if baseline_data_count is not None:
@@ -329,12 +341,12 @@ class ModelsResource(BaseResource):
     async def aupdate_baseline(
         self,
         model_id: str,
-        baseline_metrics: Dict[str, Any],
-        baseline_data_hash: Optional[str] = None,
-        baseline_data_count: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        baseline_metrics: dict[str, Any],
+        baseline_data_hash: str | None = None,
+        baseline_data_count: int | None = None,
+    ) -> dict[str, Any]:
         """Async version of update_baseline()."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if baseline_data_hash is not None:
             params["baseline_data_hash"] = baseline_data_hash
         if baseline_data_count is not None:
@@ -346,29 +358,87 @@ class ModelsResource(BaseResource):
             params=params,
         )
 
-    def archive(self, model_id: str) -> Dict[str, Any]:
+    def archive(self, model_id: str) -> dict[str, Any]:
         """Archive a model (soft delete)."""
         return self.client.request("POST", f"/api/v1/models/{model_id}/archive")
 
-    async def aarchive(self, model_id: str) -> Dict[str, Any]:
+    async def aarchive(self, model_id: str) -> dict[str, Any]:
         """Async version of archive()."""
         return await self.client.arequest("POST", f"/api/v1/models/{model_id}/archive")
 
-    def restore(self, model_id: str) -> Dict[str, Any]:
+    def restore(self, model_id: str) -> dict[str, Any]:
         """Restore an archived model to active status."""
         return self.client.request("POST", f"/api/v1/models/{model_id}/restore")
 
-    async def arestore(self, model_id: str) -> Dict[str, Any]:
+    async def arestore(self, model_id: str) -> dict[str, Any]:
         """Async version of restore()."""
         return await self.client.arequest("POST", f"/api/v1/models/{model_id}/restore")
 
-    def delete(self, model_id: str) -> Dict[str, Any]:
+    def delete(self, model_id: str) -> dict[str, Any]:
         """Permanently delete a model (hard delete, cannot be undone)."""
         return self.client.request("DELETE", f"/api/v1/models/{model_id}")
 
-    async def adelete(self, model_id: str) -> Dict[str, Any]:
+    async def adelete(self, model_id: str) -> dict[str, Any]:
         """Async version of delete()."""
         return await self.client.arequest("DELETE", f"/api/v1/models/{model_id}")
+
+    def compare_versions(self, version1_id: str, version2_id: str) -> dict[str, Any]:
+        """Compare two Git-backed model versions (`POST /api/v1/github/diff/compare`)."""
+        return self.client.request(
+            "POST",
+            "/api/v1/github/diff/compare",
+            data={"version1_id": version1_id, "version2_id": version2_id},
+        )
+
+    async def acompare_versions(self, version1_id: str, version2_id: str) -> dict[str, Any]:
+        """Async version of compare_versions()."""
+        return await self.client.arequest(
+            "POST",
+            "/api/v1/github/diff/compare",
+            data={"version1_id": version1_id, "version2_id": version2_id},
+        )
+
+    def version_changelog(self, version1_id: str, version2_id: str) -> dict[str, Any]:
+        """Generate a markdown changelog between two model versions (`GET /api/v1/github/diff/changelog`)."""
+        return self.client.request(
+            "GET",
+            "/api/v1/github/diff/changelog",
+            params={"version1_id": version1_id, "version2_id": version2_id},
+        )
+
+    async def aversion_changelog(self, version1_id: str, version2_id: str) -> dict[str, Any]:
+        """Async version of version_changelog()."""
+        return await self.client.arequest(
+            "GET",
+            "/api/v1/github/diff/changelog",
+            params={"version1_id": version1_id, "version2_id": version2_id},
+        )
+
+    def list_git_versions(self, model_id: str, limit: int = 50) -> List[dict[str, Any]]:
+        """List Git-backed version sources for a model (`GET /api/v1/github/diff/model/{model_id}/versions`)."""
+        return self.client.request(
+            "GET",
+            f"/api/v1/github/diff/model/{model_id}/versions",
+            params={"limit": limit},
+        )
+
+    async def alist_git_versions(self, model_id: str, limit: int = 50) -> List[dict[str, Any]]:
+        """Async version of list_git_versions()."""
+        return await self.client.arequest(
+            "GET",
+            f"/api/v1/github/diff/model/{model_id}/versions",
+            params={"limit": limit},
+        )
+
+    def architecture_changes_timeline(self, model_id: str) -> dict[str, Any]:
+        """Get the architecture changes timeline for a model (`GET /api/v1/github/diff/architecture-changes/{model_id}`)."""
+        return self.client.request("GET", f"/api/v1/github/diff/architecture-changes/{model_id}")
+
+    async def aarchitecture_changes_timeline(self, model_id: str) -> dict[str, Any]:
+        """Async version of architecture_changes_timeline()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/github/diff/architecture-changes/{model_id}"
+        )
 
 
 class PredictionsResource(BaseResource):
@@ -377,12 +447,12 @@ class PredictionsResource(BaseResource):
     def log(
         self,
         model_id: str,
-        input_data: Dict[str, Any],
-        output_data: Dict[str, Any],
-        prediction_id: Optional[str] = None,
-        latency_ms: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+        output_data: dict[str, Any],
+        prediction_id: str | None = None,
+        latency_ms: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Log a single prediction.
 
@@ -397,7 +467,7 @@ class PredictionsResource(BaseResource):
         Returns:
             Logged prediction data
         """
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "model_id": model_id,
             "input_data": input_data,
             "output_data": output_data,
@@ -419,14 +489,14 @@ class PredictionsResource(BaseResource):
     async def alog(
         self,
         model_id: str,
-        input_data: Dict[str, Any],
-        output_data: Dict[str, Any],
-        prediction_id: Optional[str] = None,
-        latency_ms: Optional[float] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any],
+        output_data: dict[str, Any],
+        prediction_id: str | None = None,
+        latency_ms: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Async version of log()."""
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "model_id": model_id,
             "input_data": input_data,
             "output_data": output_data,
@@ -442,8 +512,8 @@ class PredictionsResource(BaseResource):
     def log_batch(
         self,
         model_id: str,
-        predictions: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        predictions: List[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Log multiple predictions in batch (max 1000 per call).
 
@@ -467,28 +537,28 @@ class PredictionsResource(BaseResource):
     async def alog_batch(
         self,
         model_id: str,
-        predictions: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        predictions: List[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Async version of log_batch()."""
         data = {"model_id": model_id, "predictions": predictions}
         return await self.client.arequest("POST", "/api/v1/predictions/log/batch", data=data)
 
-    def get(self, prediction_id: str) -> Dict[str, Any]:
+    def get(self, prediction_id: str) -> dict[str, Any]:
         """Get a prediction by its ID."""
         return self.client.request("GET", f"/api/v1/predictions/{prediction_id}")
 
-    async def aget(self, prediction_id: str) -> Dict[str, Any]:
+    async def aget(self, prediction_id: str) -> dict[str, Any]:
         """Async version of get()."""
         return await self.client.arequest("GET", f"/api/v1/predictions/{prediction_id}")
 
     def query(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """
         Query predictions with filters.
 
@@ -499,7 +569,7 @@ class PredictionsResource(BaseResource):
             limit: Maximum results to return
             offset: Number of results to skip
         """
-        data: Dict[str, Any] = {"model_id": model_id, "limit": limit, "offset": offset}
+        data: dict[str, Any] = {"model_id": model_id, "limit": limit, "offset": offset}
         if start_time is not None:
             data["start_time"] = start_time
         if end_time is not None:
@@ -509,13 +579,13 @@ class PredictionsResource(BaseResource):
     async def aquery(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of query()."""
-        data: Dict[str, Any] = {"model_id": model_id, "limit": limit, "offset": offset}
+        data: dict[str, Any] = {"model_id": model_id, "limit": limit, "offset": offset}
         if start_time is not None:
             data["start_time"] = start_time
         if end_time is not None:
@@ -525,11 +595,11 @@ class PredictionsResource(BaseResource):
     def get_stats(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Get prediction statistics for a model."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if start_time is not None:
             params["start_time"] = start_time
         if end_time is not None:
@@ -541,11 +611,11 @@ class PredictionsResource(BaseResource):
     async def aget_stats(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of get_stats()."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if start_time is not None:
             params["start_time"] = start_time
         if end_time is not None:
@@ -554,7 +624,7 @@ class PredictionsResource(BaseResource):
             "GET", f"/api/v1/predictions/models/{model_id}/stats", params=params
         )
 
-    def get_recent(self, model_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_recent(self, model_id: str, limit: int = 10) -> List[dict[str, Any]]:
         """Get the most recent predictions for a model (max 100)."""
         return self.client.request(
             "GET",
@@ -562,7 +632,7 @@ class PredictionsResource(BaseResource):
             params={"limit": limit},
         )
 
-    async def aget_recent(self, model_id: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def aget_recent(self, model_id: str, limit: int = 10) -> List[dict[str, Any]]:
         """Async version of get_recent()."""
         return await self.client.arequest(
             "GET",
@@ -576,43 +646,383 @@ class ExplanationsResource(BaseResource):
 
     def generate(
         self,
-        prediction_id: int,
-        method: str = "shap",
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
+        model_id: str,
+        instance: dict[str, Any],
+        method: str | None = None,
+        prediction_id: str | None = None,
+        num_features: int = 10,
+        num_samples: int = 5000,
+        use_cache: bool = True,
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
         """
-        Generate explanation for a prediction.
+        Generate a SHAP/LIME explanation synchronously (blocks until computed).
 
         Args:
-            prediction_id: Prediction ID
-            method: Explanation method (shap, lime)
-            **kwargs: Method-specific parameters
+            model_id: ID of the model to explain
+            instance: Feature values for the instance to explain
+            method: "shap" or "lime" (uses the model's configured default if omitted)
+            prediction_id: Optional associated prediction ID
+            num_features: Number of top features to return (1-100)
+            num_samples: Number of samples the explainer draws (100-50000)
+            use_cache: Reuse a cached explanation for an identical instance if one exists
 
         Returns:
-            Explanation data
+            The computed explanation (feature_weights, base_value, score, ...)
         """
-        data = {"prediction_id": prediction_id, "method": method, **kwargs}
+        data = {
+            "model_id": model_id,
+            "instance": instance,
+            "method": method,
+            "prediction_id": prediction_id,
+            "num_features": num_features,
+            "num_samples": num_samples,
+            "use_cache": use_cache,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
+        }
         return self.client.request("POST", "/api/v1/explanations/generate", data=data)
 
     async def agenerate(
         self,
-        prediction_id: int,
-        method: str = "shap",
-        **kwargs: Any,
-    ) -> Dict[str, Any]:
+        model_id: str,
+        instance: dict[str, Any],
+        method: str | None = None,
+        prediction_id: str | None = None,
+        num_features: int = 10,
+        num_samples: int = 5000,
+        use_cache: bool = True,
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
         """Async version of generate()."""
-        data = {"prediction_id": prediction_id, "method": method, **kwargs}
+        data = {
+            "model_id": model_id,
+            "instance": instance,
+            "method": method,
+            "prediction_id": prediction_id,
+            "num_features": num_features,
+            "num_samples": num_samples,
+            "use_cache": use_cache,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
+        }
         return await self.client.arequest("POST", "/api/v1/explanations/generate", data=data)
+
+    def generate_bulk(
+        self,
+        model_id: str,
+        instances: List[dict[str, Any]],
+        method: str | None = None,
+        num_features: int = 10,
+        num_samples: int = 5000,
+        parallel: bool = True,
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
+        """
+        Start bulk explanation generation for multiple instances (non-blocking).
+
+        Dispatches one Celery task per instance (max 100 instances per call).
+        Poll get()/aget() with each returned explanation_id.
+
+        Args:
+            model_id: ID of the model to explain
+            instances: Feature values for each instance to explain (max 100)
+            method: "shap" or "lime" (uses the model's configured default if omitted)
+            num_features: Number of top features to return per explanation (1-100)
+            num_samples: Number of samples the explainer draws (100-50000)
+            parallel: Retained for backward compatibility; not read by the backend
+
+        Returns:
+            {"explanation_ids": [...], "total": ..., "message": ...}
+        """
+        data = {
+            "model_id": model_id,
+            "instances": instances,
+            "method": method,
+            "num_features": num_features,
+            "num_samples": num_samples,
+            "parallel": parallel,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
+        }
+        return self.client.request("POST", "/api/v1/explanations/generate/bulk", data=data)
+
+    async def agenerate_bulk(
+        self,
+        model_id: str,
+        instances: List[dict[str, Any]],
+        method: str | None = None,
+        num_features: int = 10,
+        num_samples: int = 5000,
+        parallel: bool = True,
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
+        """Async version of generate_bulk()."""
+        data = {
+            "model_id": model_id,
+            "instances": instances,
+            "method": method,
+            "num_features": num_features,
+            "num_samples": num_samples,
+            "parallel": parallel,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
+        }
+        return await self.client.arequest("POST", "/api/v1/explanations/generate/bulk", data=data)
+
+    def list_by_model(
+        self,
+        model_id: str,
+        method: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """List explanations for a model, optionally filtered by method/status."""
+        params = _drop_none(method=method, status=status, limit=limit, offset=offset)
+        return self.client.request("GET", f"/api/v1/explanations/model/{model_id}", params=params)
+
+    async def alist_by_model(
+        self,
+        model_id: str,
+        method: str | None = None,
+        status: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> dict[str, Any]:
+        """Async version of list_by_model()."""
+        params = _drop_none(method=method, status=status, limit=limit, offset=offset)
+        return await self.client.arequest(
+            "GET", f"/api/v1/explanations/model/{model_id}", params=params
+        )
+
+    def get_by_prediction(self, prediction_id: str) -> dict[str, Any]:
+        """Get the explanation associated with a prediction, if one exists."""
+        return self.client.request("GET", f"/api/v1/explanations/prediction/{prediction_id}")
+
+    async def aget_by_prediction(self, prediction_id: str) -> dict[str, Any]:
+        """Async version of get_by_prediction()."""
+        return await self.client.arequest("GET", f"/api/v1/explanations/prediction/{prediction_id}")
+
+    def get_stats(self, model_id: str) -> dict[str, Any]:
+        """Get aggregated explanation statistics for a model."""
+        return self.client.request("GET", f"/api/v1/explanations/model/{model_id}/stats")
+
+    async def aget_stats(self, model_id: str) -> dict[str, Any]:
+        """Async version of get_stats()."""
+        return await self.client.arequest("GET", f"/api/v1/explanations/model/{model_id}/stats")
+
+    def set_config(
+        self,
+        model_id: str,
+        enabled: bool = True,
+        default_method: str = "shap_kernel",
+        auto_explain: bool = False,
+        cache_enabled: bool = True,
+        cache_ttl_hours: int = 24,
+        lime_config: dict[str, Any] | None = None,
+        shap_config: dict[str, Any] | None = None,
+        visualization_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create or update a model's explanation configuration (upsert)."""
+        data = {
+            "model_id": model_id,
+            "enabled": enabled,
+            "default_method": default_method,
+            "auto_explain": auto_explain,
+            "cache_enabled": cache_enabled,
+            "cache_ttl_hours": cache_ttl_hours,
+            "lime_config": lime_config,
+            "shap_config": shap_config,
+            "visualization_config": visualization_config,
+        }
+        return self.client.request("POST", "/api/v1/explanations/config", data=data)
+
+    async def aset_config(
+        self,
+        model_id: str,
+        enabled: bool = True,
+        default_method: str = "shap_kernel",
+        auto_explain: bool = False,
+        cache_enabled: bool = True,
+        cache_ttl_hours: int = 24,
+        lime_config: dict[str, Any] | None = None,
+        shap_config: dict[str, Any] | None = None,
+        visualization_config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Async version of set_config()."""
+        data = {
+            "model_id": model_id,
+            "enabled": enabled,
+            "default_method": default_method,
+            "auto_explain": auto_explain,
+            "cache_enabled": cache_enabled,
+            "cache_ttl_hours": cache_ttl_hours,
+            "lime_config": lime_config,
+            "shap_config": shap_config,
+            "visualization_config": visualization_config,
+        }
+        return await self.client.arequest("POST", "/api/v1/explanations/config", data=data)
+
+    def get_config(self, model_id: str) -> dict[str, Any]:
+        """Get a model's explanation configuration."""
+        return self.client.request("GET", f"/api/v1/explanations/config/{model_id}")
+
+    async def aget_config(self, model_id: str) -> dict[str, Any]:
+        """Async version of get_config()."""
+        return await self.client.arequest("GET", f"/api/v1/explanations/config/{model_id}")
+
+    def delete_config(self, model_id: str) -> dict[str, Any]:
+        """Delete a model's explanation configuration."""
+        return self.client.request("DELETE", f"/api/v1/explanations/config/{model_id}")
+
+    async def adelete_config(self, model_id: str) -> dict[str, Any]:
+        """Async version of delete_config()."""
+        return await self.client.arequest("DELETE", f"/api/v1/explanations/config/{model_id}")
+
+    def compare(
+        self,
+        explanation_ids: List[str],
+        comparison_type: str = "feature_importance",
+    ) -> dict[str, Any]:
+        """
+        Compare 2-20 explanations against each other.
+
+        Args:
+            explanation_ids: IDs of the explanations to compare (2-20)
+            comparison_type: "feature_importance", "instance_similarity", or
+                "method_agreement"
+        """
+        data = {"explanation_ids": explanation_ids, "comparison_type": comparison_type}
+        return self.client.request("POST", "/api/v1/explanations/compare", data=data)
+
+    async def acompare(
+        self,
+        explanation_ids: List[str],
+        comparison_type: str = "feature_importance",
+    ) -> dict[str, Any]:
+        """Async version of compare()."""
+        data = {"explanation_ids": explanation_ids, "comparison_type": comparison_type}
+        return await self.client.arequest("POST", "/api/v1/explanations/compare", data=data)
+
+    def visualize(
+        self,
+        explanation_id: str,
+        plot_type: str,
+        max_features: int = 10,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Get visualization data for a single explanation.
+
+        Args:
+            explanation_id: The explanation to visualize
+            plot_type: "waterfall", "force", or "feature_importance"
+            max_features: Maximum number of features to include (1-50)
+            config: Optional plot-specific configuration
+        """
+        data = {
+            "explanation_id": explanation_id,
+            "plot_type": plot_type,
+            "max_features": max_features,
+            "config": config,
+        }
+        return self.client.request("POST", "/api/v1/explanations/visualizations/single", data=data)
+
+    async def avisualize(
+        self,
+        explanation_id: str,
+        plot_type: str,
+        max_features: int = 10,
+        config: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Async version of visualize()."""
+        data = {
+            "explanation_id": explanation_id,
+            "plot_type": plot_type,
+            "max_features": max_features,
+            "config": config,
+        }
+        return await self.client.arequest(
+            "POST", "/api/v1/explanations/visualizations/single", data=data
+        )
+
+    def visualize_multi(
+        self,
+        explanation_ids: List[str],
+        plot_type: str,
+        feature_index: int | None = None,
+        interaction_index: int | None = None,
+        max_features: int = 20,
+        highlight_index: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Get visualization data spanning multiple explanations.
+
+        Args:
+            explanation_ids: The explanations to visualize together (1-100)
+            plot_type: "summary", "decision", or "dependence"
+            feature_index: Feature to focus on (for dependence plots)
+            interaction_index: Feature to color by (for dependence plots)
+            max_features: Maximum number of features to include (1-50)
+            highlight_index: Index of an explanation to highlight (for decision plots)
+        """
+        data = {
+            "explanation_ids": explanation_ids,
+            "plot_type": plot_type,
+            "feature_index": feature_index,
+            "interaction_index": interaction_index,
+            "max_features": max_features,
+            "highlight_index": highlight_index,
+        }
+        return self.client.request("POST", "/api/v1/explanations/visualizations/multi", data=data)
+
+    async def avisualize_multi(
+        self,
+        explanation_ids: List[str],
+        plot_type: str,
+        feature_index: int | None = None,
+        interaction_index: int | None = None,
+        max_features: int = 20,
+        highlight_index: int | None = None,
+    ) -> dict[str, Any]:
+        """Async version of visualize_multi()."""
+        data = {
+            "explanation_ids": explanation_ids,
+            "plot_type": plot_type,
+            "feature_index": feature_index,
+            "interaction_index": interaction_index,
+            "max_features": max_features,
+            "highlight_index": highlight_index,
+        }
+        return await self.client.arequest(
+            "POST", "/api/v1/explanations/visualizations/multi", data=data
+        )
 
     def generate_async(
         self,
         model_id: str,
-        instance: Dict[str, Any],
-        method: Optional[str] = None,
-        prediction_id: Optional[str] = None,
+        instance: dict[str, Any],
+        method: str | None = None,
+        prediction_id: str | None = None,
         num_features: int = 10,
         num_samples: int = 5000,
-    ) -> Dict[str, Any]:
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
         """
         Start asynchronous explanation generation (non-blocking).
 
@@ -639,18 +1049,24 @@ class ExplanationsResource(BaseResource):
             "prediction_id": prediction_id,
             "num_features": num_features,
             "num_samples": num_samples,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
         }
         return self.client.request("POST", "/api/v1/explanations/generate/async", data=data)
 
     async def agenerate_async(
         self,
         model_id: str,
-        instance: Dict[str, Any],
-        method: Optional[str] = None,
-        prediction_id: Optional[str] = None,
+        instance: dict[str, Any],
+        method: str | None = None,
+        prediction_id: str | None = None,
         num_features: int = 10,
         num_samples: int = 5000,
-    ) -> Dict[str, Any]:
+        total_cfs: int = 3,
+        desired_class: str | int = "opposite",
+        features_to_vary: str | list[str] = "all",
+    ) -> dict[str, Any]:
         """Async version of generate_async()."""
         data = {
             "model_id": model_id,
@@ -659,14 +1075,17 @@ class ExplanationsResource(BaseResource):
             "prediction_id": prediction_id,
             "num_features": num_features,
             "num_samples": num_samples,
+            "total_cfs": total_cfs,
+            "desired_class": desired_class,
+            "features_to_vary": features_to_vary,
         }
         return await self.client.arequest("POST", "/api/v1/explanations/generate/async", data=data)
 
-    def get(self, explanation_id: str) -> Dict[str, Any]:
+    def get(self, explanation_id: str) -> dict[str, Any]:
         """Get explanation by ID."""
         return self.client.request("GET", f"/api/v1/explanations/{explanation_id}")
 
-    async def aget(self, explanation_id: str) -> Dict[str, Any]:
+    async def aget(self, explanation_id: str) -> dict[str, Any]:
         """Async version of get()."""
         return await self.client.arequest("GET", f"/api/v1/explanations/{explanation_id}")
 
@@ -678,8 +1097,8 @@ class DriftResource(BaseResource):
         self,
         model_id: str,
         window_size: int = 1000,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        feature_names: List[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Detect data drift for a model (ephemeral, not persisted).
 
@@ -691,7 +1110,7 @@ class DriftResource(BaseResource):
         Returns:
             Drift detection results
         """
-        params: Dict[str, Any] = {"window_size": window_size}
+        params: dict[str, Any] = {"window_size": window_size}
         if feature_names is not None:
             params["feature_names"] = feature_names
         return self.client.request("POST", f"/api/v1/drift/detect/{model_id}", params=params)
@@ -700,15 +1119,15 @@ class DriftResource(BaseResource):
         self,
         model_id: str,
         window_size: int = 1000,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        feature_names: List[str] | None = None,
+    ) -> dict[str, Any]:
         """Async version of detect()."""
-        params: Dict[str, Any] = {"window_size": window_size}
+        params: dict[str, Any] = {"window_size": window_size}
         if feature_names is not None:
             params["feature_names"] = feature_names
         return await self.client.arequest("POST", f"/api/v1/drift/detect/{model_id}", params=params)
 
-    def create_report(self, model_id: str, window_size: int = 1000) -> Dict[str, Any]:
+    def create_report(self, model_id: str, window_size: int = 1000) -> dict[str, Any]:
         """Run drift analysis and persist the result as a drift report."""
         return self.client.request(
             "POST",
@@ -716,7 +1135,7 @@ class DriftResource(BaseResource):
             params={"model_id": model_id, "window_size": window_size},
         )
 
-    async def acreate_report(self, model_id: str, window_size: int = 1000) -> Dict[str, Any]:
+    async def acreate_report(self, model_id: str, window_size: int = 1000) -> dict[str, Any]:
         """Async version of create_report()."""
         return await self.client.arequest(
             "POST",
@@ -724,7 +1143,7 @@ class DriftResource(BaseResource):
             params={"model_id": model_id, "window_size": window_size},
         )
 
-    def get_reports(self, model_id: str, limit: int = 10, skip: int = 0) -> List[Dict[str, Any]]:
+    def get_reports(self, model_id: str, limit: int = 10, skip: int = 0) -> List[dict[str, Any]]:
         """List drift reports for a model, most recent first."""
         return self.client.request(
             "GET",
@@ -734,7 +1153,7 @@ class DriftResource(BaseResource):
 
     async def aget_reports(
         self, model_id: str, limit: int = 10, skip: int = 0
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of get_reports()."""
         return await self.client.arequest(
             "GET",
@@ -742,19 +1161,19 @@ class DriftResource(BaseResource):
             params={"limit": limit, "skip": skip},
         )
 
-    def get_report(self, model_id: str, report_id: str) -> Dict[str, Any]:
+    def get_report(self, model_id: str, report_id: str) -> dict[str, Any]:
         """Get a specific drift report with per-feature statistics."""
         return self.client.request("GET", f"/api/v1/drift/reports/{model_id}/{report_id}")
 
-    async def aget_report(self, model_id: str, report_id: str) -> Dict[str, Any]:
+    async def aget_report(self, model_id: str, report_id: str) -> dict[str, Any]:
         """Async version of get_report()."""
         return await self.client.arequest("GET", f"/api/v1/drift/reports/{model_id}/{report_id}")
 
-    def get_trend(self, model_id: str, days: int = 7) -> Dict[str, Any]:
+    def get_trend(self, model_id: str, days: int = 7) -> dict[str, Any]:
         """Get drift trend over time for a model."""
         return self.client.request("GET", f"/api/v1/drift/trend/{model_id}", params={"days": days})
 
-    async def aget_trend(self, model_id: str, days: int = 7) -> Dict[str, Any]:
+    async def aget_trend(self, model_id: str, days: int = 7) -> dict[str, Any]:
         """Async version of get_trend()."""
         return await self.client.arequest(
             "GET", f"/api/v1/drift/trend/{model_id}", params={"days": days}
@@ -770,11 +1189,11 @@ class FairnessResource(BaseResource):
         sensitive_attributes: List[str],
         y_true: List[int],
         y_pred: List[int],
-        group_data: Dict[str, List[Any]],
-        y_prob: Optional[List[float]] = None,
-        fairness_thresholds: Optional[Dict[str, float]] = None,
-        metrics_to_compute: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        group_data: dict[str, list[Any]],
+        y_prob: List[float] | None = None,
+        fairness_thresholds: dict[str, float] | None = None,
+        metrics_to_compute: List[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Run a bias audit on model predictions.
 
@@ -796,7 +1215,7 @@ class FairnessResource(BaseResource):
         Returns:
             Complete bias audit results with metrics, group comparisons, and recommendations
         """
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "model_id": model_id,
             "sensitive_attributes": sensitive_attributes,
             "y_true": y_true,
@@ -817,13 +1236,13 @@ class FairnessResource(BaseResource):
         sensitive_attributes: List[str],
         y_true: List[int],
         y_pred: List[int],
-        group_data: Dict[str, List[Any]],
-        y_prob: Optional[List[float]] = None,
-        fairness_thresholds: Optional[Dict[str, float]] = None,
-        metrics_to_compute: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        group_data: dict[str, list[Any]],
+        y_prob: List[float] | None = None,
+        fairness_thresholds: dict[str, float] | None = None,
+        metrics_to_compute: List[str] | None = None,
+    ) -> dict[str, Any]:
         """Async version of audit()."""
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "model_id": model_id,
             "sensitive_attributes": sensitive_attributes,
             "y_true": y_true,
@@ -838,39 +1257,39 @@ class FairnessResource(BaseResource):
             data["metrics_to_compute"] = metrics_to_compute
         return await self.client.arequest("POST", "/api/v1/fairness/audit", data=data)
 
-    def get_audit(self, audit_id: str) -> Dict[str, Any]:
+    def get_audit(self, audit_id: str) -> dict[str, Any]:
         """Get bias audit results by ID."""
         return self.client.request("GET", f"/api/v1/fairness/audits/{audit_id}")
 
-    async def aget_audit(self, audit_id: str) -> Dict[str, Any]:
+    async def aget_audit(self, audit_id: str) -> dict[str, Any]:
         """Async version of get_audit()."""
         return await self.client.arequest("GET", f"/api/v1/fairness/audits/{audit_id}")
 
     def list_audits(
         self,
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List bias audits, optionally filtered by model."""
-        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         if model_id is not None:
             params["model_id"] = model_id
         return self.client.request("GET", "/api/v1/fairness/audits", params=params)
 
     async def alist_audits(
         self,
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_audits()."""
-        params: Dict[str, Any] = {"limit": limit, "offset": offset}
+        params: dict[str, Any] = {"limit": limit, "offset": offset}
         if model_id is not None:
             params["model_id"] = model_id
         return await self.client.arequest("GET", "/api/v1/fairness/audits", params=params)
 
-    def get_bias_history(self, model_id: str, days: int = 30) -> Dict[str, Any]:
+    def get_bias_history(self, model_id: str, days: int = 30) -> dict[str, Any]:
         """Get historical bias metrics/trend for a model."""
         return self.client.request(
             "GET",
@@ -878,7 +1297,7 @@ class FairnessResource(BaseResource):
             params={"days": days},
         )
 
-    async def aget_bias_history(self, model_id: str, days: int = 30) -> Dict[str, Any]:
+    async def aget_bias_history(self, model_id: str, days: int = 30) -> dict[str, Any]:
         """Async version of get_bias_history()."""
         return await self.client.arequest(
             "GET",
@@ -886,7 +1305,7 @@ class FairnessResource(BaseResource):
             params={"days": days},
         )
 
-    def get_metric_history(self, model_id: str, metric_type: str, days: int = 30) -> Dict[str, Any]:
+    def get_metric_history(self, model_id: str, metric_type: str, days: int = 30) -> dict[str, Any]:
         """Get history for a specific fairness metric type."""
         return self.client.request(
             "GET",
@@ -896,7 +1315,7 @@ class FairnessResource(BaseResource):
 
     async def aget_metric_history(
         self, model_id: str, metric_type: str, days: int = 30
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of get_metric_history()."""
         return await self.client.arequest(
             "GET",
@@ -904,11 +1323,11 @@ class FairnessResource(BaseResource):
             params={"days": days},
         )
 
-    def get_latest_audit(self, model_id: str) -> Dict[str, Any]:
+    def get_latest_audit(self, model_id: str) -> dict[str, Any]:
         """Get the most recent bias audit for a model."""
         return self.client.request("GET", f"/api/v1/fairness/models/{model_id}/latest-audit")
 
-    async def aget_latest_audit(self, model_id: str) -> Dict[str, Any]:
+    async def aget_latest_audit(self, model_id: str) -> dict[str, Any]:
         """Async version of get_latest_audit()."""
         return await self.client.arequest("GET", f"/api/v1/fairness/models/{model_id}/latest-audit")
 
@@ -929,16 +1348,16 @@ class AlertsResource(BaseResource):
         name: str,
         alert_type: str,
         severity: str,
-        conditions: List[Dict[str, Any]],
-        model_id: Optional[str] = None,
-        description: Optional[str] = None,
+        conditions: List[dict[str, Any]],
+        model_id: str | None = None,
+        description: str | None = None,
         logic_operator: str = "AND",
-        notification_channels: Optional[List[Dict[str, Any]]] = None,
+        notification_channels: List[dict[str, Any]] | None = None,
         throttle_minutes: int = 60,
         cooldown_minutes: int = 0,
         is_active: bool = True,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create an alert rule.
 
@@ -978,19 +1397,19 @@ class AlertsResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/alerts/rules", data=data)
 
-    async def acreate(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def acreate(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of create()."""
         data = _alert_rule_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/alerts/rules", data=data)
 
     def list(
         self,
-        model_id: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        model_id: str | None = None,
+        alert_type: str | None = None,
+        is_active: bool | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List alert rules for the caller's organization."""
         params = _drop_none(
             model_id=model_id,
@@ -1003,12 +1422,12 @@ class AlertsResource(BaseResource):
 
     async def alist(
         self,
-        model_id: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        is_active: Optional[bool] = None,
+        model_id: str | None = None,
+        alert_type: str | None = None,
+        is_active: bool | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list()."""
         params = _drop_none(
             model_id=model_id,
@@ -1019,39 +1438,39 @@ class AlertsResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/alerts/rules", params=params)
 
-    def get_rule(self, rule_id: str) -> Dict[str, Any]:
+    def get_rule(self, rule_id: str) -> dict[str, Any]:
         """Get a specific alert rule by ID."""
         return self.client.request("GET", f"/api/v1/alerts/rules/{rule_id}")
 
-    async def aget_rule(self, rule_id: str) -> Dict[str, Any]:
+    async def aget_rule(self, rule_id: str) -> dict[str, Any]:
         """Async version of get_rule()."""
         return await self.client.arequest("GET", f"/api/v1/alerts/rules/{rule_id}")
 
-    def update_rule(self, rule_id: str, **kwargs: Any) -> Dict[str, Any]:
+    def update_rule(self, rule_id: str, **kwargs: Any) -> dict[str, Any]:
         """Update an alert rule. Any AlertRuleCreate field may be passed as
         a kwarg; only supplied fields are changed."""
         return self.client.request("PATCH", f"/api/v1/alerts/rules/{rule_id}", data=kwargs)
 
-    async def aupdate_rule(self, rule_id: str, **kwargs: Any) -> Dict[str, Any]:
+    async def aupdate_rule(self, rule_id: str, **kwargs: Any) -> dict[str, Any]:
         """Async version of update_rule()."""
         return await self.client.arequest("PATCH", f"/api/v1/alerts/rules/{rule_id}", data=kwargs)
 
-    def delete_rule(self, rule_id: str) -> Dict[str, Any]:
+    def delete_rule(self, rule_id: str) -> dict[str, Any]:
         """Delete an alert rule."""
         return self.client.request("DELETE", f"/api/v1/alerts/rules/{rule_id}")
 
-    async def adelete_rule(self, rule_id: str) -> Dict[str, Any]:
+    async def adelete_rule(self, rule_id: str) -> dict[str, Any]:
         """Async version of delete_rule()."""
         return await self.client.arequest("DELETE", f"/api/v1/alerts/rules/{rule_id}")
 
     def evaluate_rule(
         self,
         rule_id: str,
-        metric_values: Optional[Dict[str, Any]] = None,
-        model_id: Optional[str] = None,
-        historical_values: Optional[List[float]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metric_values: dict[str, Any] | None = None,
+        model_id: str | None = None,
+        historical_values: List[float] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Test whether an alert rule would trigger given metric values,
         without creating a real alert instance. Useful for validating a rule
         before activation."""
@@ -1066,11 +1485,11 @@ class AlertsResource(BaseResource):
     async def aevaluate_rule(
         self,
         rule_id: str,
-        metric_values: Optional[Dict[str, Any]] = None,
-        model_id: Optional[str] = None,
-        historical_values: Optional[List[float]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metric_values: dict[str, Any] | None = None,
+        model_id: str | None = None,
+        historical_values: List[float] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Async version of evaluate_rule()."""
         data = _alert_evaluation_context_payload(
             metric_values=metric_values,
@@ -1084,15 +1503,15 @@ class AlertsResource(BaseResource):
 
     def list_instances(
         self,
-        rule_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        severity: Optional[str] = None,
-        status: Optional[str] = None,
-        hours: Optional[int] = None,
+        rule_id: str | None = None,
+        model_id: str | None = None,
+        alert_type: str | None = None,
+        severity: str | None = None,
+        status: str | None = None,
+        hours: int | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List triggered alert instances with optional filters."""
         params = _drop_none(
             rule_id=rule_id,
@@ -1108,15 +1527,15 @@ class AlertsResource(BaseResource):
 
     async def alist_instances(
         self,
-        rule_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        alert_type: Optional[str] = None,
-        severity: Optional[str] = None,
-        status: Optional[str] = None,
-        hours: Optional[int] = None,
+        rule_id: str | None = None,
+        model_id: str | None = None,
+        alert_type: str | None = None,
+        severity: str | None = None,
+        status: str | None = None,
+        hours: int | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_instances()."""
         params = _drop_none(
             rule_id=rule_id,
@@ -1130,17 +1549,15 @@ class AlertsResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/alerts/instances", params=params)
 
-    def get_instance(self, alert_id: str) -> Dict[str, Any]:
+    def get_instance(self, alert_id: str) -> dict[str, Any]:
         """Get a specific triggered alert instance by ID."""
         return self.client.request("GET", f"/api/v1/alerts/instances/{alert_id}")
 
-    async def aget_instance(self, alert_id: str) -> Dict[str, Any]:
+    async def aget_instance(self, alert_id: str) -> dict[str, Any]:
         """Async version of get_instance()."""
         return await self.client.arequest("GET", f"/api/v1/alerts/instances/{alert_id}")
 
-    def acknowledge(
-        self, alert_id: str, user_id: str, notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+    def acknowledge(self, alert_id: str, user_id: str, notes: str | None = None) -> dict[str, Any]:
         """Acknowledge an active alert instance."""
         data = _drop_none(user_id=user_id, notes=notes)
         return self.client.request(
@@ -1148,8 +1565,8 @@ class AlertsResource(BaseResource):
         )
 
     async def aacknowledge(
-        self, alert_id: str, user_id: str, notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, alert_id: str, user_id: str, notes: str | None = None
+    ) -> dict[str, Any]:
         """Async version of acknowledge()."""
         data = _drop_none(user_id=user_id, notes=notes)
         return await self.client.arequest(
@@ -1157,8 +1574,8 @@ class AlertsResource(BaseResource):
         )
 
     def resolve(
-        self, alert_id: str, user_id: str, resolution_notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, alert_id: str, user_id: str, resolution_notes: str | None = None
+    ) -> dict[str, Any]:
         """Resolve an alert instance."""
         data = _drop_none(user_id=user_id, resolution_notes=resolution_notes)
         return self.client.request(
@@ -1166,15 +1583,15 @@ class AlertsResource(BaseResource):
         )
 
     async def aresolve(
-        self, alert_id: str, user_id: str, resolution_notes: Optional[str] = None
-    ) -> Dict[str, Any]:
+        self, alert_id: str, user_id: str, resolution_notes: str | None = None
+    ) -> dict[str, Any]:
         """Async version of resolve()."""
         data = _drop_none(user_id=user_id, resolution_notes=resolution_notes)
         return await self.client.arequest(
             "POST", f"/api/v1/alerts/instances/{alert_id}/resolve", data=data
         )
 
-    def snooze(self, alert_id: str, snooze_minutes: int) -> Dict[str, Any]:
+    def snooze(self, alert_id: str, snooze_minutes: int) -> dict[str, Any]:
         """Snooze an active alert instance for `snooze_minutes` (max 1 week)."""
         return self.client.request(
             "POST",
@@ -1182,7 +1599,7 @@ class AlertsResource(BaseResource):
             data={"snooze_minutes": snooze_minutes},
         )
 
-    async def asnooze(self, alert_id: str, snooze_minutes: int) -> Dict[str, Any]:
+    async def asnooze(self, alert_id: str, snooze_minutes: int) -> dict[str, Any]:
         """Async version of snooze()."""
         return await self.client.arequest(
             "POST",
@@ -1190,12 +1607,12 @@ class AlertsResource(BaseResource):
             data={"snooze_minutes": snooze_minutes},
         )
 
-    def statistics(self, hours: int = 24) -> Dict[str, Any]:
+    def statistics(self, hours: int = 24) -> dict[str, Any]:
         """Get alert statistics for the organization (counts, severity
         distribution, MTTA/MTTR) over the last `hours`."""
         return self.client.request("GET", "/api/v1/alerts/statistics", params={"hours": hours})
 
-    async def astatistics(self, hours: int = 24) -> Dict[str, Any]:
+    async def astatistics(self, hours: int = 24) -> dict[str, Any]:
         """Async version of statistics()."""
         return await self.client.arequest(
             "GET", "/api/v1/alerts/statistics", params={"hours": hours}
@@ -1206,18 +1623,18 @@ def _alert_rule_payload(
     name: str,
     alert_type: str,
     severity: str,
-    conditions: List[Dict[str, Any]],
-    model_id: Optional[str] = None,
-    description: Optional[str] = None,
+    conditions: List[dict[str, Any]],
+    model_id: str | None = None,
+    description: str | None = None,
     logic_operator: str = "AND",
-    notification_channels: Optional[List[Dict[str, Any]]] = None,
+    notification_channels: List[dict[str, Any]] | None = None,
     throttle_minutes: int = 60,
     cooldown_minutes: int = 0,
     is_active: bool = True,
     **kwargs: Any,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Shared request-body builder for AlertsResource.create/acreate."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "name": name,
         "alert_type": alert_type,
         "severity": severity,
@@ -1234,11 +1651,11 @@ def _alert_rule_payload(
 
 
 def _alert_evaluation_context_payload(
-    metric_values: Optional[Dict[str, Any]] = None,
-    model_id: Optional[str] = None,
-    historical_values: Optional[List[float]] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    metric_values: dict[str, Any] | None = None,
+    model_id: str | None = None,
+    historical_values: List[float] | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for AlertsResource.evaluate_rule/aevaluate_rule."""
     return {
         "metric_values": metric_values or {},
@@ -1246,6 +1663,970 @@ def _alert_evaluation_context_payload(
         "historical_values": historical_values,
         "metadata": metadata or {},
     }
+
+
+class AlertIntelligenceResource(BaseResource):
+    """Alert Intelligence API resource (backed by
+    backend/api/v1/alert_intelligence.py; issue #224).
+
+    Unlike an earlier revision of this resource (issue #295), every
+    endpoint here derives organization scoping from the caller's own
+    authenticated session -- there is no organization_id argument to pass.
+
+    predict_trends()/detect_seasonality()/forecast_volume() compute real
+    statistics (numpy-based linear trend + hour-of-day seasonality) from
+    the organization's actual alert history, not a full forecasting model
+    (no ARIMA/Prophet) -- see each method's docstring for what's actually
+    computed, including the honest "insufficient_data" fallback used when
+    too little history exists.
+    """
+
+    # ==================== Alert Correlation ====================
+
+    def detect_correlations(
+        self, alert_id: str, look_back_hours: int = 24, min_score: float = 0.5
+    ) -> dict[str, Any]:
+        """Detect correlations for an alert (temporal, model, feature, and
+        pattern-based relationships to other alerts)."""
+        params = {"look_back_hours": look_back_hours, "min_score": min_score}
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/correlations",
+            params=params,
+        )
+
+    async def adetect_correlations(
+        self, alert_id: str, look_back_hours: int = 24, min_score: float = 0.5
+    ) -> dict[str, Any]:
+        """Async version of detect_correlations()."""
+        params = {"look_back_hours": look_back_hours, "min_score": min_score}
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/correlations",
+            params=params,
+        )
+
+    def get_correlation_clusters(
+        self,
+        min_cluster_size: int = 3,
+        min_score: float = 0.7,
+        hours_back: int = 24,
+    ) -> dict[str, Any]:
+        """Get clusters of highly correlated alerts -- useful for spotting
+        widespread issues or cascading failures."""
+        params = {
+            "min_cluster_size": min_cluster_size,
+            "min_score": min_score,
+            "hours_back": hours_back,
+        }
+        return self.client.request(
+            "GET", "/api/v1/alert-intelligence/correlations/clusters", params=params
+        )
+
+    async def aget_correlation_clusters(
+        self,
+        min_cluster_size: int = 3,
+        min_score: float = 0.7,
+        hours_back: int = 24,
+    ) -> dict[str, Any]:
+        """Async version of get_correlation_clusters()."""
+        params = {
+            "min_cluster_size": min_cluster_size,
+            "min_score": min_score,
+            "hours_back": hours_back,
+        }
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/correlations/clusters", params=params
+        )
+
+    # ==================== Root Cause Analysis ====================
+
+    def analyze_root_cause(self, alert_id: str, analyze_history: bool = True) -> dict[str, Any]:
+        """Analyze potential root causes (data drift, model degradation,
+        feature anomalies, system issues) for an alert."""
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/root-cause",
+            params={"analyze_history": analyze_history},
+        )
+
+    async def aanalyze_root_cause(
+        self, alert_id: str, analyze_history: bool = True
+    ) -> dict[str, Any]:
+        """Async version of analyze_root_cause()."""
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/root-cause",
+            params={"analyze_history": analyze_history},
+        )
+
+    def verify_root_cause(
+        self, root_cause_id: int, verified: bool, notes: str | None = None
+    ) -> dict[str, Any]:
+        """Mark a previously computed root cause as verified or rejected."""
+        data = {"root_cause_id": root_cause_id, "verified": verified, "notes": notes}
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-intelligence/root-causes/{root_cause_id}/verify",
+            data=data,
+        )
+
+    async def averify_root_cause(
+        self, root_cause_id: int, verified: bool, notes: str | None = None
+    ) -> dict[str, Any]:
+        """Async version of verify_root_cause()."""
+        data = {"root_cause_id": root_cause_id, "verified": verified, "notes": notes}
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-intelligence/root-causes/{root_cause_id}/verify",
+            data=data,
+        )
+
+    def get_similar_incidents(self, cause_type: str, limit: int = 10) -> List[dict[str, Any]]:
+        """Find past alerts sharing the same root-cause type -- useful for
+        learning from historical resolutions."""
+        params = {"cause_type": cause_type, "limit": limit}
+        return self.client.request(
+            "GET", "/api/v1/alert-intelligence/root-causes/similar", params=params
+        )
+
+    async def aget_similar_incidents(
+        self, cause_type: str, limit: int = 10
+    ) -> List[dict[str, Any]]:
+        """Async version of get_similar_incidents()."""
+        params = {"cause_type": cause_type, "limit": limit}
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/root-causes/similar", params=params
+        )
+
+    # ==================== Alert Priority Ranking ====================
+
+    def calculate_priority(
+        self,
+        alert_id: str,
+        business_impact_weight: float = 0.3,
+        urgency_weight: float = 0.3,
+        criticality_weight: float = 0.25,
+        history_weight: float = 0.15,
+    ) -> dict[str, Any]:
+        """Compute a weighted priority score (0-100) and level
+        (critical/high/medium/low) for an alert."""
+        params = {
+            "business_impact_weight": business_impact_weight,
+            "urgency_weight": urgency_weight,
+            "criticality_weight": criticality_weight,
+            "history_weight": history_weight,
+        }
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/priority",
+            params=params,
+        )
+
+    async def acalculate_priority(
+        self,
+        alert_id: str,
+        business_impact_weight: float = 0.3,
+        urgency_weight: float = 0.3,
+        criticality_weight: float = 0.25,
+        history_weight: float = 0.15,
+    ) -> dict[str, Any]:
+        """Async version of calculate_priority()."""
+        params = {
+            "business_impact_weight": business_impact_weight,
+            "urgency_weight": urgency_weight,
+            "criticality_weight": criticality_weight,
+            "history_weight": history_weight,
+        }
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-intelligence/alerts/{alert_id}/priority",
+            params=params,
+        )
+
+    def adjust_priority(
+        self,
+        alert_id: str,
+        new_priority_score: float,
+        new_priority_level: str,
+        adjustment_reason: str,
+    ) -> dict[str, Any]:
+        """Manually override a calculated priority. `adjustment_reason` is
+        required justification."""
+        data = {
+            "alert_id": alert_id,
+            "new_priority_score": new_priority_score,
+            "new_priority_level": new_priority_level,
+            "adjustment_reason": adjustment_reason,
+        }
+        return self.client.request(
+            "PATCH", f"/api/v1/alert-intelligence/alerts/{alert_id}/priority", data=data
+        )
+
+    async def aadjust_priority(
+        self,
+        alert_id: str,
+        new_priority_score: float,
+        new_priority_level: str,
+        adjustment_reason: str,
+    ) -> dict[str, Any]:
+        """Async version of adjust_priority()."""
+        data = {
+            "alert_id": alert_id,
+            "new_priority_score": new_priority_score,
+            "new_priority_level": new_priority_level,
+            "adjustment_reason": adjustment_reason,
+        }
+        return await self.client.arequest(
+            "PATCH", f"/api/v1/alert-intelligence/alerts/{alert_id}/priority", data=data
+        )
+
+    def get_priority_distribution(self, hours_back: int = 24) -> dict[str, Any]:
+        """Get a breakdown of alerts by priority level."""
+        params = {"hours_back": hours_back}
+        return self.client.request(
+            "GET", "/api/v1/alert-intelligence/priority/distribution", params=params
+        )
+
+    async def aget_priority_distribution(self, hours_back: int = 24) -> dict[str, Any]:
+        """Async version of get_priority_distribution()."""
+        params = {"hours_back": hours_back}
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/priority/distribution", params=params
+        )
+
+    def get_priority_queue(self, limit: int = 20) -> List[dict[str, Any]]:
+        """Get the prioritized alert queue for triage and assignment."""
+        params = {"limit": limit}
+        return self.client.request(
+            "GET", "/api/v1/alert-intelligence/priority/queue", params=params
+        )
+
+    async def aget_priority_queue(self, limit: int = 20) -> List[dict[str, Any]]:
+        """Async version of get_priority_queue()."""
+        params = {"limit": limit}
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/priority/queue", params=params
+        )
+
+    # ==================== Pattern Detection ====================
+
+    def detect_patterns(self, hours_back: int = 168) -> dict[str, Any]:
+        """Detect recurring temporal/frequency/correlation/anomaly patterns
+        in alerts."""
+        params = {"hours_back": hours_back}
+        return self.client.request("GET", "/api/v1/alert-intelligence/patterns", params=params)
+
+    async def adetect_patterns(self, hours_back: int = 168) -> dict[str, Any]:
+        """Async version of detect_patterns()."""
+        params = {"hours_back": hours_back}
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/patterns", params=params
+        )
+
+    def get_pattern(self, pattern_id: int) -> dict[str, Any]:
+        """Get a specific alert pattern's details."""
+        return self.client.request("GET", f"/api/v1/alert-intelligence/patterns/{pattern_id}")
+
+    async def aget_pattern(self, pattern_id: int) -> dict[str, Any]:
+        """Async version of get_pattern()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/alert-intelligence/patterns/{pattern_id}"
+        )
+
+    def deactivate_pattern(self, pattern_id: int) -> dict[str, Any]:
+        """Mark a pattern inactive (resolved or no longer relevant)."""
+        return self.client.request(
+            "PATCH", f"/api/v1/alert-intelligence/patterns/{pattern_id}/deactivate"
+        )
+
+    async def adeactivate_pattern(self, pattern_id: int) -> dict[str, Any]:
+        """Async version of deactivate_pattern()."""
+        return await self.client.arequest(
+            "PATCH", f"/api/v1/alert-intelligence/patterns/{pattern_id}/deactivate"
+        )
+
+    # ==================== Fatigue Reduction ====================
+
+    def apply_fatigue_reduction(
+        self,
+        enable_auto_throttling: bool = True,
+        enable_intelligent_grouping: bool = True,
+        enable_auto_snooze: bool = True,
+        similarity_threshold: float = 0.8,
+        grouping_window_minutes: int = 60,
+        auto_snooze_threshold: int = 10,
+    ) -> dict[str, Any]:
+        """Apply automated throttling/grouping/snoozing to reduce alert
+        noise. Returns a summary of actions taken."""
+        data = _fatigue_reduction_config_payload(
+            enable_auto_throttling=enable_auto_throttling,
+            enable_intelligent_grouping=enable_intelligent_grouping,
+            enable_auto_snooze=enable_auto_snooze,
+            similarity_threshold=similarity_threshold,
+            grouping_window_minutes=grouping_window_minutes,
+            auto_snooze_threshold=auto_snooze_threshold,
+        )
+        return self.client.request(
+            "POST",
+            "/api/v1/alert-intelligence/fatigue-reduction/apply",
+            data=data,
+        )
+
+    async def aapply_fatigue_reduction(
+        self,
+        enable_auto_throttling: bool = True,
+        enable_intelligent_grouping: bool = True,
+        enable_auto_snooze: bool = True,
+        similarity_threshold: float = 0.8,
+        grouping_window_minutes: int = 60,
+        auto_snooze_threshold: int = 10,
+    ) -> dict[str, Any]:
+        """Async version of apply_fatigue_reduction()."""
+        data = _fatigue_reduction_config_payload(
+            enable_auto_throttling=enable_auto_throttling,
+            enable_intelligent_grouping=enable_intelligent_grouping,
+            enable_auto_snooze=enable_auto_snooze,
+            similarity_threshold=similarity_threshold,
+            grouping_window_minutes=grouping_window_minutes,
+            auto_snooze_threshold=auto_snooze_threshold,
+        )
+        return await self.client.arequest(
+            "POST",
+            "/api/v1/alert-intelligence/fatigue-reduction/apply",
+            data=data,
+        )
+
+    def get_throttle_recommendations(self) -> List[dict[str, Any]]:
+        """Get recommended alert-throttling rules to reduce fatigue without
+        missing critical issues."""
+        return self.client.request(
+            "GET",
+            "/api/v1/alert-intelligence/fatigue-reduction/recommendations",
+        )
+
+    async def aget_throttle_recommendations(self) -> List[dict[str, Any]]:
+        """Async version of get_throttle_recommendations()."""
+        return await self.client.arequest(
+            "GET",
+            "/api/v1/alert-intelligence/fatigue-reduction/recommendations",
+        )
+
+    # ==================== Enhanced Grouping ====================
+
+    def ml_group_alerts(
+        self,
+        clustering_method: str = "kmeans",
+        num_clusters: int | None = None,
+    ) -> dict[str, Any]:
+        """Cluster alerts via ML (kmeans/dbscan/hierarchical). Automatically
+        determines the optimal number of clusters if not specified."""
+        params = _drop_none(
+            clustering_method=clustering_method,
+            num_clusters=num_clusters,
+        )
+        return self.client.request("POST", "/api/v1/alert-intelligence/grouping/ml", params=params)
+
+    async def aml_group_alerts(
+        self,
+        clustering_method: str = "kmeans",
+        num_clusters: int | None = None,
+    ) -> dict[str, Any]:
+        """Async version of ml_group_alerts()."""
+        params = _drop_none(
+            clustering_method=clustering_method,
+            num_clusters=num_clusters,
+        )
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-intelligence/grouping/ml", params=params
+        )
+
+    def temporal_group_alerts(
+        self,
+        time_window_minutes: int = 60,
+        similarity_threshold: float = 0.7,
+    ) -> dict[str, Any]:
+        """Group alerts occurring in the same time window with similar
+        characteristics."""
+        params = {
+            "time_window_minutes": time_window_minutes,
+            "similarity_threshold": similarity_threshold,
+        }
+        return self.client.request(
+            "POST", "/api/v1/alert-intelligence/grouping/temporal", params=params
+        )
+
+    async def atemporal_group_alerts(
+        self,
+        time_window_minutes: int = 60,
+        similarity_threshold: float = 0.7,
+    ) -> dict[str, Any]:
+        """Async version of temporal_group_alerts()."""
+        params = {
+            "time_window_minutes": time_window_minutes,
+            "similarity_threshold": similarity_threshold,
+        }
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-intelligence/grouping/temporal", params=params
+        )
+
+    # ==================== Enhanced Trend Analysis ====================
+
+    def predict_trends(self, time_horizon: str = "next_day") -> dict[str, Any]:
+        """Forecast alert volume/severity/type for `time_horizon`
+        (next_hour/next_day/next_week).
+
+        Uses a least-squares linear trend (numpy.polyfit) over the
+        organization's real historical hourly alert counts, not a full
+        time-series forecasting model (no ARIMA/Prophet). Returns
+        `trend_direction="insufficient_data"` and zeroed values when fewer
+        than 24 real hourly data points exist; `sample_size` in the response
+        always discloses exactly how much real history backed the estimate.
+        """
+        params = {"time_horizon": time_horizon}
+        return self.client.request(
+            "POST", "/api/v1/alert-intelligence/trends/predict", params=params
+        )
+
+    async def apredict_trends(self, time_horizon: str = "next_day") -> dict[str, Any]:
+        """Async version of predict_trends()."""
+        params = {"time_horizon": time_horizon}
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-intelligence/trends/predict", params=params
+        )
+
+    def detect_seasonality(self, days_back: int = 30) -> dict[str, Any]:
+        """Detect hour-of-day seasonality in alert volume.
+
+        Real detection from the organization's actual alert history (24
+        hourly buckets summed across the requested window). Day-of-week/
+        week-of-month cycles are not computed, so `pattern_type` is always
+        `"hourly"` (or `"insufficient_data"` below a 24-data-point floor),
+        never a fabricated `"daily"`/`"weekly"` label.
+        """
+        params = {"days_back": days_back}
+        return self.client.request(
+            "GET", "/api/v1/alert-intelligence/trends/seasonality", params=params
+        )
+
+    async def adetect_seasonality(self, days_back: int = 30) -> dict[str, Any]:
+        """Async version of detect_seasonality()."""
+        params = {"days_back": days_back}
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-intelligence/trends/seasonality", params=params
+        )
+
+    def enhanced_trend_analysis(
+        self, metric: str = "alert_count", hours_back: int = 168
+    ) -> dict[str, Any]:
+        """Combine real alert-volume time-series data with a real
+        hour-of-day seasonality estimate, a numpy.polyfit trend prediction
+        (with an R²-based confidence score), and real z-score anomaly
+        detection over the same window -- all computed from the
+        organization's actual alert history. Not a full forecasting model
+        (no ARIMA/Prophet)."""
+        params = {"metric": metric, "hours_back": hours_back}
+        return self.client.request(
+            "POST", "/api/v1/alert-intelligence/trends/enhanced", params=params
+        )
+
+    async def aenhanced_trend_analysis(
+        self, metric: str = "alert_count", hours_back: int = 168
+    ) -> dict[str, Any]:
+        """Async version of enhanced_trend_analysis()."""
+        params = {"metric": metric, "hours_back": hours_back}
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-intelligence/trends/enhanced", params=params
+        )
+
+    def forecast_volume(self, forecast_hours: int = 24) -> dict[str, Any]:
+        """Forecast future alert volume with confidence intervals.
+
+        Uses a least-squares linear trend (numpy.polyfit) over real
+        historical hourly alert counts, shaped by the organization's real
+        hour-of-day seasonality. NOT ARIMA/Prophet. Forward-looking
+        `anomaly_predictions` are intentionally always empty -- predicting
+        future anomalies needs its own model, out of scope here; anomaly
+        detection over *observed* data is available via
+        enhanced_trend_analysis() instead. Falls back to an
+        honestly-labeled zeroed forecast (`seasonal_pattern.type ==
+        "insufficient_data"`) when fewer than 24 hourly data points exist.
+        """
+        params = {"forecast_hours": forecast_hours}
+        return self.client.request(
+            "POST", "/api/v1/alert-intelligence/trends/forecast", params=params
+        )
+
+    async def aforecast_volume(self, forecast_hours: int = 24) -> dict[str, Any]:
+        """Async version of forecast_volume()."""
+        params = {"forecast_hours": forecast_hours}
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-intelligence/trends/forecast", params=params
+        )
+
+
+def _fatigue_reduction_config_payload(
+    enable_auto_throttling: bool = True,
+    enable_intelligent_grouping: bool = True,
+    enable_auto_snooze: bool = True,
+    similarity_threshold: float = 0.8,
+    grouping_window_minutes: int = 60,
+    auto_snooze_threshold: int = 10,
+) -> dict[str, Any]:
+    """Shared request-body builder for
+    AlertIntelligenceResource.apply_fatigue_reduction/aapply_fatigue_reduction."""
+    return {
+        "enable_auto_throttling": enable_auto_throttling,
+        "enable_intelligent_grouping": enable_intelligent_grouping,
+        "enable_auto_snooze": enable_auto_snooze,
+        "similarity_threshold": similarity_threshold,
+        "grouping_window_minutes": grouping_window_minutes,
+        "auto_snooze_threshold": auto_snooze_threshold,
+    }
+
+
+class AlertManagementResource(BaseResource):
+    """Alert Management API resource (backed by
+    backend/api/v1/alert_management.py; issue #224).
+
+    Unlike AlertIntelligenceResource, every endpoint here derives
+    organization scoping from the caller's own authenticated session --
+    there is no organization_id argument to pass.
+
+    acknowledge()/resolve()/snooze() hit a different URL
+    (/alert-management/alerts/{id}/...) than AlertsResource's same-named
+    methods (/alerts/instances/{id}/...) -- they are not duplicates, they
+    are genuinely different backend endpoints with different history.
+
+    Escalation-policy CRUD (create/list/get/update/delete_escalation_policy)
+    and bulk_action() are SDK-only: they are not exposed as MCP tools
+    (admin-console-shaped, not agent-shaped -- see issue #224).
+    """
+
+    # ==================== Alert History ====================
+
+    def get_history(self, alert_id: str) -> dict[str, Any]:
+        """Get the full action timeline (triggered/acknowledged/snoozed/
+        resolved/escalated/commented) for an alert."""
+        return self.client.request("GET", f"/api/v1/alert-management/alerts/{alert_id}/history")
+
+    async def aget_history(self, alert_id: str) -> dict[str, Any]:
+        """Async version of get_history()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/alert-management/alerts/{alert_id}/history"
+        )
+
+    # ==================== Alert Analytics ====================
+
+    def get_analytics(
+        self, start_time: str | None = None, end_time: str | None = None
+    ) -> dict[str, Any]:
+        """Get comprehensive alert analytics (counts, MTTA/MTTR,
+        distributions, escalation metrics) for the caller's organization.
+        `start_time`/`end_time` are ISO 8601 timestamps."""
+        params = _drop_none(start_time=start_time, end_time=end_time)
+        return self.client.request("GET", "/api/v1/alert-management/analytics", params=params)
+
+    async def aget_analytics(
+        self, start_time: str | None = None, end_time: str | None = None
+    ) -> dict[str, Any]:
+        """Async version of get_analytics()."""
+        params = _drop_none(start_time=start_time, end_time=end_time)
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-management/analytics", params=params
+        )
+
+    def get_trend(
+        self,
+        start: str,
+        end: str,
+        interval: str = "hour",
+        group_by: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Get alert volume as a time series between `start` and `end`
+        (ISO 8601 timestamps), bucketed by `interval` (hour/day/week)."""
+        data = _alert_time_series_query_payload(start, end, interval, group_by, filters)
+        return self.client.request("POST", "/api/v1/alert-management/analytics/trend", data=data)
+
+    async def aget_trend(
+        self,
+        start: str,
+        end: str,
+        interval: str = "hour",
+        group_by: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Async version of get_trend()."""
+        data = _alert_time_series_query_payload(start, end, interval, group_by, filters)
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-management/analytics/trend", data=data
+        )
+
+    def get_velocity(self) -> dict[str, Any]:
+        """Get alert generation rate trends (hour-over-hour, day-over-day,
+        rolling averages) for the caller's organization."""
+        return self.client.request("GET", "/api/v1/alert-management/analytics/velocity")
+
+    async def aget_velocity(self) -> dict[str, Any]:
+        """Async version of get_velocity()."""
+        return await self.client.arequest("GET", "/api/v1/alert-management/analytics/velocity")
+
+    def get_grouping(self, group_by: str) -> dict[str, Any]:
+        """Group active alerts by a dimension: "type", "severity", "model",
+        or "rule" -- useful for spotting hotspots."""
+        return self.client.request(
+            "GET",
+            "/api/v1/alert-management/analytics/grouping",
+            params={"group_by": group_by},
+        )
+
+    async def aget_grouping(self, group_by: str) -> dict[str, Any]:
+        """Async version of get_grouping()."""
+        return await self.client.arequest(
+            "GET",
+            "/api/v1/alert-management/analytics/grouping",
+            params={"group_by": group_by},
+        )
+
+    def detect_fatigue(self) -> dict[str, Any]:
+        """Detect alert-fatigue indicators and get recommendations for
+        reducing alert noise."""
+        return self.client.request("GET", "/api/v1/alert-management/analytics/fatigue")
+
+    async def adetect_fatigue(self) -> dict[str, Any]:
+        """Async version of detect_fatigue()."""
+        return await self.client.arequest("GET", "/api/v1/alert-management/analytics/fatigue")
+
+    # ==================== Alert Lifecycle Management ====================
+
+    def acknowledge(self, alert_id: str, notes: str | None = None) -> dict[str, Any]:
+        """Acknowledge an alert. Distinct from AlertsResource.acknowledge --
+        this hits /alert-management/alerts/{id}/acknowledge."""
+        params = _drop_none(notes=notes)
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/acknowledge",
+            params=params,
+        )
+
+    async def aacknowledge(self, alert_id: str, notes: str | None = None) -> dict[str, Any]:
+        """Async version of acknowledge()."""
+        params = _drop_none(notes=notes)
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/acknowledge",
+            params=params,
+        )
+
+    def resolve(self, alert_id: str, resolution_notes: str | None = None) -> dict[str, Any]:
+        """Resolve an alert. Distinct from AlertsResource.resolve -- this
+        hits /alert-management/alerts/{id}/resolve."""
+        params = _drop_none(resolution_notes=resolution_notes)
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/resolve",
+            params=params,
+        )
+
+    async def aresolve(self, alert_id: str, resolution_notes: str | None = None) -> dict[str, Any]:
+        """Async version of resolve()."""
+        params = _drop_none(resolution_notes=resolution_notes)
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/resolve",
+            params=params,
+        )
+
+    def snooze(self, alert_id: str, snooze_minutes: int) -> dict[str, Any]:
+        """Snooze an alert for `snooze_minutes` (max 1 week). Distinct from
+        AlertsResource.snooze -- this hits
+        /alert-management/alerts/{id}/snooze."""
+        return self.client.request(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/snooze",
+            params={"snooze_minutes": snooze_minutes},
+        )
+
+    async def asnooze(self, alert_id: str, snooze_minutes: int) -> dict[str, Any]:
+        """Async version of snooze()."""
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/alert-management/alerts/{alert_id}/snooze",
+            params={"snooze_minutes": snooze_minutes},
+        )
+
+    # ==================== Bulk Operations (SDK-only) ====================
+
+    def bulk_action(
+        self,
+        alert_ids: List[str],
+        action: str,
+        user_id: str,
+        notes: str | None = None,
+        snooze_minutes: int | None = None,
+    ) -> dict[str, Any]:
+        """Acknowledge or resolve up to 100 alerts at once.
+
+        Only action="acknowledge" and action="resolve" are actually
+        implemented by the backend -- despite the schema documenting
+        "snooze"/"mute" as possible actions, the handler 400s on anything
+        else.
+        """
+        data: dict[str, Any] = {
+            "alert_ids": alert_ids,
+            "action": action,
+            "user_id": user_id,
+        }
+        data.update(_drop_none(notes=notes, snooze_minutes=snooze_minutes))
+        return self.client.request("POST", "/api/v1/alert-management/alerts/bulk-action", data=data)
+
+    async def abulk_action(
+        self,
+        alert_ids: List[str],
+        action: str,
+        user_id: str,
+        notes: str | None = None,
+        snooze_minutes: int | None = None,
+    ) -> dict[str, Any]:
+        """Async version of bulk_action(). Same acknowledge/resolve-only
+        caveat."""
+        data: dict[str, Any] = {
+            "alert_ids": alert_ids,
+            "action": action,
+            "user_id": user_id,
+        }
+        data.update(_drop_none(notes=notes, snooze_minutes=snooze_minutes))
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-management/alerts/bulk-action", data=data
+        )
+
+    # ==================== Alert Comments ====================
+
+    def create_comment(
+        self, alert_id: str, comment: str, comment_type: str = "note"
+    ) -> dict[str, Any]:
+        """Add a comment to an alert (comment_type: note/action/resolution)."""
+        data = {
+            "alert_id": alert_id,
+            "comment": comment,
+            "comment_type": comment_type,
+        }
+        return self.client.request(
+            "POST", f"/api/v1/alert-management/alerts/{alert_id}/comments", data=data
+        )
+
+    async def acreate_comment(
+        self, alert_id: str, comment: str, comment_type: str = "note"
+    ) -> dict[str, Any]:
+        """Async version of create_comment()."""
+        data = {
+            "alert_id": alert_id,
+            "comment": comment,
+            "comment_type": comment_type,
+        }
+        return await self.client.arequest(
+            "POST", f"/api/v1/alert-management/alerts/{alert_id}/comments", data=data
+        )
+
+    def get_comments(self, alert_id: str) -> List[dict[str, Any]]:
+        """List all comments on an alert."""
+        return self.client.request("GET", f"/api/v1/alert-management/alerts/{alert_id}/comments")
+
+    async def aget_comments(self, alert_id: str) -> List[dict[str, Any]]:
+        """Async version of get_comments()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/alert-management/alerts/{alert_id}/comments"
+        )
+
+    # ==================== Escalation Policy Management (SDK-only) ====================
+
+    def create_escalation_policy(
+        self,
+        name: str,
+        escalation_rules: List[dict[str, Any]],
+        description: str | None = None,
+        applies_to_severities: List[str] | None = None,
+        applies_to_types: List[str] | None = None,
+        applies_to_model_ids: List[str] | None = None,
+        is_active: bool = True,
+    ) -> dict[str, Any]:
+        """Create an escalation policy for unacknowledged alerts.
+
+        escalation_rules: list of {level (1-10), delay_minutes (>=1),
+        notify_user_ids?, notify_channels?, message_template?}. The
+        backend derives organization_id from the caller's session and
+        overwrites whatever is sent, so this method doesn't expose it.
+        """
+        data = _escalation_policy_payload(
+            name=name,
+            escalation_rules=escalation_rules,
+            description=description,
+            applies_to_severities=applies_to_severities,
+            applies_to_types=applies_to_types,
+            applies_to_model_ids=applies_to_model_ids,
+            is_active=is_active,
+        )
+        return self.client.request(
+            "POST", "/api/v1/alert-management/escalation-policies", data=data
+        )
+
+    async def acreate_escalation_policy(
+        self,
+        name: str,
+        escalation_rules: List[dict[str, Any]],
+        description: str | None = None,
+        applies_to_severities: List[str] | None = None,
+        applies_to_types: List[str] | None = None,
+        applies_to_model_ids: List[str] | None = None,
+        is_active: bool = True,
+    ) -> dict[str, Any]:
+        """Async version of create_escalation_policy()."""
+        data = _escalation_policy_payload(
+            name=name,
+            escalation_rules=escalation_rules,
+            description=description,
+            applies_to_severities=applies_to_severities,
+            applies_to_types=applies_to_types,
+            applies_to_model_ids=applies_to_model_ids,
+            is_active=is_active,
+        )
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-management/escalation-policies", data=data
+        )
+
+    def list_escalation_policies(self, is_active: bool | None = None) -> List[dict[str, Any]]:
+        """List escalation policies for the caller's organization."""
+        params = _drop_none(is_active=is_active)
+        return self.client.request(
+            "GET", "/api/v1/alert-management/escalation-policies", params=params
+        )
+
+    async def alist_escalation_policies(
+        self, is_active: bool | None = None
+    ) -> List[dict[str, Any]]:
+        """Async version of list_escalation_policies()."""
+        params = _drop_none(is_active=is_active)
+        return await self.client.arequest(
+            "GET", "/api/v1/alert-management/escalation-policies", params=params
+        )
+
+    def get_escalation_policy(self, policy_id: str) -> dict[str, Any]:
+        """Get a specific escalation policy."""
+        return self.client.request(
+            "GET", f"/api/v1/alert-management/escalation-policies/{policy_id}"
+        )
+
+    async def aget_escalation_policy(self, policy_id: str) -> dict[str, Any]:
+        """Async version of get_escalation_policy()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/alert-management/escalation-policies/{policy_id}"
+        )
+
+    def update_escalation_policy(self, policy_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Update an escalation policy. Any EscalationPolicyUpdate field may
+        be passed as a kwarg; only supplied fields are changed."""
+        return self.client.request(
+            "PATCH",
+            f"/api/v1/alert-management/escalation-policies/{policy_id}",
+            data=kwargs,
+        )
+
+    async def aupdate_escalation_policy(self, policy_id: str, **kwargs: Any) -> dict[str, Any]:
+        """Async version of update_escalation_policy()."""
+        return await self.client.arequest(
+            "PATCH",
+            f"/api/v1/alert-management/escalation-policies/{policy_id}",
+            data=kwargs,
+        )
+
+    def delete_escalation_policy(self, policy_id: str) -> dict[str, Any]:
+        """Delete an escalation policy."""
+        return self.client.request(
+            "DELETE", f"/api/v1/alert-management/escalation-policies/{policy_id}"
+        )
+
+    async def adelete_escalation_policy(self, policy_id: str) -> dict[str, Any]:
+        """Async version of delete_escalation_policy()."""
+        return await self.client.arequest(
+            "DELETE", f"/api/v1/alert-management/escalation-policies/{policy_id}"
+        )
+
+    # ==================== Maintenance ====================
+
+    def process_pending_escalations(self) -> dict[str, Any]:
+        """Manually trigger processing of pending escalations (normally a
+        scheduled background task)."""
+        return self.client.request(
+            "POST", "/api/v1/alert-management/maintenance/process-escalations"
+        )
+
+    async def aprocess_pending_escalations(self) -> dict[str, Any]:
+        """Async version of process_pending_escalations()."""
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-management/maintenance/process-escalations"
+        )
+
+    def unsnooze_expired_alerts(self) -> dict[str, Any]:
+        """Manually trigger reactivation of alerts whose snooze period has
+        expired (normally a scheduled background task)."""
+        return self.client.request("POST", "/api/v1/alert-management/maintenance/unsnooze-alerts")
+
+    async def aunsnooze_expired_alerts(self) -> dict[str, Any]:
+        """Async version of unsnooze_expired_alerts()."""
+        return await self.client.arequest(
+            "POST", "/api/v1/alert-management/maintenance/unsnooze-alerts"
+        )
+
+
+def _alert_time_series_query_payload(
+    start: str,
+    end: str,
+    interval: str = "hour",
+    group_by: str | None = None,
+    filters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Shared request-body builder for
+    AlertManagementResource.get_trend/aget_trend."""
+    data: dict[str, Any] = {
+        "time_range": {"start": start, "end": end},
+        "interval": interval,
+    }
+    data.update(_drop_none(group_by=group_by, filters=filters))
+    return data
+
+
+def _escalation_policy_payload(
+    name: str,
+    escalation_rules: List[dict[str, Any]],
+    description: str | None = None,
+    applies_to_severities: List[str] | None = None,
+    applies_to_types: List[str] | None = None,
+    applies_to_model_ids: List[str] | None = None,
+    is_active: bool = True,
+) -> dict[str, Any]:
+    """Shared request-body builder for
+    AlertManagementResource.create_escalation_policy/acreate_escalation_policy.
+
+    organization_id is required by the backend's Pydantic schema but is
+    always overwritten server-side from the caller's session, so an empty
+    placeholder is sent rather than exposing a meaningless parameter.
+    """
+    data: dict[str, Any] = {
+        "organization_id": "",
+        "name": name,
+        "escalation_rules": escalation_rules,
+        "is_active": is_active,
+    }
+    data.update(
+        _drop_none(
+            description=description,
+            applies_to_severities=applies_to_severities,
+            applies_to_types=applies_to_types,
+            applies_to_model_ids=applies_to_model_ids,
+        )
+    )
+    return data
 
 
 class RiskRegisterResource(BaseResource):
@@ -1258,13 +2639,13 @@ class RiskRegisterResource(BaseResource):
 
     def list(
         self,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-        category: Optional[str] = None,
-        model_id: Optional[str] = None,
+        status: str | None = None,
+        severity: str | None = None,
+        category: str | None = None,
+        model_id: str | None = None,
         limit: int = 50,
         skip: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List AI risk register entries, optionally filtered.
 
         Args:
@@ -1280,7 +2661,7 @@ class RiskRegisterResource(BaseResource):
             each item includes `iso42001_clause_refs`, the ISO 42001 clause
             IDs this risk maps to.
         """
-        params: Dict[str, Any] = {"limit": limit, "skip": skip}
+        params: dict[str, Any] = {"limit": limit, "skip": skip}
         for key, value in (
             ("status", status),
             ("severity", severity),
@@ -1293,15 +2674,15 @@ class RiskRegisterResource(BaseResource):
 
     async def alist(
         self,
-        status: Optional[str] = None,
-        severity: Optional[str] = None,
-        category: Optional[str] = None,
-        model_id: Optional[str] = None,
+        status: str | None = None,
+        severity: str | None = None,
+        category: str | None = None,
+        model_id: str | None = None,
         limit: int = 50,
         skip: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of list()."""
-        params: Dict[str, Any] = {"limit": limit, "skip": skip}
+        params: dict[str, Any] = {"limit": limit, "skip": skip}
         for key, value in (
             ("status", status),
             ("severity", severity),
@@ -1312,19 +2693,19 @@ class RiskRegisterResource(BaseResource):
                 params[key] = value
         return await self.client.arequest("GET", "/api/v1/risk-register", params=params)
 
-    def get(self, entry_id: str) -> Dict[str, Any]:
+    def get(self, entry_id: str) -> dict[str, Any]:
         """Get a single risk register entry by ID."""
         return self.client.request("GET", f"/api/v1/risk-register/{entry_id}")
 
-    async def aget(self, entry_id: str) -> Dict[str, Any]:
+    async def aget(self, entry_id: str) -> dict[str, Any]:
         """Async version of get()."""
         return await self.client.arequest("GET", f"/api/v1/risk-register/{entry_id}")
 
-    def portfolio(self) -> Dict[str, Any]:
+    def portfolio(self) -> dict[str, Any]:
         """Get the likelihood x impact heat map and top open risks."""
         return self.client.request("GET", "/api/v1/risk-register/portfolio")
 
-    async def aportfolio(self) -> Dict[str, Any]:
+    async def aportfolio(self) -> dict[str, Any]:
         """Async version of portfolio()."""
         return await self.client.arequest("GET", "/api/v1/risk-register/portfolio")
 
@@ -1337,19 +2718,19 @@ class GovernanceResource(BaseResource):
     workflow, not exposed here.
     """
 
-    def list_boards(self) -> List[Dict[str, Any]]:
+    def list_boards(self) -> List[dict[str, Any]]:
         """List governance review boards for the organization."""
         return self.client.request("GET", "/api/v1/governance/review-boards")
 
-    async def alist_boards(self) -> List[Dict[str, Any]]:
+    async def alist_boards(self) -> List[dict[str, Any]]:
         """Async version of list_boards()."""
         return await self.client.arequest("GET", "/api/v1/governance/review-boards")
 
     def list_review_requests(
-        self, board_id: Optional[str] = None, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, board_id: str | None = None, status: str | None = None
+    ) -> List[dict[str, Any]]:
         """List governance review requests, optionally filtered."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if board_id is not None:
             params["board_id"] = board_id
         if status is not None:
@@ -1359,10 +2740,10 @@ class GovernanceResource(BaseResource):
         )
 
     async def alist_review_requests(
-        self, board_id: Optional[str] = None, status: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        self, board_id: str | None = None, status: str | None = None
+    ) -> List[dict[str, Any]]:
         """Async version of list_review_requests()."""
-        params: Dict[str, Any] = {}
+        params: dict[str, Any] = {}
         if board_id is not None:
             params["board_id"] = board_id
         if status is not None:
@@ -1371,7 +2752,19 @@ class GovernanceResource(BaseResource):
             "GET", "/api/v1/governance/review-boards/requests", params=params
         )
 
-    def raci_grid(self, board_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_review_request(self, request_id: str) -> dict[str, Any]:
+        """Get a specific governance review request with full detail (board,
+        submitter, comments, decisions, attachments, and vote_status).
+        """
+        return self.client.request("GET", f"/api/v1/governance/review-boards/requests/{request_id}")
+
+    async def aget_review_request(self, request_id: str) -> dict[str, Any]:
+        """Async version of get_review_request()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/governance/review-boards/requests/{request_id}"
+        )
+
+    def raci_grid(self, board_id: str | None = None) -> dict[str, Any]:
         """Get the RACI grid: review requests and their Responsible /
         Accountable / Consulted / Informed assignments, optionally scoped to
         one board.
@@ -1381,11 +2774,70 @@ class GovernanceResource(BaseResource):
             "GET", "/api/v1/governance/review-boards/raci-grid", params=params
         )
 
-    async def araci_grid(self, board_id: Optional[str] = None) -> Dict[str, Any]:
+    async def araci_grid(self, board_id: str | None = None) -> dict[str, Any]:
         """Async version of raci_grid()."""
         params = {"board_id": board_id} if board_id is not None else {}
         return await self.client.arequest(
             "GET", "/api/v1/governance/review-boards/raci-grid", params=params
+        )
+
+    def submit_decision(
+        self,
+        request_id: str,
+        decision: str,
+        justification: str | None = None,
+        conditions: str | None = None,
+        *,
+        evidence_snapshot_hash: str,
+        totp_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Submit a board member's decision on a governance review request.
+
+        Requires a personal human session (JWT); requests authenticated with
+        an organization API key (`wbx_live_...`) are rejected with 403 by
+        `require_human_session`. The voter must also have two-factor
+        authentication enabled and supply a current authenticator (or backup)
+        code as `totp_code`; each code works once.
+
+        `evidence_snapshot_hash` is the `evidence_snapshot_hash` of the request
+        detail the voter was shown. The backend refuses the vote with 409 if the
+        request has changed since.
+        """
+        data = _drop_none(
+            decision=decision,
+            justification=justification,
+            conditions=conditions,
+            evidence_snapshot_hash=evidence_snapshot_hash,
+            totp_code=totp_code,
+        )
+        return self.client.request(
+            "POST",
+            f"/api/v1/governance/review-boards/requests/{request_id}/decisions",
+            data=data,
+        )
+
+    async def asubmit_decision(
+        self,
+        request_id: str,
+        decision: str,
+        justification: str | None = None,
+        conditions: str | None = None,
+        *,
+        evidence_snapshot_hash: str,
+        totp_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of submit_decision()."""
+        data = _drop_none(
+            decision=decision,
+            justification=justification,
+            conditions=conditions,
+            evidence_snapshot_hash=evidence_snapshot_hash,
+            totp_code=totp_code,
+        )
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/governance/review-boards/requests/{request_id}/decisions",
+            data=data,
         )
 
 
@@ -1398,22 +2850,23 @@ class LLMResource(BaseResource):
         model_name: str,
         prompt: str,
         latency_ms: float,
-        model_id: Optional[str] = None,
-        completion: Optional[str] = None,
-        prompt_tokens: Optional[int] = None,
-        completion_tokens: Optional[int] = None,
-        finish_reason: Optional[str] = None,
-        response_metadata: Optional[Dict[str, Any]] = None,
-        messages: Optional[List[Dict[str, Any]]] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        status: Optional[str] = None,
-        error_message: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        request_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        completion: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        finish_reason: str | None = None,
+        response_metadata: dict[str, Any] | None = None,
+        messages: List[dict[str, Any]] | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        status: str | None = None,
+        error_message: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        request_id: str | None = None,
+        environment: str | None = None,
+        prompt_version_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Log a single LLM call with real token/cost/latency data.
 
@@ -1437,9 +2890,12 @@ class LLMResource(BaseResource):
             session_id: Session identifier
             request_id: Request tracking ID
             environment: Environment (dev, staging, prod)
+            prompt_version_id: Governed prompt version ID (optional)
 
         Returns:
-            {id, message} for the created log entry
+            {id, message} for the created log entry, or
+            {"status": "queued", "operation_id": ...} when offline mode is
+            enabled and the API couldn't be reached.
         """
         data = _llm_log_payload(
             provider=provider,
@@ -1461,15 +2917,22 @@ class LLMResource(BaseResource):
             session_id=session_id,
             request_id=request_id,
             environment=environment,
+            prompt_version_id=prompt_version_id,
         )
-        return self.client.request("POST", "/api/v1/llm/logs", data=data)
+        return self._request_or_queue(
+            "POST",
+            "/api/v1/llm/logs",
+            operation_type="LLM_LOG",
+            queue_data={"data": data},
+            data=data,
+        )
 
-    async def alog_call(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def alog_call(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of log_call()."""
         data = _llm_log_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/logs", data=data)
 
-    def log_calls_batch(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def log_calls_batch(self, logs: List[dict[str, Any]]) -> dict[str, Any]:
         """
         Log multiple LLM calls in one request (max 1000).
 
@@ -1479,18 +2942,18 @@ class LLMResource(BaseResource):
         """
         return self.client.request("POST", "/api/v1/llm/logs/batch", data={"logs": logs})
 
-    async def alog_calls_batch(self, logs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def alog_calls_batch(self, logs: List[dict[str, Any]]) -> dict[str, Any]:
         """Async version of log_calls_batch()."""
         return await self.client.arequest("POST", "/api/v1/llm/logs/batch", data={"logs": logs})
 
     def get_stats(
         self,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-        environment: Optional[str] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        provider: str | None = None,
+        environment: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Get aggregated LLM usage statistics (tokens, cost, latency, by_model)."""
         params = _drop_none(
             model_id=model_id,
@@ -1503,12 +2966,12 @@ class LLMResource(BaseResource):
 
     async def aget_stats(
         self,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-        environment: Optional[str] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        provider: str | None = None,
+        environment: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of get_stats()."""
         params = _drop_none(
             model_id=model_id,
@@ -1522,9 +2985,9 @@ class LLMResource(BaseResource):
     def get_recent(
         self,
         limit: int = 100,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        provider: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get recent LLM logs (requires a model_id owned by the caller's org)."""
         params = _drop_none(limit=limit, model_id=model_id, provider=provider)
         return self.client.request("GET", "/api/v1/llm/logs/recent", params=params)
@@ -1532,39 +2995,39 @@ class LLMResource(BaseResource):
     async def aget_recent(
         self,
         limit: int = 100,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        provider: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of get_recent()."""
         params = _drop_none(limit=limit, model_id=model_id, provider=provider)
         return await self.client.arequest("GET", "/api/v1/llm/logs/recent", params=params)
 
-    def get_log(self, log_id: str) -> Dict[str, Any]:
+    def get_log(self, log_id: str) -> dict[str, Any]:
         """Get a single LLM log by ID."""
         return self.client.request("GET", f"/api/v1/llm/logs/{log_id}")
 
-    async def aget_log(self, log_id: str) -> Dict[str, Any]:
+    async def aget_log(self, log_id: str) -> dict[str, Any]:
         """Async version of get_log()."""
         return await self.client.arequest("GET", f"/api/v1/llm/logs/{log_id}")
 
     def query_logs(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-        model_name: Optional[str] = None,
-        status: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        min_cost: Optional[float] = None,
-        max_cost: Optional[float] = None,
-        min_latency_ms: Optional[float] = None,
-        max_latency_ms: Optional[float] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        provider: str | None = None,
+        model_name: str | None = None,
+        status: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        environment: str | None = None,
+        min_cost: float | None = None,
+        max_cost: float | None = None,
+        min_latency_ms: float | None = None,
+        max_latency_ms: float | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Query LLM logs with filters and pagination. Returns {logs, total, skip, limit}."""
         data = _llm_query_logs_payload(
             start_time=start_time,
@@ -1585,26 +3048,26 @@ class LLMResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm/logs/query", data=data)
 
-    async def aquery_logs(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def aquery_logs(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of query_logs()."""
         data = _llm_query_logs_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/logs/query", data=data)
 
-    def session_logs(self, session_id: str) -> List[Dict[str, Any]]:
+    def session_logs(self, session_id: str) -> List[dict[str, Any]]:
         """Get all LLM logs for a specific session."""
         return self.client.request("GET", f"/api/v1/llm/logs/session/{session_id}")
 
-    async def asession_logs(self, session_id: str) -> List[Dict[str, Any]]:
+    async def asession_logs(self, session_id: str) -> List[dict[str, Any]]:
         """Async version of session_logs()."""
         return await self.client.arequest("GET", f"/api/v1/llm/logs/session/{session_id}")
 
     def cost_breakdown(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         include_user: bool = False,
         include_environment: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get detailed cost breakdown (platform-wide aggregate)."""
         params = _drop_none(
             start_time=start_time,
@@ -1616,11 +3079,11 @@ class LLMResource(BaseResource):
 
     async def acost_breakdown(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         include_user: bool = False,
         include_environment: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of cost_breakdown()."""
         params = _drop_none(
             start_time=start_time,
@@ -1632,11 +3095,11 @@ class LLMResource(BaseResource):
 
     def performance(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """Get LLM latency/throughput performance metrics."""
         params = _drop_none(
             start_time=start_time,
@@ -1648,11 +3111,11 @@ class LLMResource(BaseResource):
 
     async def aperformance(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        provider: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        provider: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of performance()."""
         params = _drop_none(
             start_time=start_time,
@@ -1664,11 +3127,11 @@ class LLMResource(BaseResource):
 
     def trends_tokens(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get token usage trend over time (granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -1680,11 +3143,11 @@ class LLMResource(BaseResource):
 
     async def atrends_tokens(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of trends_tokens()."""
         params = _drop_none(
             start_time=start_time,
@@ -1696,11 +3159,11 @@ class LLMResource(BaseResource):
 
     def trends_costs(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        provider: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        provider: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get cost trend over time (platform-wide; granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -1712,11 +3175,11 @@ class LLMResource(BaseResource):
 
     async def atrends_costs(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        provider: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        provider: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of trends_costs()."""
         params = _drop_none(
             start_time=start_time,
@@ -1731,12 +3194,12 @@ class LLMResource(BaseResource):
         start_time: str,
         end_time: str,
         granularity: str = "day",
-        provider: Optional[str] = None,
-        model_name: Optional[str] = None,
-        model_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        provider: str | None = None,
+        model_name: str | None = None,
+        model_id: str | None = None,
+        user_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get detailed, grouped usage statistics (granularity: hour/day/week/month)."""
         data = _llm_usage_stats_payload(
             start_time=start_time,
@@ -1750,35 +3213,35 @@ class LLMResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm/usage-stats", data=data)
 
-    async def ausage_stats(self, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def ausage_stats(self, *args: Any, **kwargs: Any) -> List[dict[str, Any]]:
         """Async version of usage_stats()."""
         data = _llm_usage_stats_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/usage-stats", data=data)
 
     def cost_threshold_alert(
         self, period_minutes: int = 60, threshold: float = 100.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check whether costs over the recent period exceed a threshold."""
         params = {"period_minutes": period_minutes, "threshold": threshold}
         return self.client.request("GET", "/api/v1/llm/alerts/cost-threshold", params=params)
 
     async def acost_threshold_alert(
         self, period_minutes: int = 60, threshold: float = 100.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of cost_threshold_alert()."""
         params = {"period_minutes": period_minutes, "threshold": threshold}
         return await self.client.arequest("GET", "/api/v1/llm/alerts/cost-threshold", params=params)
 
     def latency_threshold_alert(
         self, period_minutes: int = 60, threshold_ms: float = 5000.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check whether average latency over the recent period exceeds a threshold."""
         params = {"period_minutes": period_minutes, "threshold_ms": threshold_ms}
         return self.client.request("GET", "/api/v1/llm/alerts/latency-threshold", params=params)
 
     async def alatency_threshold_alert(
         self, period_minutes: int = 60, threshold_ms: float = 5000.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of latency_threshold_alert()."""
         params = {"period_minutes": period_minutes, "threshold_ms": threshold_ms}
         return await self.client.arequest(
@@ -1787,7 +3250,7 @@ class LLMResource(BaseResource):
 
     def error_rate_alert(
         self, period_minutes: int = 60, threshold_percent: float = 10.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Check whether the error rate over the recent period exceeds a threshold."""
         params = {
             "period_minutes": period_minutes,
@@ -1797,7 +3260,7 @@ class LLMResource(BaseResource):
 
     async def aerror_rate_alert(
         self, period_minutes: int = 60, threshold_percent: float = 10.0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of error_rate_alert()."""
         params = {
             "period_minutes": period_minutes,
@@ -1805,36 +3268,36 @@ class LLMResource(BaseResource):
         }
         return await self.client.arequest("GET", "/api/v1/llm/alerts/error-rate", params=params)
 
-    def cleanup_logs(self, days: int = 30) -> Dict[str, Any]:
+    def cleanup_logs(self, days: int = 30) -> dict[str, Any]:
         """Delete LLM logs older than `days`. Admin-only on the backend."""
         params = {"days": days}
         return self.client.request("DELETE", "/api/v1/llm/logs/cleanup", params=params)
 
-    async def acleanup_logs(self, days: int = 30) -> Dict[str, Any]:
+    async def acleanup_logs(self, days: int = 30) -> dict[str, Any]:
         """Async version of cleanup_logs()."""
         params = {"days": days}
         return await self.client.arequest("DELETE", "/api/v1/llm/logs/cleanup", params=params)
 
 
 def _llm_query_logs_payload(
-    start_time: Optional[str] = None,
-    end_time: Optional[str] = None,
-    model_id: Optional[str] = None,
-    provider: Optional[str] = None,
-    model_name: Optional[str] = None,
-    status: Optional[str] = None,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    environment: Optional[str] = None,
-    min_cost: Optional[float] = None,
-    max_cost: Optional[float] = None,
-    min_latency_ms: Optional[float] = None,
-    max_latency_ms: Optional[float] = None,
+    start_time: str | None = None,
+    end_time: str | None = None,
+    model_id: str | None = None,
+    provider: str | None = None,
+    model_name: str | None = None,
+    status: str | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    environment: str | None = None,
+    min_cost: float | None = None,
+    max_cost: float | None = None,
+    min_latency_ms: float | None = None,
+    max_latency_ms: float | None = None,
     skip: int = 0,
     limit: int = 100,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Shared request-body builder for LLMResource.query_logs/aquery_logs."""
-    data: Dict[str, Any] = {"skip": skip, "limit": limit}
+    data: dict[str, Any] = {"skip": skip, "limit": limit}
     data.update(
         _drop_none(
             start_time=start_time,
@@ -1859,14 +3322,14 @@ def _llm_usage_stats_payload(
     start_time: str,
     end_time: str,
     granularity: str = "day",
-    provider: Optional[str] = None,
-    model_name: Optional[str] = None,
-    model_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    environment: Optional[str] = None,
-) -> Dict[str, Any]:
+    provider: str | None = None,
+    model_name: str | None = None,
+    model_id: str | None = None,
+    user_id: str | None = None,
+    environment: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMResource.usage_stats/ausage_stats."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "start_time": start_time,
         "end_time": end_time,
         "granularity": granularity,
@@ -1888,24 +3351,25 @@ def _llm_log_payload(
     model_name: str,
     prompt: str,
     latency_ms: float,
-    model_id: Optional[str] = None,
-    completion: Optional[str] = None,
-    prompt_tokens: Optional[int] = None,
-    completion_tokens: Optional[int] = None,
-    finish_reason: Optional[str] = None,
-    response_metadata: Optional[Dict[str, Any]] = None,
-    messages: Optional[List[Dict[str, Any]]] = None,
-    temperature: Optional[float] = None,
-    max_tokens: Optional[int] = None,
-    status: Optional[str] = None,
-    error_message: Optional[str] = None,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    request_id: Optional[str] = None,
-    environment: Optional[str] = None,
-) -> Dict[str, Any]:
+    model_id: str | None = None,
+    completion: str | None = None,
+    prompt_tokens: int | None = None,
+    completion_tokens: int | None = None,
+    finish_reason: str | None = None,
+    response_metadata: dict[str, Any] | None = None,
+    messages: List[dict[str, Any]] | None = None,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+    status: str | None = None,
+    error_message: str | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    request_id: str | None = None,
+    environment: str | None = None,
+    prompt_version_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMResource.log_call/alog_call."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "provider": provider,
         "model_name": model_name,
         "prompt": prompt,
@@ -1928,12 +3392,13 @@ def _llm_log_payload(
             session_id=session_id,
             request_id=request_id,
             environment=environment,
+            prompt_version_id=prompt_version_id,
         )
     )
     return data
 
 
-def _drop_none(**kwargs: Any) -> Dict[str, Any]:
+def _drop_none(**kwargs: Any) -> dict[str, Any]:
     """Filter out None-valued kwargs, so optional fields aren't sent at all
     (letting the backend's own schema defaults apply) rather than sent as
     explicit nulls."""
@@ -1946,22 +3411,22 @@ class RAGResource(BaseResource):
     def log_retrieval(
         self,
         query: str,
-        results: List[Dict[str, Any]],
+        results: List[dict[str, Any]],
         top_k: int,
         retrieval_method: str,
         query_type: str = "semantic",
-        retrieval_params: Optional[Dict[str, Any]] = None,
-        retrieval_latency_ms: Optional[float] = None,
-        answer: Optional[str] = None,
-        answer_latency_ms: Optional[float] = None,
-        ground_truth_ids: Optional[List[str]] = None,
-        llm_log_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        retrieval_params: dict[str, Any] | None = None,
+        retrieval_latency_ms: float | None = None,
+        answer: str | None = None,
+        answer_latency_ms: float | None = None,
+        ground_truth_ids: List[str] | None = None,
+        llm_log_id: str | None = None,
+        model_id: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        environment: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Log a retrieval operation, with real quality metrics computed
         server-side when ground_truth_ids is supplied.
@@ -2010,7 +3475,7 @@ class RAGResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/rag/retrievals", data=data)
 
-    async def alog_retrieval(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def alog_retrieval(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of log_retrieval()."""
         data = _rag_retrieval_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/rag/retrievals", data=data)
@@ -2019,14 +3484,14 @@ class RAGResource(BaseResource):
         self,
         name: str,
         queries: List[str],
-        description: Optional[str] = None,
+        description: str | None = None,
         evaluation_type: str = "manual",
-        model_id: Optional[str] = None,
-        system_version: Optional[str] = None,
-        ground_truth: Optional[Dict[str, List[str]]] = None,
-        environment: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        system_version: str | None = None,
+        ground_truth: dict[str, list[str]] | None = None,
+        environment: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create a RAG evaluation, aggregating already-logged retrievals for
         each query in `queries` (optionally recomputing precision/recall/
@@ -2062,18 +3527,18 @@ class RAGResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/rag/evaluations", data=data)
 
-    async def acreate_evaluation(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def acreate_evaluation(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of create_evaluation()."""
         data = _rag_evaluation_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/rag/evaluations", data=data)
 
     def get_stats(
         self,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        environment: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Get aggregated RAG statistics (precision/recall/MRR/NDCG/relevance/latency)."""
         params = _drop_none(
             model_id=model_id,
@@ -2085,11 +3550,11 @@ class RAGResource(BaseResource):
 
     async def aget_stats(
         self,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        model_id: str | None = None,
+        environment: str | None = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of get_stats()."""
         params = _drop_none(
             model_id=model_id,
@@ -2101,12 +3566,12 @@ class RAGResource(BaseResource):
 
     def list_evaluations(
         self,
-        model_id: Optional[str] = None,
-        evaluation_type: Optional[str] = None,
-        environment: Optional[str] = None,
+        model_id: str | None = None,
+        evaluation_type: str | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List RAG evaluations with optional filters."""
         params = _drop_none(
             model_id=model_id,
@@ -2119,12 +3584,12 @@ class RAGResource(BaseResource):
 
     async def alist_evaluations(
         self,
-        model_id: Optional[str] = None,
-        evaluation_type: Optional[str] = None,
-        environment: Optional[str] = None,
+        model_id: str | None = None,
+        evaluation_type: str | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_evaluations()."""
         params = _drop_none(
             model_id=model_id,
@@ -2135,26 +3600,26 @@ class RAGResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/rag/evaluations", params=params)
 
-    def get_retrieval(self, log_id: str) -> Dict[str, Any]:
+    def get_retrieval(self, log_id: str) -> dict[str, Any]:
         """Get a specific retrieval log by ID."""
         return self.client.request("GET", f"/api/v1/rag/retrievals/{log_id}")
 
-    async def aget_retrieval(self, log_id: str) -> Dict[str, Any]:
+    async def aget_retrieval(self, log_id: str) -> dict[str, Any]:
         """Async version of get_retrieval()."""
         return await self.client.arequest("GET", f"/api/v1/rag/retrievals/{log_id}")
 
     def list_retrievals(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        retrieval_method: Optional[str] = None,
-        environment: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        retrieval_method: str | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Query retrieval logs. model_id is required (owned by the caller's
         organization) until organization-wide RAG log scoping ships."""
         params = {"model_id": model_id, "limit": limit, "offset": offset}
@@ -2173,15 +3638,15 @@ class RAGResource(BaseResource):
     async def alist_retrievals(
         self,
         model_id: str,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        retrieval_method: Optional[str] = None,
-        environment: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        retrieval_method: str | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_retrievals()."""
         params = {"model_id": model_id, "limit": limit, "offset": offset}
         params.update(
@@ -2198,12 +3663,12 @@ class RAGResource(BaseResource):
 
     def trends(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get RAG quality metrics trend over time (granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -2216,12 +3681,12 @@ class RAGResource(BaseResource):
 
     async def atrends(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of trends()."""
         params = _drop_none(
             start_time=start_time,
@@ -2232,22 +3697,22 @@ class RAGResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/rag/trends", params=params)
 
-    def get_evaluation(self, evaluation_id: str) -> Dict[str, Any]:
+    def get_evaluation(self, evaluation_id: str) -> dict[str, Any]:
         """Get a specific RAG evaluation by ID."""
         return self.client.request("GET", f"/api/v1/rag/evaluations/{evaluation_id}")
 
-    async def aget_evaluation(self, evaluation_id: str) -> Dict[str, Any]:
+    async def aget_evaluation(self, evaluation_id: str) -> dict[str, Any]:
         """Async version of get_evaluation()."""
         return await self.client.arequest("GET", f"/api/v1/rag/evaluations/{evaluation_id}")
 
     def metrics_precision(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        k_values: Optional[List[int]] = None,
-    ) -> Dict[str, Optional[float]]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        environment: str | None = None,
+        k_values: List[int] | None = None,
+    ) -> dict[str, float | None]:
         """Get Precision@K metrics for the given K values (default [1, 3, 5, 10])."""
         params = _drop_none(
             start_time=start_time,
@@ -2260,12 +3725,12 @@ class RAGResource(BaseResource):
 
     async def ametrics_precision(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-        k_values: Optional[List[int]] = None,
-    ) -> Dict[str, Optional[float]]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        environment: str | None = None,
+        k_values: List[int] | None = None,
+    ) -> dict[str, float | None]:
         """Async version of metrics_precision()."""
         params = _drop_none(
             start_time=start_time,
@@ -2278,20 +3743,20 @@ class RAGResource(BaseResource):
 
     def metrics_relevance(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-    ) -> Dict[str, float]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+    ) -> dict[str, float]:
         """Get average relevance metrics (context/answer/faithfulness)."""
         params = _drop_none(start_time=start_time, end_time=end_time, model_id=model_id)
         return self.client.request("GET", "/api/v1/rag/metrics/relevance", params=params)
 
     async def ametrics_relevance(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-    ) -> Dict[str, float]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+    ) -> dict[str, float]:
         """Async version of metrics_relevance()."""
         params = _drop_none(start_time=start_time, end_time=end_time, model_id=model_id)
         return await self.client.arequest("GET", "/api/v1/rag/metrics/relevance", params=params)
@@ -2299,24 +3764,24 @@ class RAGResource(BaseResource):
 
 def _rag_retrieval_payload(
     query: str,
-    results: List[Dict[str, Any]],
+    results: List[dict[str, Any]],
     top_k: int,
     retrieval_method: str,
     query_type: str = "semantic",
-    retrieval_params: Optional[Dict[str, Any]] = None,
-    retrieval_latency_ms: Optional[float] = None,
-    answer: Optional[str] = None,
-    answer_latency_ms: Optional[float] = None,
-    ground_truth_ids: Optional[List[str]] = None,
-    llm_log_id: Optional[str] = None,
-    model_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    environment: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    retrieval_params: dict[str, Any] | None = None,
+    retrieval_latency_ms: float | None = None,
+    answer: str | None = None,
+    answer_latency_ms: float | None = None,
+    ground_truth_ids: List[str] | None = None,
+    llm_log_id: str | None = None,
+    model_id: str | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    environment: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for RAGResource.log_retrieval/alog_retrieval."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "query": query,
         "results": results,
         "top_k": top_k,
@@ -2344,16 +3809,16 @@ def _rag_retrieval_payload(
 def _rag_evaluation_payload(
     name: str,
     queries: List[str],
-    description: Optional[str] = None,
+    description: str | None = None,
     evaluation_type: str = "manual",
-    model_id: Optional[str] = None,
-    system_version: Optional[str] = None,
-    ground_truth: Optional[Dict[str, List[str]]] = None,
-    environment: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    model_id: str | None = None,
+    system_version: str | None = None,
+    ground_truth: dict[str, list[str]] | None = None,
+    environment: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for RAGResource.create_evaluation/acreate_evaluation."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "name": name,
         "queries": queries,
         "evaluation_type": evaluation_type,
@@ -2382,12 +3847,12 @@ class SafetyResource(BaseResource):
         check_pii: bool = True,
         check_harmful: bool = True,
         language: str = "en",
-        llm_log_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        session_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+        model_id: str | None = None,
+        user_id: str | None = None,
+        session_id: str | None = None,
+        environment: str | None = None,
+    ) -> dict[str, Any]:
         """
         Analyze content for toxicity, PII, and harmful content.
 
@@ -2423,7 +3888,7 @@ class SafetyResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/safety/analyze", data=data)
 
-    async def aanalyze(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def aanalyze(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of analyze()."""
         data = _safety_analyze_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/safety/analyze", data=data)
@@ -2436,10 +3901,10 @@ class SafetyResource(BaseResource):
         check_pii: bool = True,
         check_harmful: bool = True,
         language: str = "en",
-        model_id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        user_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Analyze multiple content items in one request (max 100)."""
         data = _safety_analyze_batch_payload(
             contents=contents,
@@ -2454,22 +3919,22 @@ class SafetyResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/safety/analyze/batch", data=data)
 
-    async def aanalyze_batch(self, *args: Any, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def aanalyze_batch(self, *args: Any, **kwargs: Any) -> List[dict[str, Any]]:
         """Async version of analyze_batch()."""
         data = _safety_analyze_batch_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/safety/analyze/batch", data=data)
 
     def get_scores(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        safety_status: Optional[str] = None,
-        contains_pii: Optional[bool] = None,
-        environment: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        safety_status: str | None = None,
+        contains_pii: bool | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Query safety analysis scores with filters."""
         params = _drop_none(
             start_time=start_time,
@@ -2485,15 +3950,15 @@ class SafetyResource(BaseResource):
 
     async def aget_scores(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        safety_status: Optional[str] = None,
-        contains_pii: Optional[bool] = None,
-        environment: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        safety_status: str | None = None,
+        contains_pii: bool | None = None,
+        environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of get_scores()."""
         params = _drop_none(
             start_time=start_time,
@@ -2509,11 +3974,11 @@ class SafetyResource(BaseResource):
 
     def get_stats(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> dict[str, Any]:
         """Get aggregated safety statistics (per-category toxicity averages,
         flagged categories, PII types)."""
         params = _drop_none(
@@ -2526,11 +3991,11 @@ class SafetyResource(BaseResource):
 
     async def aget_stats(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        start_time: str | None = None,
+        end_time: str | None = None,
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of get_stats()."""
         params = _drop_none(
             start_time=start_time,
@@ -2540,22 +4005,22 @@ class SafetyResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/safety/stats", params=params)
 
-    def get_score(self, score_id: str) -> Dict[str, Any]:
+    def get_score(self, score_id: str) -> dict[str, Any]:
         """Get a specific safety score by ID."""
         return self.client.request("GET", f"/api/v1/safety/scores/{score_id}")
 
-    async def aget_score(self, score_id: str) -> Dict[str, Any]:
+    async def aget_score(self, score_id: str) -> dict[str, Any]:
         """Async version of get_score()."""
         return await self.client.arequest("GET", f"/api/v1/safety/scores/{score_id}")
 
     def trends(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Get content-safety trend over time (per-category toxicity averages,
         PII detections; granularity: hour/day/week)."""
         params = _drop_none(
@@ -2569,12 +4034,12 @@ class SafetyResource(BaseResource):
 
     async def atrends(
         self,
-        start_time: Optional[str] = None,
-        end_time: Optional[str] = None,
+        start_time: str | None = None,
+        end_time: str | None = None,
         granularity: str = "day",
-        model_id: Optional[str] = None,
-        environment: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        model_id: str | None = None,
+        environment: str | None = None,
+    ) -> List[dict[str, Any]]:
         """Async version of trends()."""
         params = _drop_none(
             start_time=start_time,
@@ -2585,7 +4050,7 @@ class SafetyResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/safety/trends", params=params)
 
-    def create_threshold(self, name: str, **kwargs: Any) -> Dict[str, Any]:
+    def create_threshold(self, name: str, **kwargs: Any) -> dict[str, Any]:
         """Create a safety threshold configuration.
 
         Args:
@@ -2601,34 +4066,34 @@ class SafetyResource(BaseResource):
         data = {"name": name, **kwargs}
         return self.client.request("POST", "/api/v1/safety/thresholds", data=data)
 
-    async def acreate_threshold(self, name: str, **kwargs: Any) -> Dict[str, Any]:
+    async def acreate_threshold(self, name: str, **kwargs: Any) -> dict[str, Any]:
         """Async version of create_threshold()."""
         data = {"name": name, **kwargs}
         return await self.client.arequest("POST", "/api/v1/safety/thresholds", data=data)
 
     def list_thresholds(
-        self, model_id: Optional[str] = None, is_active: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
+        self, model_id: str | None = None, is_active: bool | None = None
+    ) -> List[dict[str, Any]]:
         """List safety thresholds for the caller's organization."""
         params = _drop_none(model_id=model_id, is_active=is_active)
         return self.client.request("GET", "/api/v1/safety/thresholds", params=params)
 
     async def alist_thresholds(
-        self, model_id: Optional[str] = None, is_active: Optional[bool] = None
-    ) -> List[Dict[str, Any]]:
+        self, model_id: str | None = None, is_active: bool | None = None
+    ) -> List[dict[str, Any]]:
         """Async version of list_thresholds()."""
         params = _drop_none(model_id=model_id, is_active=is_active)
         return await self.client.arequest("GET", "/api/v1/safety/thresholds", params=params)
 
-    def get_threshold(self, threshold_id: str) -> Dict[str, Any]:
+    def get_threshold(self, threshold_id: str) -> dict[str, Any]:
         """Get a specific safety threshold by ID."""
         return self.client.request("GET", f"/api/v1/safety/thresholds/{threshold_id}")
 
-    async def aget_threshold(self, threshold_id: str) -> Dict[str, Any]:
+    async def aget_threshold(self, threshold_id: str) -> dict[str, Any]:
         """Async version of get_threshold()."""
         return await self.client.arequest("GET", f"/api/v1/safety/thresholds/{threshold_id}")
 
-    def update_threshold(self, threshold_id: str, **kwargs: Any) -> Dict[str, Any]:
+    def update_threshold(self, threshold_id: str, **kwargs: Any) -> dict[str, Any]:
         """Update a safety threshold configuration.
 
         Args:
@@ -2642,17 +4107,17 @@ class SafetyResource(BaseResource):
             "PATCH", f"/api/v1/safety/thresholds/{threshold_id}", data=kwargs
         )
 
-    async def aupdate_threshold(self, threshold_id: str, **kwargs: Any) -> Dict[str, Any]:
+    async def aupdate_threshold(self, threshold_id: str, **kwargs: Any) -> dict[str, Any]:
         """Async version of update_threshold()."""
         return await self.client.arequest(
             "PATCH", f"/api/v1/safety/thresholds/{threshold_id}", data=kwargs
         )
 
-    def delete_threshold(self, threshold_id: str) -> Dict[str, Any]:
+    def delete_threshold(self, threshold_id: str) -> dict[str, Any]:
         """Delete a safety threshold configuration."""
         return self.client.request("DELETE", f"/api/v1/safety/thresholds/{threshold_id}")
 
-    async def adelete_threshold(self, threshold_id: str) -> Dict[str, Any]:
+    async def adelete_threshold(self, threshold_id: str) -> dict[str, Any]:
         """Async version of delete_threshold()."""
         return await self.client.arequest("DELETE", f"/api/v1/safety/thresholds/{threshold_id}")
 
@@ -2664,14 +4129,14 @@ def _safety_analyze_payload(
     check_pii: bool = True,
     check_harmful: bool = True,
     language: str = "en",
-    llm_log_id: Optional[str] = None,
-    model_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    session_id: Optional[str] = None,
-    environment: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+    model_id: str | None = None,
+    user_id: str | None = None,
+    session_id: str | None = None,
+    environment: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for SafetyResource.analyze/aanalyze."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "content": content,
         "content_type": content_type,
         "check_toxicity": check_toxicity,
@@ -2698,12 +4163,12 @@ def _safety_analyze_batch_payload(
     check_pii: bool = True,
     check_harmful: bool = True,
     language: str = "en",
-    model_id: Optional[str] = None,
-    user_id: Optional[str] = None,
-    environment: Optional[str] = None,
-) -> Dict[str, Any]:
+    model_id: str | None = None,
+    user_id: str | None = None,
+    environment: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for SafetyResource.analyze_batch/aanalyze_batch."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "contents": contents,
         "content_type": content_type,
         "check_toxicity": check_toxicity,
@@ -2723,14 +4188,14 @@ class LLMXAIResource(BaseResource):
     def attention(
         self,
         prompt: str,
-        completion: Optional[str] = None,
-        model_id: Optional[str] = None,
-        layers: Optional[List[int]] = None,
+        completion: str | None = None,
+        model_id: str | None = None,
+        layers: List[int] | None = None,
         aggregate_heads: bool = True,
-        attention_weights: Optional[List[Any]] = None,
+        attention_weights: List[Any] | None = None,
         top_k: int = 10,
-        llm_log_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+    ) -> dict[str, Any]:
         """Analyze transformer attention patterns for a prompt/completion."""
         data = _llm_xai_attention_payload(
             prompt=prompt,
@@ -2744,7 +4209,7 @@ class LLMXAIResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm-xai/attention", data=data)
 
-    async def aattention(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def aattention(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of attention()."""
         data = _llm_xai_attention_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/attention", data=data)
@@ -2753,11 +4218,11 @@ class LLMXAIResource(BaseResource):
         self,
         prompt: str,
         completion: str,
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         method: str = "perturbation",
         top_k: int = 10,
-        llm_log_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+    ) -> dict[str, Any]:
         """Calculate token-level importance scores for a prompt/completion pair."""
         data = _llm_xai_token_importance_payload(
             prompt=prompt,
@@ -2769,7 +4234,7 @@ class LLMXAIResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm-xai/token-importance", data=data)
 
-    async def atoken_importance(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def atoken_importance(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of token_importance()."""
         data = _llm_xai_token_importance_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/token-importance", data=data)
@@ -2778,11 +4243,11 @@ class LLMXAIResource(BaseResource):
         self,
         prompt: str,
         baseline_output: str,
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         num_perturbations: int = 10,
         perturbation_type: str = "mixed",
-        llm_log_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+    ) -> dict[str, Any]:
         """Test prompt robustness by perturbing it and measuring output stability."""
         data = _llm_xai_sensitivity_payload(
             prompt=prompt,
@@ -2794,7 +4259,7 @@ class LLMXAIResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm-xai/sensitivity", data=data)
 
-    async def aprompt_sensitivity(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def aprompt_sensitivity(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of prompt_sensitivity()."""
         data = _llm_xai_sensitivity_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/sensitivity", data=data)
@@ -2804,12 +4269,12 @@ class LLMXAIResource(BaseResource):
         prompt: str,
         original_output: str,
         target_change: str = "any",
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         max_edits: int = 3,
         num_candidates: int = 10,
         search_strategy: str = "greedy",
-        llm_log_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+    ) -> dict[str, Any]:
         """Generate minimal prompt edits that change the model's output."""
         data = _llm_xai_counterfactuals_payload(
             prompt=prompt,
@@ -2823,7 +4288,7 @@ class LLMXAIResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm-xai/counterfactuals", data=data)
 
-    async def acounterfactuals(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def acounterfactuals(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of counterfactuals()."""
         data = _llm_xai_counterfactuals_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/counterfactuals", data=data)
@@ -2831,14 +4296,15 @@ class LLMXAIResource(BaseResource):
     def debug_prompt(
         self,
         prompt: str,
-        model_id: Optional[str] = None,
+        model_id: str | None = None,
         check_clarity: bool = True,
         check_specificity: bool = True,
         check_completeness: bool = True,
         check_consistency: bool = True,
         suggest_improvements: bool = True,
-        llm_log_id: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        llm_log_id: str | None = None,
+        prompt_version_id: str | None = None,
+    ) -> dict[str, Any]:
         """Assess prompt quality and get improvement recommendations."""
         data = _llm_xai_debug_prompt_payload(
             prompt=prompt,
@@ -2849,38 +4315,39 @@ class LLMXAIResource(BaseResource):
             check_consistency=check_consistency,
             suggest_improvements=suggest_improvements,
             llm_log_id=llm_log_id,
+            prompt_version_id=prompt_version_id,
         )
         return self.client.request("POST", "/api/v1/llm-xai/debug-prompt", data=data)
 
-    async def adebug_prompt(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def adebug_prompt(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of debug_prompt()."""
         data = _llm_xai_debug_prompt_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/debug-prompt", data=data)
 
-    def get_explanation(self, explanation_id: str) -> Dict[str, Any]:
+    def get_explanation(self, explanation_id: str) -> dict[str, Any]:
         """Get a specific attention/token-importance/sensitivity/counterfactual
         explanation by ID."""
         return self.client.request("GET", f"/api/v1/llm-xai/explanations/{explanation_id}")
 
-    async def aget_explanation(self, explanation_id: str) -> Dict[str, Any]:
+    async def aget_explanation(self, explanation_id: str) -> dict[str, Any]:
         """Async version of get_explanation()."""
         return await self.client.arequest("GET", f"/api/v1/llm-xai/explanations/{explanation_id}")
 
-    def get_prompt_analysis(self, analysis_id: str) -> Dict[str, Any]:
+    def get_prompt_analysis(self, analysis_id: str) -> dict[str, Any]:
         """Get a specific prompt debug analysis by ID."""
         return self.client.request("GET", f"/api/v1/llm-xai/prompt-analyses/{analysis_id}")
 
-    async def aget_prompt_analysis(self, analysis_id: str) -> Dict[str, Any]:
+    async def aget_prompt_analysis(self, analysis_id: str) -> dict[str, Any]:
         """Async version of get_prompt_analysis()."""
         return await self.client.arequest("GET", f"/api/v1/llm-xai/prompt-analyses/{analysis_id}")
 
     def list_explanations(
         self,
-        llm_log_id: Optional[str] = None,
-        explanation_type: Optional[str] = None,
-        model_id: Optional[str] = None,
+        llm_log_id: str | None = None,
+        explanation_type: str | None = None,
+        model_id: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List explanations, optionally filtered by LLM log, type, or model."""
         params = _drop_none(
             llm_log_id=llm_log_id,
@@ -2892,11 +4359,11 @@ class LLMXAIResource(BaseResource):
 
     async def alist_explanations(
         self,
-        llm_log_id: Optional[str] = None,
-        explanation_type: Optional[str] = None,
-        model_id: Optional[str] = None,
+        llm_log_id: str | None = None,
+        explanation_type: str | None = None,
+        model_id: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_explanations()."""
         params = _drop_none(
             llm_log_id=llm_log_id,
@@ -2908,11 +4375,11 @@ class LLMXAIResource(BaseResource):
 
     def list_prompt_analyses(
         self,
-        prompt: Optional[str] = None,
-        model_id: Optional[str] = None,
-        min_quality_score: Optional[float] = None,
+        prompt: str | None = None,
+        model_id: str | None = None,
+        min_quality_score: float | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """List prompt analyses, optionally filtered by similar prompt text,
         model, or minimum quality score."""
         params = _drop_none(
@@ -2925,11 +4392,11 @@ class LLMXAIResource(BaseResource):
 
     async def alist_prompt_analyses(
         self,
-        prompt: Optional[str] = None,
-        model_id: Optional[str] = None,
-        min_quality_score: Optional[float] = None,
+        prompt: str | None = None,
+        model_id: str | None = None,
+        min_quality_score: float | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of list_prompt_analyses()."""
         params = _drop_none(
             prompt=prompt,
@@ -2939,27 +4406,27 @@ class LLMXAIResource(BaseResource):
         )
         return await self.client.arequest("GET", "/api/v1/llm-xai/prompt-analyses", params=params)
 
-    def stats(self, model_id: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
+    def stats(self, model_id: str | None = None, days: int = 7) -> dict[str, Any]:
         """Get aggregated LLM-XAI usage statistics."""
         params = _drop_none(model_id=model_id, days=days)
         return self.client.request("GET", "/api/v1/llm-xai/stats", params=params)
 
-    async def astats(self, model_id: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
+    async def astats(self, model_id: str | None = None, days: int = 7) -> dict[str, Any]:
         """Async version of stats()."""
         params = _drop_none(model_id=model_id, days=days)
         return await self.client.arequest("GET", "/api/v1/llm-xai/stats", params=params)
 
-    def visualize_attention(self, explanation_id: str) -> Dict[str, Any]:
+    def visualize_attention(self, explanation_id: str) -> dict[str, Any]:
         """Get attention-heatmap visualization data for an explanation."""
         return self.client.request("GET", f"/api/v1/llm-xai/attention/visualize/{explanation_id}")
 
-    async def avisualize_attention(self, explanation_id: str) -> Dict[str, Any]:
+    async def avisualize_attention(self, explanation_id: str) -> dict[str, Any]:
         """Async version of visualize_attention()."""
         return await self.client.arequest(
             "GET", f"/api/v1/llm-xai/attention/visualize/{explanation_id}"
         )
 
-    def visualize_token_importance(self, explanation_id: str, top_k: int = 20) -> Dict[str, Any]:
+    def visualize_token_importance(self, explanation_id: str, top_k: int = 20) -> dict[str, Any]:
         """Get token-importance bar-chart visualization data for an explanation."""
         params = _drop_none(top_k=top_k)
         return self.client.request(
@@ -2970,7 +4437,7 @@ class LLMXAIResource(BaseResource):
 
     async def avisualize_token_importance(
         self, explanation_id: str, top_k: int = 20
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of visualize_token_importance()."""
         params = _drop_none(top_k=top_k)
         return await self.client.arequest(
@@ -2986,7 +4453,7 @@ class LLMXAIResource(BaseResource):
         include_token_importance: bool = True,
         include_sensitivity: bool = False,
         include_prompt_debug: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run multiple explanation analyses on a single LLM log in one call."""
         params = {
             "llm_log_id": llm_log_id,
@@ -3004,7 +4471,7 @@ class LLMXAIResource(BaseResource):
         include_token_importance: bool = True,
         include_sensitivity: bool = False,
         include_prompt_debug: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of batch_analyze()."""
         params = {
             "llm_log_id": llm_log_id,
@@ -3018,16 +4485,16 @@ class LLMXAIResource(BaseResource):
 
 def _llm_xai_attention_payload(
     prompt: str,
-    completion: Optional[str] = None,
-    model_id: Optional[str] = None,
-    layers: Optional[List[int]] = None,
+    completion: str | None = None,
+    model_id: str | None = None,
+    layers: List[int] | None = None,
     aggregate_heads: bool = True,
-    attention_weights: Optional[List[Any]] = None,
+    attention_weights: List[Any] | None = None,
     top_k: int = 10,
-    llm_log_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.attention/aattention."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "prompt": prompt,
         "aggregate_heads": aggregate_heads,
         "top_k": top_k,
@@ -3047,13 +4514,13 @@ def _llm_xai_attention_payload(
 def _llm_xai_token_importance_payload(
     prompt: str,
     completion: str,
-    model_id: Optional[str] = None,
+    model_id: str | None = None,
     method: str = "perturbation",
     top_k: int = 10,
-    llm_log_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.token_importance/atoken_importance."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "prompt": prompt,
         "completion": completion,
         "method": method,
@@ -3066,13 +4533,13 @@ def _llm_xai_token_importance_payload(
 def _llm_xai_sensitivity_payload(
     prompt: str,
     baseline_output: str,
-    model_id: Optional[str] = None,
+    model_id: str | None = None,
     num_perturbations: int = 10,
     perturbation_type: str = "mixed",
-    llm_log_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.prompt_sensitivity/aprompt_sensitivity."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "prompt": prompt,
         "baseline_output": baseline_output,
         "num_perturbations": num_perturbations,
@@ -3086,14 +4553,14 @@ def _llm_xai_counterfactuals_payload(
     prompt: str,
     original_output: str,
     target_change: str = "any",
-    model_id: Optional[str] = None,
+    model_id: str | None = None,
     max_edits: int = 3,
     num_candidates: int = 10,
     search_strategy: str = "greedy",
-    llm_log_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.counterfactuals/acounterfactuals."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "prompt": prompt,
         "original_output": original_output,
         "target_change": target_change,
@@ -3107,16 +4574,17 @@ def _llm_xai_counterfactuals_payload(
 
 def _llm_xai_debug_prompt_payload(
     prompt: str,
-    model_id: Optional[str] = None,
+    model_id: str | None = None,
     check_clarity: bool = True,
     check_specificity: bool = True,
     check_completeness: bool = True,
     check_consistency: bool = True,
     suggest_improvements: bool = True,
-    llm_log_id: Optional[str] = None,
-) -> Dict[str, Any]:
+    llm_log_id: str | None = None,
+    prompt_version_id: str | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.debug_prompt/adebug_prompt."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "prompt": prompt,
         "check_clarity": check_clarity,
         "check_specificity": check_specificity,
@@ -3124,7 +4592,13 @@ def _llm_xai_debug_prompt_payload(
         "check_consistency": check_consistency,
         "suggest_improvements": suggest_improvements,
     }
-    data.update(_drop_none(model_id=model_id, llm_log_id=llm_log_id))
+    data.update(
+        _drop_none(
+            model_id=model_id,
+            llm_log_id=llm_log_id,
+            prompt_version_id=prompt_version_id,
+        )
+    )
     return data
 
 
@@ -3146,9 +4620,9 @@ class AgentWorkflowsResource(BaseResource):
         self,
         name: str,
         framework: str,
-        meta_data: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        meta_data: dict[str, Any] | None = None,
+        tags: List[str] | None = None,
+    ) -> dict[str, Any]:
         """Create a new multi-agent workflow.
 
         framework: "crewai", "langchain", "autogen", "n8n", or "custom".
@@ -3162,14 +4636,14 @@ class AgentWorkflowsResource(BaseResource):
         self,
         name: str,
         framework: str,
-        meta_data: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        meta_data: dict[str, Any] | None = None,
+        tags: List[str] | None = None,
+    ) -> dict[str, Any]:
         """Async version of create_and_start()."""
         data = _drop_none(name=name, framework=framework, meta_data=meta_data, tags=tags)
         return await self.client.arequest("POST", "/api/v1/workflows/multi-agent/start", data=data)
 
-    def start(self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def start(self, workflow_id: str, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
         """Mark a workflow as running. Call after registering agents/tasks."""
         data = _drop_none(inputs=inputs)
         return self.client.request(
@@ -3177,8 +4651,8 @@ class AgentWorkflowsResource(BaseResource):
         )
 
     async def astart(
-        self, workflow_id: str, inputs: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+        self, workflow_id: str, inputs: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Async version of start()."""
         data = _drop_none(inputs=inputs)
         return await self.client.arequest(
@@ -3189,10 +4663,10 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         status: str,
-        outputs: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
+        outputs: dict[str, Any] | None = None,
+        error_message: str | None = None,
         trigger_analytics: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Mark a workflow completed/failed/cancelled and optionally trigger
         async analytics (metrics, cost, bottlenecks, timeline)."""
         data = {"status": status}
@@ -3208,10 +4682,10 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         status: str,
-        outputs: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
+        outputs: dict[str, Any] | None = None,
+        error_message: str | None = None,
         trigger_analytics: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of complete()."""
         data = {"status": status}
         data.update(_drop_none(outputs=outputs, error_message=error_message))
@@ -3224,11 +4698,11 @@ class AgentWorkflowsResource(BaseResource):
 
     def list(
         self,
-        status: Optional[str] = None,
-        framework: Optional[str] = None,
+        status: str | None = None,
+        framework: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """List workflows for the organization. Returns {workflows, total, skip, limit}."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(status=status, framework=framework))
@@ -3236,29 +4710,29 @@ class AgentWorkflowsResource(BaseResource):
 
     async def alist(
         self,
-        status: Optional[str] = None,
-        framework: Optional[str] = None,
+        status: str | None = None,
+        framework: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of list()."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(status=status, framework=framework))
         return await self.client.arequest("GET", "/api/v1/workflows/multi-agent", params=params)
 
-    def get(self, workflow_id: str) -> Dict[str, Any]:
+    def get(self, workflow_id: str) -> dict[str, Any]:
         """Get a workflow by ID."""
         return self.client.request("GET", f"/api/v1/workflows/multi-agent/{workflow_id}")
 
-    async def aget(self, workflow_id: str) -> Dict[str, Any]:
+    async def aget(self, workflow_id: str) -> dict[str, Any]:
         """Async version of get()."""
         return await self.client.arequest("GET", f"/api/v1/workflows/multi-agent/{workflow_id}")
 
-    def delete(self, workflow_id: str) -> Dict[str, Any]:
+    def delete(self, workflow_id: str) -> dict[str, Any]:
         """Delete a workflow and all related agents/executions/tasks/interactions."""
         return self.client.request("DELETE", f"/api/v1/workflows/multi-agent/{workflow_id}")
 
-    async def adelete(self, workflow_id: str) -> Dict[str, Any]:
+    async def adelete(self, workflow_id: str) -> dict[str, Any]:
         """Async version of delete()."""
         return await self.client.arequest("DELETE", f"/api/v1/workflows/multi-agent/{workflow_id}")
 
@@ -3266,18 +4740,18 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         name: str,
-        role: Optional[str] = None,
-        agent_type: Optional[str] = None,
-        model_name: Optional[str] = None,
-        llm_provider: Optional[str] = None,
-        llm_config: Optional[Dict[str, Any]] = None,
-        system_prompt: Optional[str] = None,
-        goal: Optional[str] = None,
-        backstory: Optional[str] = None,
-        tools: Optional[List[str]] = None,
-        capabilities: Optional[Dict[str, Any]] = None,
-        meta_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        role: str | None = None,
+        agent_type: str | None = None,
+        model_name: str | None = None,
+        llm_provider: str | None = None,
+        llm_config: dict[str, Any] | None = None,
+        system_prompt: str | None = None,
+        goal: str | None = None,
+        backstory: str | None = None,
+        tools: List[str] | None = None,
+        capabilities: dict[str, Any] | None = None,
+        meta_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Register an agent in a workflow. Call once per agent before
         starting execution."""
         data = _agent_register_payload(
@@ -3298,18 +4772,18 @@ class AgentWorkflowsResource(BaseResource):
             "POST", f"/api/v1/workflows/multi-agent/{workflow_id}/agents", data=data
         )
 
-    async def aregister_agent(self, workflow_id: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def aregister_agent(self, workflow_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of register_agent()."""
         data = _agent_register_payload(*args, **kwargs)
         return await self.client.arequest(
             "POST", f"/api/v1/workflows/multi-agent/{workflow_id}/agents", data=data
         )
 
-    def list_agents(self, workflow_id: str) -> List[Dict[str, Any]]:
+    def list_agents(self, workflow_id: str) -> List[dict[str, Any]]:
         """List all agents registered in a workflow."""
         return self.client.request("GET", f"/api/v1/workflows/multi-agent/{workflow_id}/agents")
 
-    async def alist_agents(self, workflow_id: str) -> List[Dict[str, Any]]:
+    async def alist_agents(self, workflow_id: str) -> List[dict[str, Any]]:
         """Async version of list_agents()."""
         return await self.client.arequest(
             "GET", f"/api/v1/workflows/multi-agent/{workflow_id}/agents"
@@ -3319,10 +4793,10 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         agent_id: str,
-        inputs: Optional[Dict[str, Any]] = None,
-        parent_execution_id: Optional[str] = None,
-        execution_order: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any] | None = None,
+        parent_execution_id: str | None = None,
+        execution_order: int | None = None,
+    ) -> dict[str, Any]:
         """Log that an agent started executing. Set parent_execution_id for
         hierarchical/delegated executions."""
         data = {"agent_id": agent_id}
@@ -3341,10 +4815,10 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         agent_id: str,
-        inputs: Optional[Dict[str, Any]] = None,
-        parent_execution_id: Optional[str] = None,
-        execution_order: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        inputs: dict[str, Any] | None = None,
+        parent_execution_id: str | None = None,
+        execution_order: int | None = None,
+    ) -> dict[str, Any]:
         """Async version of create_execution()."""
         data = {"agent_id": agent_id}
         data.update(
@@ -3362,13 +4836,13 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         interaction_type: str,
-        from_agent_id: Optional[str] = None,
-        to_agent_id: Optional[str] = None,
-        from_execution_id: Optional[str] = None,
-        to_execution_id: Optional[str] = None,
-        message: Optional[str] = None,
-        meta_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        from_agent_id: str | None = None,
+        to_agent_id: str | None = None,
+        from_execution_id: str | None = None,
+        to_execution_id: str | None = None,
+        message: str | None = None,
+        meta_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Log agent-to-agent communication (delegation/handoff/query/feedback/broadcast)."""
         data = {"interaction_type": interaction_type}
         data.update(
@@ -3391,13 +4865,13 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         interaction_type: str,
-        from_agent_id: Optional[str] = None,
-        to_agent_id: Optional[str] = None,
-        from_execution_id: Optional[str] = None,
-        to_execution_id: Optional[str] = None,
-        message: Optional[str] = None,
-        meta_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        from_agent_id: str | None = None,
+        to_agent_id: str | None = None,
+        from_execution_id: str | None = None,
+        to_execution_id: str | None = None,
+        message: str | None = None,
+        meta_data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Async version of log_interaction()."""
         data = {"interaction_type": interaction_type}
         data.update(
@@ -3416,13 +4890,13 @@ class AgentWorkflowsResource(BaseResource):
             data=data,
         )
 
-    def list_interactions(self, workflow_id: str) -> List[Dict[str, Any]]:
+    def list_interactions(self, workflow_id: str) -> List[dict[str, Any]]:
         """List all agent-to-agent interactions in a workflow, chronologically."""
         return self.client.request(
             "GET", f"/api/v1/workflows/multi-agent/{workflow_id}/interactions"
         )
 
-    async def alist_interactions(self, workflow_id: str) -> List[Dict[str, Any]]:
+    async def alist_interactions(self, workflow_id: str) -> List[dict[str, Any]]:
         """Async version of list_interactions()."""
         return await self.client.arequest(
             "GET", f"/api/v1/workflows/multi-agent/{workflow_id}/interactions"
@@ -3432,15 +4906,15 @@ class AgentWorkflowsResource(BaseResource):
         self,
         workflow_id: str,
         task_name: str,
-        description: Optional[str] = None,
-        task_type: Optional[str] = None,
-        expected_output: Optional[str] = None,
-        agent_id: Optional[str] = None,
-        parent_task_id: Optional[str] = None,
+        description: str | None = None,
+        task_type: str | None = None,
+        expected_output: str | None = None,
+        agent_id: str | None = None,
+        parent_task_id: str | None = None,
         priority: int = 0,
-        input_data: Optional[Dict[str, Any]] = None,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        input_data: dict[str, Any] | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create a workflow task. task_type: research/write/analyze/delegate/review."""
         data = _agent_task_create_payload(
             task_name=task_name,
@@ -3457,7 +4931,7 @@ class AgentWorkflowsResource(BaseResource):
             "POST", f"/api/v1/workflows/multi-agent/{workflow_id}/tasks", data=data
         )
 
-    async def acreate_task(self, workflow_id: str, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def acreate_task(self, workflow_id: str, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of create_task()."""
         data = _agent_task_create_payload(*args, **kwargs)
         return await self.client.arequest(
@@ -3468,9 +4942,9 @@ class AgentWorkflowsResource(BaseResource):
         self,
         task_id: str,
         status: str,
-        output_data: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        output_data: dict[str, Any] | None = None,
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
         """Update a task's status. status: pending/running/completed/failed/skipped."""
         data = {"status": status}
         data.update(_drop_none(output_data=output_data, error_message=error_message))
@@ -3482,9 +4956,9 @@ class AgentWorkflowsResource(BaseResource):
         self,
         task_id: str,
         status: str,
-        output_data: Optional[Dict[str, Any]] = None,
-        error_message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        output_data: dict[str, Any] | None = None,
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
         """Async version of update_task_status()."""
         data = {"status": status}
         data.update(_drop_none(output_data=output_data, error_message=error_message))
@@ -3492,28 +4966,28 @@ class AgentWorkflowsResource(BaseResource):
             "PATCH", f"/api/v1/workflows/multi-agent/tasks/{task_id}", data=data
         )
 
-    def list_tasks(self, workflow_id: str) -> List[Dict[str, Any]]:
+    def list_tasks(self, workflow_id: str) -> List[dict[str, Any]]:
         """List all tasks in a workflow, with status, assignments, and results."""
         return self.client.request("GET", f"/api/v1/workflows/multi-agent/{workflow_id}/tasks")
 
-    async def alist_tasks(self, workflow_id: str) -> List[Dict[str, Any]]:
+    async def alist_tasks(self, workflow_id: str) -> List[dict[str, Any]]:
         """Async version of list_tasks()."""
         return await self.client.arequest(
             "GET", f"/api/v1/workflows/multi-agent/{workflow_id}/tasks"
         )
 
-    def analytics(self, workflow_id: str) -> Dict[str, Any]:
+    def analytics(self, workflow_id: str) -> dict[str, Any]:
         """Get workflow analytics (tokens, costs, execution counts, durations).
         Calculated asynchronously after workflow completion."""
         return self.client.request("GET", f"/api/v1/workflows/multi-agent/{workflow_id}/analytics")
 
-    async def aanalytics(self, workflow_id: str) -> Dict[str, Any]:
+    async def aanalytics(self, workflow_id: str) -> dict[str, Any]:
         """Async version of analytics()."""
         return await self.client.arequest(
             "GET", f"/api/v1/workflows/multi-agent/{workflow_id}/analytics"
         )
 
-    def cost_breakdown(self, workflow_id: str) -> Dict[str, Any]:
+    def cost_breakdown(self, workflow_id: str) -> dict[str, Any]:
         """Get per-agent cost breakdown (tokens, cost, execution count, avg
         duration). Computed via a Celery task the backend blocks on for up
         to 30s server-side, so this call uses an extended client timeout."""
@@ -3523,7 +4997,7 @@ class AgentWorkflowsResource(BaseResource):
             timeout=_AGENT_WORKFLOW_ANALYTICS_TIMEOUT_S,
         )
 
-    async def acost_breakdown(self, workflow_id: str) -> Dict[str, Any]:
+    async def acost_breakdown(self, workflow_id: str) -> dict[str, Any]:
         """Async version of cost_breakdown()."""
         return await self.client.arequest(
             "GET",
@@ -3531,7 +5005,7 @@ class AgentWorkflowsResource(BaseResource):
             timeout=_AGENT_WORKFLOW_ANALYTICS_TIMEOUT_S,
         )
 
-    def bottlenecks(self, workflow_id: str) -> Dict[str, Any]:
+    def bottlenecks(self, workflow_id: str) -> dict[str, Any]:
         """Identify workflow bottlenecks: slowest agents, slowest tasks,
         failing agents. Computed via a Celery task the backend blocks on for
         up to 30s server-side, so this call uses an extended client timeout."""
@@ -3541,7 +5015,7 @@ class AgentWorkflowsResource(BaseResource):
             timeout=_AGENT_WORKFLOW_ANALYTICS_TIMEOUT_S,
         )
 
-    async def abottlenecks(self, workflow_id: str) -> Dict[str, Any]:
+    async def abottlenecks(self, workflow_id: str) -> dict[str, Any]:
         """Async version of bottlenecks()."""
         return await self.client.arequest(
             "GET",
@@ -3549,7 +5023,7 @@ class AgentWorkflowsResource(BaseResource):
             timeout=_AGENT_WORKFLOW_ANALYTICS_TIMEOUT_S,
         )
 
-    def timeline(self, workflow_id: str) -> Dict[str, Any]:
+    def timeline(self, workflow_id: str) -> dict[str, Any]:
         """Get a chronological timeline of workflow events (start/end, agent
         executions, task updates, interactions). Computed via a Celery task
         the backend blocks on for up to 30s server-side, so this call uses
@@ -3560,7 +5034,7 @@ class AgentWorkflowsResource(BaseResource):
             timeout=_AGENT_WORKFLOW_ANALYTICS_TIMEOUT_S,
         )
 
-    async def atimeline(self, workflow_id: str) -> Dict[str, Any]:
+    async def atimeline(self, workflow_id: str) -> dict[str, Any]:
         """Async version of timeline()."""
         return await self.client.arequest(
             "GET",
@@ -3571,20 +5045,20 @@ class AgentWorkflowsResource(BaseResource):
 
 def _agent_register_payload(
     name: str,
-    role: Optional[str] = None,
-    agent_type: Optional[str] = None,
-    model_name: Optional[str] = None,
-    llm_provider: Optional[str] = None,
-    llm_config: Optional[Dict[str, Any]] = None,
-    system_prompt: Optional[str] = None,
-    goal: Optional[str] = None,
-    backstory: Optional[str] = None,
-    tools: Optional[List[str]] = None,
-    capabilities: Optional[Dict[str, Any]] = None,
-    meta_data: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    role: str | None = None,
+    agent_type: str | None = None,
+    model_name: str | None = None,
+    llm_provider: str | None = None,
+    llm_config: dict[str, Any] | None = None,
+    system_prompt: str | None = None,
+    goal: str | None = None,
+    backstory: str | None = None,
+    tools: List[str] | None = None,
+    capabilities: dict[str, Any] | None = None,
+    meta_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for AgentWorkflowsResource.register_agent/aregister_agent."""
-    data: Dict[str, Any] = {"name": name}
+    data: dict[str, Any] = {"name": name}
     data.update(
         _drop_none(
             role=role,
@@ -3605,17 +5079,17 @@ def _agent_register_payload(
 
 def _agent_task_create_payload(
     task_name: str,
-    description: Optional[str] = None,
-    task_type: Optional[str] = None,
-    expected_output: Optional[str] = None,
-    agent_id: Optional[str] = None,
-    parent_task_id: Optional[str] = None,
+    description: str | None = None,
+    task_type: str | None = None,
+    expected_output: str | None = None,
+    agent_id: str | None = None,
+    parent_task_id: str | None = None,
     priority: int = 0,
-    input_data: Optional[Dict[str, Any]] = None,
-    context: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    input_data: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for AgentWorkflowsResource.create_task/acreate_task."""
-    data: Dict[str, Any] = {"task_name": task_name, "priority": priority}
+    data: dict[str, Any] = {"task_name": task_name, "priority": priority}
     data.update(
         _drop_none(
             description=description,
@@ -3639,9 +5113,9 @@ class MetricsResource(BaseResource):
         metric_type: str,
         metric_name: str,
         metric_value: float,
-        metric_metadata: Optional[Dict[str, Any]] = None,
-        sample_size: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        metric_metadata: dict[str, Any] | None = None,
+        sample_size: int | None = None,
+    ) -> dict[str, Any]:
         """Create a new metric record."""
         data = _metric_create_payload(
             model_id=model_id,
@@ -3653,20 +5127,20 @@ class MetricsResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/metrics/", data=data)
 
-    async def acreate(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
+    async def acreate(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         """Async version of create()."""
         data = _metric_create_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/metrics/", data=data)
 
-    def create_batch(self, model_id: str, metrics: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def create_batch(self, model_id: str, metrics: List[dict[str, Any]]) -> List[dict[str, Any]]:
         """Create multiple metrics at once (max 100). Each dict in `metrics`
         needs metric_type/metric_name/metric_value."""
         data = {"model_id": model_id, "metrics": metrics}
         return self.client.request("POST", "/api/v1/metrics/batch", data=data)
 
     async def acreate_batch(
-        self, model_id: str, metrics: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, model_id: str, metrics: List[dict[str, Any]]
+    ) -> List[dict[str, Any]]:
         """Async version of create_batch()."""
         data = {"model_id": model_id, "metrics": metrics}
         return await self.client.arequest("POST", "/api/v1/metrics/batch", data=data)
@@ -3675,10 +5149,10 @@ class MetricsResource(BaseResource):
         self,
         y_true: List[Any],
         y_pred: List[Any],
-        y_pred_proba: Optional[List[float]] = None,
+        y_pred_proba: List[float] | None = None,
         average: str = "binary",
         pos_label: int = 1,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Calculate classification metrics (accuracy/precision/recall/F1/etc.)
         from predictions, without persisting anything."""
         params = {"average": average, "pos_label": pos_label}
@@ -3691,10 +5165,10 @@ class MetricsResource(BaseResource):
         self,
         y_true: List[Any],
         y_pred: List[Any],
-        y_pred_proba: Optional[List[float]] = None,
+        y_pred_proba: List[float] | None = None,
         average: str = "binary",
         pos_label: int = 1,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Async version of calculate_classification()."""
         params = {"average": average, "pos_label": pos_label}
         data = _drop_none(y_true=y_true, y_pred=y_pred, y_pred_proba=y_pred_proba)
@@ -3702,7 +5176,7 @@ class MetricsResource(BaseResource):
             "POST", "/api/v1/metrics/calculate/classification", data=data, params=params
         )
 
-    def calculate_regression(self, y_true: List[float], y_pred: List[float]) -> Dict[str, float]:
+    def calculate_regression(self, y_true: List[float], y_pred: List[float]) -> dict[str, float]:
         """Calculate regression metrics (MAE/MSE/RMSE/R2/etc.) from
         predictions, without persisting anything."""
         data = {"y_true": y_true, "y_pred": y_pred}
@@ -3710,7 +5184,7 @@ class MetricsResource(BaseResource):
 
     async def acalculate_regression(
         self, y_true: List[float], y_pred: List[float]
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Async version of calculate_regression()."""
         data = {"y_true": y_true, "y_pred": y_pred}
         return await self.client.arequest("POST", "/api/v1/metrics/calculate/regression", data=data)
@@ -3718,12 +5192,12 @@ class MetricsResource(BaseResource):
     def get_model_metrics(
         self,
         model_id: str,
-        metric_type: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        metric_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Get metrics recorded for a model, with optional type/date filters."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
@@ -3732,28 +5206,28 @@ class MetricsResource(BaseResource):
     async def aget_model_metrics(
         self,
         model_id: str,
-        metric_type: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        metric_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of get_model_metrics()."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
         return await self.client.arequest("GET", f"/api/v1/metrics/{model_id}", params=params)
 
-    def latest(self, model_id: str, metric_type: str) -> Dict[str, Any]:
+    def latest(self, model_id: str, metric_type: str) -> dict[str, Any]:
         """Get the most recent metric of a specific type for a model."""
         return self.client.request("GET", f"/api/v1/metrics/{model_id}/latest/{metric_type}")
 
-    async def alatest(self, model_id: str, metric_type: str) -> Dict[str, Any]:
+    async def alatest(self, model_id: str, metric_type: str) -> dict[str, Any]:
         """Async version of latest()."""
         return await self.client.arequest("GET", f"/api/v1/metrics/{model_id}/latest/{metric_type}")
 
     def timeseries(
         self, model_id: str, metric_type: str, start_date: str, end_date: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Get time series data for a metric over a required date range."""
         params = {"start_date": start_date, "end_date": end_date}
         return self.client.request(
@@ -3762,7 +5236,7 @@ class MetricsResource(BaseResource):
 
     async def atimeseries(
         self, model_id: str, metric_type: str, start_date: str, end_date: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of timeseries()."""
         params = {"start_date": start_date, "end_date": end_date}
         return await self.client.arequest(
@@ -3773,11 +5247,11 @@ class MetricsResource(BaseResource):
         self,
         model_id: str,
         period: str,
-        metric_type: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        metric_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         force_recompute: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Get metrics aggregated over `period` (e.g. "daily", "weekly").
         Defaults to the last 30 days if no date range is given."""
         params = {"period": period, "force_recompute": force_recompute}
@@ -3788,11 +5262,11 @@ class MetricsResource(BaseResource):
         self,
         model_id: str,
         period: str,
-        metric_type: Optional[str] = None,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        metric_type: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         force_recompute: bool = False,
-    ) -> List[Dict[str, Any]]:
+    ) -> List[dict[str, Any]]:
         """Async version of aggregate()."""
         params = {"period": period, "force_recompute": force_recompute}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
@@ -3800,7 +5274,7 @@ class MetricsResource(BaseResource):
             "GET", f"/api/v1/metrics/{model_id}/aggregate", params=params
         )
 
-    def trend(self, model_id: str, metric_type: str, lookback_days: int = 30) -> Dict[str, Any]:
+    def trend(self, model_id: str, metric_type: str, lookback_days: int = 30) -> dict[str, Any]:
         """Get trend statistics for a metric over `lookback_days`."""
         params = {"lookback_days": lookback_days}
         return self.client.request(
@@ -3809,14 +5283,14 @@ class MetricsResource(BaseResource):
 
     async def atrend(
         self, model_id: str, metric_type: str, lookback_days: int = 30
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of trend()."""
         params = {"lookback_days": lookback_days}
         return await self.client.arequest(
             "GET", f"/api/v1/metrics/{model_id}/trend/{metric_type}", params=params
         )
 
-    def rolling(self, model_id: str, metric_type: str, window_days: int = 7) -> Dict[str, Any]:
+    def rolling(self, model_id: str, metric_type: str, window_days: int = 7) -> dict[str, Any]:
         """Get rolling-window statistics for a metric over `window_days`."""
         params = {"window_days": window_days}
         return self.client.request(
@@ -3825,30 +5299,30 @@ class MetricsResource(BaseResource):
 
     async def arolling(
         self, model_id: str, metric_type: str, window_days: int = 7
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of rolling()."""
         params = {"window_days": window_days}
         return await self.client.arequest(
             "GET", f"/api/v1/metrics/{model_id}/rolling/{metric_type}", params=params
         )
 
-    def summary(self, model_id: str, days: int = 30) -> Dict[str, Any]:
+    def summary(self, model_id: str, days: int = 30) -> dict[str, Any]:
         """Get a summary of all metrics for a model over the last `days`."""
         return self.client.request(
             "GET", f"/api/v1/metrics/{model_id}/summary", params={"days": days}
         )
 
-    async def asummary(self, model_id: str, days: int = 30) -> Dict[str, Any]:
+    async def asummary(self, model_id: str, days: int = 30) -> dict[str, Any]:
         """Async version of summary()."""
         return await self.client.arequest(
             "GET", f"/api/v1/metrics/{model_id}/summary", params={"days": days}
         )
 
-    def delete(self, model_id: str) -> Dict[str, Any]:
+    def delete(self, model_id: str) -> dict[str, Any]:
         """Delete all metrics for a model."""
         return self.client.request("DELETE", f"/api/v1/metrics/{model_id}")
 
-    async def adelete(self, model_id: str) -> Dict[str, Any]:
+    async def adelete(self, model_id: str) -> dict[str, Any]:
         """Async version of delete()."""
         return await self.client.arequest("DELETE", f"/api/v1/metrics/{model_id}")
 
@@ -3858,11 +5332,11 @@ def _metric_create_payload(
     metric_type: str,
     metric_name: str,
     metric_value: float,
-    metric_metadata: Optional[Dict[str, Any]] = None,
-    sample_size: Optional[int] = None,
-) -> Dict[str, Any]:
+    metric_metadata: dict[str, Any] | None = None,
+    sample_size: int | None = None,
+) -> dict[str, Any]:
     """Shared request-body builder for MetricsResource.create/acreate."""
-    data: Dict[str, Any] = {
+    data: dict[str, Any] = {
         "model_id": model_id,
         "metric_type": metric_type,
         "metric_name": metric_name,
@@ -3870,3 +5344,463 @@ def _metric_create_payload(
     }
     data.update(_drop_none(metric_metadata=metric_metadata, sample_size=sample_size))
     return data
+
+
+class ReportTypesResource(BaseResource):
+    """Report Types API resource.
+
+    Generates and lists compliance and governance reports via the
+    Workitem 134 Phase 6 Report Engine.
+    """
+
+    def list(self) -> dict[str, Any]:
+        """
+        List all available report types for the organization.
+
+        Returns:
+            Dictionary containing available report types.
+        """
+        return self.client.request("GET", "/api/v1/report-types")
+
+    async def alist(self) -> dict[str, Any]:
+        """Async version of list()."""
+        return await self.client.arequest("GET", "/api/v1/report-types")
+
+    def generate(
+        self,
+        report_type_id: str,
+        model_id: str | None = None,
+        format: str = "pdf",
+    ) -> dict[str, Any]:
+        """
+        Generate a compliance or governance report.
+
+        Args:
+            report_type_id: The ID of the report type (e.g., 'model_card', 'fairness_audit')
+            model_id: The model ID for single-model reports (optional for org-wide reports)
+            format: Output format ('pdf', 'html', or 'docx')
+
+        Returns:
+            Dictionary with generation result and download URL.
+        """
+        data = {"format": format}
+        if model_id:
+            data["model_id"] = model_id
+
+        return self.client.request(
+            "POST",
+            f"/api/v1/report-types/{report_type_id}/generate",
+            data=data,
+        )
+
+    async def agenerate(
+        self,
+        report_type_id: str,
+        model_id: str | None = None,
+        format: str = "pdf",
+    ) -> dict[str, Any]:
+        """Async version of generate()."""
+        data = {"format": format}
+        if model_id:
+            data["model_id"] = model_id
+
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/report-types/{report_type_id}/generate",
+            data=data,
+        )
+
+    def preview(
+        self,
+        report_type_id: str,
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        """
+        Preview a generated report's content structure before rendering.
+
+        Args:
+            report_type_id: The ID of the report type
+            model_id: The model ID (optional)
+
+        Returns:
+            Dictionary containing the preview document blocks.
+        """
+        data = {"report_type_id": report_type_id}
+        if model_id:
+            data["model_id"] = model_id
+
+        return self.client.request(
+            "POST",
+            "/api/v1/export/templates/preview",
+            data=data,
+        )
+
+    async def apreview(
+        self,
+        report_type_id: str,
+        model_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of preview()."""
+        data = {"report_type_id": report_type_id}
+        if model_id:
+            data["model_id"] = model_id
+
+        return await self.client.arequest(
+            "POST",
+            "/api/v1/export/templates/preview",
+            data=data,
+        )
+
+
+class PromptsResource(BaseResource):
+    """Prompt lifecycle, deployment and drift governance API resource (backed by /api/v1/prompts)."""
+
+    def list_templates(self) -> List[dict[str, Any]]:
+        """List all prompt templates in the organization."""
+        return self.client.request("GET", "/api/v1/prompts")
+
+    async def alist_templates(self) -> List[dict[str, Any]]:
+        """Async version of list_templates()."""
+        return await self.client.arequest("GET", "/api/v1/prompts")
+
+    def get_template(self, template_id: str) -> dict[str, Any]:
+        """Get a specific prompt template by ID."""
+        return self.client.request("GET", f"/api/v1/prompts/{template_id}")
+
+    async def aget_template(self, template_id: str) -> dict[str, Any]:
+        """Async version of get_template()."""
+        return await self.client.arequest("GET", f"/api/v1/prompts/{template_id}")
+
+    def create_template(
+        self,
+        name: str,
+        description: str | None = None,
+        tags: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new prompt template."""
+        data: dict[str, Any] = {"name": name}
+        if description is not None:
+            data["description"] = description
+        if tags is not None:
+            data["tags"] = tags
+        return self.client.request("POST", "/api/v1/prompts", data=data)
+
+    async def acreate_template(
+        self,
+        name: str,
+        description: str | None = None,
+        tags: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Async version of create_template()."""
+        data: dict[str, Any] = {"name": name}
+        if description is not None:
+            data["description"] = description
+        if tags is not None:
+            data["tags"] = tags
+        return await self.client.arequest("POST", "/api/v1/prompts", data=data)
+
+    def list_versions(self, template_id: str) -> List[dict[str, Any]]:
+        """List all versions of a prompt template."""
+        return self.client.request("GET", f"/api/v1/prompts/{template_id}/versions")
+
+    async def alist_versions(self, template_id: str) -> List[dict[str, Any]]:
+        """Async version of list_versions()."""
+        return await self.client.arequest("GET", f"/api/v1/prompts/{template_id}/versions")
+
+    def get_version(self, template_id: str, version_id: str) -> dict[str, Any]:
+        """Get a specific prompt version."""
+        return self.client.request("GET", f"/api/v1/prompts/{template_id}/versions/{version_id}")
+
+    async def aget_version(self, template_id: str, version_id: str) -> dict[str, Any]:
+        """Async version of get_version()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/prompts/{template_id}/versions/{version_id}"
+        )
+
+    def create_version(
+        self,
+        template_id: str,
+        user_message_template: str,
+        system_message: str | None = None,
+        model_name: str | None = None,
+        model_id: str | None = None,
+        temperature: float | None = None,
+        tool_schemas: dict[str, Any] | None = None,
+        version_tag: str | None = None,
+        commit_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new version under a prompt template."""
+        data: dict[str, Any] = {"user_message_template": user_message_template}
+        data.update(
+            _drop_none(
+                system_message=system_message,
+                model_name=model_name,
+                model_id=model_id,
+                temperature=temperature,
+                tool_schemas=tool_schemas,
+                version_tag=version_tag,
+                commit_hash=commit_hash,
+            )
+        )
+        return self.client.request("POST", f"/api/v1/prompts/{template_id}/versions", data=data)
+
+    async def acreate_version(
+        self,
+        template_id: str,
+        user_message_template: str,
+        system_message: str | None = None,
+        model_name: str | None = None,
+        model_id: str | None = None,
+        temperature: float | None = None,
+        tool_schemas: dict[str, Any] | None = None,
+        version_tag: str | None = None,
+        commit_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of create_version()."""
+        data: dict[str, Any] = {"user_message_template": user_message_template}
+        data.update(
+            _drop_none(
+                system_message=system_message,
+                model_name=model_name,
+                model_id=model_id,
+                temperature=temperature,
+                tool_schemas=tool_schemas,
+                version_tag=version_tag,
+                commit_hash=commit_hash,
+            )
+        )
+        return await self.client.arequest(
+            "POST", f"/api/v1/prompts/{template_id}/versions", data=data
+        )
+
+    def advance_stage(
+        self,
+        template_id: str,
+        version_id: str,
+        target_stage: str,
+        notes: str | None = None,
+        verification_run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Advance prompt version lifecycle stage (design -> verify -> deploy -> retired)."""
+        data: dict[str, Any] = {"target_stage": target_stage}
+        data.update(_drop_none(notes=notes, verification_run_id=verification_run_id))
+        return self.client.request(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/advance-stage",
+            data=data,
+        )
+
+    async def aadvance_stage(
+        self,
+        template_id: str,
+        version_id: str,
+        target_stage: str,
+        notes: str | None = None,
+        verification_run_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of advance_stage()."""
+        data: dict[str, Any] = {"target_stage": target_stage}
+        data.update(_drop_none(notes=notes, verification_run_id=verification_run_id))
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/advance-stage",
+            data=data,
+        )
+
+    def deploy(
+        self,
+        template_id: str,
+        version_id: str,
+        deployment_notes: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Deploy prompt version, enforcing single active deployment and verification gate."""
+        data: dict[str, Any] = {"force": force}
+        data.update(_drop_none(deployment_notes=deployment_notes))
+        return self.client.request(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/deploy",
+            data=data,
+        )
+
+    async def adeploy(
+        self,
+        template_id: str,
+        version_id: str,
+        deployment_notes: str | None = None,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        """Async version of deploy()."""
+        data: dict[str, Any] = {"force": force}
+        data.update(_drop_none(deployment_notes=deployment_notes))
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/deploy",
+            data=data,
+        )
+
+    def rollback(
+        self,
+        template_id: str,
+        target_version_id: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Rollback prompt template to a previous version."""
+        data: dict[str, Any] = {"reason": reason or "Emergency rollback"}
+        data.update(_drop_none(target_version_id=target_version_id))
+        return self.client.request(
+            "POST",
+            f"/api/v1/prompts/{template_id}/rollback",
+            data=data,
+        )
+
+    async def arollback(
+        self,
+        template_id: str,
+        target_version_id: str | None = None,
+        reason: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of rollback()."""
+        data: dict[str, Any] = {"reason": reason or "Emergency rollback"}
+        data.update(_drop_none(target_version_id=target_version_id))
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/prompts/{template_id}/rollback",
+            data=data,
+        )
+
+    def compute_drift(
+        self,
+        template_id: str,
+        version_id: str,
+        baseline_dataset_id: str | None = None,
+        sample_size: int = 100,
+    ) -> dict[str, Any]:
+        """Compute drift report for a prompt version against baseline dataset and recent logs."""
+        data: dict[str, Any] = {"sample_size": sample_size}
+        data.update(_drop_none(baseline_dataset_id=baseline_dataset_id))
+        return self.client.request(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports",
+            data=data,
+        )
+
+    async def acompute_drift(
+        self,
+        template_id: str,
+        version_id: str,
+        baseline_dataset_id: str | None = None,
+        sample_size: int = 100,
+    ) -> dict[str, Any]:
+        """Async version of compute_drift()."""
+        data: dict[str, Any] = {"sample_size": sample_size}
+        data.update(_drop_none(baseline_dataset_id=baseline_dataset_id))
+        return await self.client.arequest(
+            "POST",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports",
+            data=data,
+        )
+
+    def list_drift_reports(self, template_id: str, version_id: str) -> List[dict[str, Any]]:
+        """List historical drift reports for a prompt version."""
+        return self.client.request(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports",
+        )
+
+    async def alist_drift_reports(self, template_id: str, version_id: str) -> List[dict[str, Any]]:
+        """Async version of list_drift_reports()."""
+        return await self.client.arequest(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports",
+        )
+
+    def get_drift_report(self, template_id: str, version_id: str, report_id: str) -> dict[str, Any]:
+        """Get a specific prompt drift report."""
+        return self.client.request(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports/{report_id}",
+        )
+
+    async def aget_drift_report(
+        self, template_id: str, version_id: str, report_id: str
+    ) -> dict[str, Any]:
+        """Async version of get_drift_report()."""
+        return await self.client.arequest(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports/{report_id}",
+        )
+
+    def get_incidents(self, template_id: str, version_id: str) -> dict[str, Any]:
+        """Get security incidents and alerts associated with a prompt version."""
+        return self.client.request(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/incidents",
+        )
+
+    async def aget_incidents(self, template_id: str, version_id: str) -> dict[str, Any]:
+        """Async version of get_incidents()."""
+        return await self.client.arequest(
+            "GET",
+            f"/api/v1/prompts/{template_id}/versions/{version_id}/incidents",
+        )
+
+
+class ComplianceResource(BaseResource):
+    """Compliance & ISO/IEC 42001 readiness API resource (backed by
+    backend/api/v1/iso42001.py and backend/api/v1/control_catalog.py).
+    """
+
+    def iso42001_score(self) -> dict[str, Any]:
+        """Get the organization's current ISO/IEC 42001 readiness score and
+        clause-level breakdown (25 shipped controls across Clauses 4-10).
+        """
+        return self.client.request("GET", "/api/v1/compliance/iso42001/score")
+
+    async def aiso42001_score(self) -> dict[str, Any]:
+        """Async version of iso42001_score()."""
+        return await self.client.arequest("GET", "/api/v1/compliance/iso42001/score")
+
+    def iso42001_gaps(
+        self,
+        clause_filter: str | None = None,
+        severity_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """Get ISO/IEC 42001 compliance gaps, optionally filtered by clause or severity."""
+        params = _drop_none(
+            clause_filter=clause_filter,
+            severity_filter=severity_filter,
+        )
+        return self.client.request("GET", "/api/v1/compliance/iso42001/gaps", params=params)
+
+    async def aiso42001_gaps(
+        self,
+        clause_filter: str | None = None,
+        severity_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """Async version of iso42001_gaps()."""
+        params = _drop_none(
+            clause_filter=clause_filter,
+            severity_filter=severity_filter,
+        )
+        return await self.client.arequest("GET", "/api/v1/compliance/iso42001/gaps", params=params)
+
+    def list_frameworks(self) -> List[dict[str, Any]]:
+        """List the platform's five in-scope compliance frameworks (ISO/IEC
+        42001, GDPR, CCPA, EU AI Act, NIST AI RMF) and their adoption status.
+        """
+        return self.client.request("GET", "/api/v1/compliance/frameworks")
+
+    async def alist_frameworks(self) -> List[dict[str, Any]]:
+        """Async version of list_frameworks()."""
+        return await self.client.arequest("GET", "/api/v1/compliance/frameworks")
+
+    def get_framework_controls(self, framework: str) -> dict[str, Any]:
+        """Get the control catalog and Statement of Applicability status for a framework."""
+        return self.client.request("GET", f"/api/v1/compliance/frameworks/{framework}/controls")
+
+    async def aget_framework_controls(self, framework: str) -> dict[str, Any]:
+        """Async version of get_framework_controls()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/compliance/frameworks/{framework}/controls"
+        )

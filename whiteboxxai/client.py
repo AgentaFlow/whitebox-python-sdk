@@ -4,13 +4,15 @@ WhiteBoxXAI Client
 Main client class for interacting with the WhiteBoxXAI API.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from whiteboxxai.config import Config
 from whiteboxxai.exceptions import (
@@ -23,7 +25,10 @@ from whiteboxxai.exceptions import (
 )
 from whiteboxxai.resources import (
     AgentWorkflowsResource,
+    AlertIntelligenceResource,
+    AlertManagementResource,
     AlertsResource,
+    ComplianceResource,
     DriftResource,
     ExplanationsResource,
     FairnessResource,
@@ -33,12 +38,30 @@ from whiteboxxai.resources import (
     MetricsResource,
     ModelsResource,
     PredictionsResource,
+    PromptsResource,
     RAGResource,
+    ReportTypesResource,
     RiskRegisterResource,
     SafetyResource,
 )
+from whiteboxxai.runs import with_run_header
 
 logger = logging.getLogger(__name__)
+
+
+#: A 429 that asks for a longer wait than this is raised, not slept on. Short
+#: waits are throttling worth riding out; a long one is a lockout or an exhausted
+#: quota, and sleeping through it (twice, at up to 15 minutes each) would hold an
+#: interactive call -- a governance vote, say -- for far longer than any client
+#: would wait. The caller gets the RateLimitError, with ``retry_after`` set.
+MAX_AUTO_RETRY_WAIT_SECONDS = 60
+
+
+def _should_retry(exc: BaseException) -> bool:
+    """Which failures ``request``/``arequest`` retry automatically."""
+    if isinstance(exc, RateLimitError):
+        return exc.retry_after is None or exc.retry_after <= MAX_AUTO_RETRY_WAIT_SECONDS
+    return isinstance(exc, (APIConnectionError, ServerError))
 
 
 def _retry_wait(retry_state: Any) -> float:
@@ -63,12 +86,15 @@ class WhiteBoxXAI:
     monitoring, RAG pipeline monitoring, and content safety analysis.
 
     Args:
-        api_key: WhiteBoxXAI API key
-        base_url: Base URL for WhiteBoxXAI API (default: https://api.whiteboxxai.com)
+        api_key: WhiteBoxXAI API key (default: the WHITEBOX_API_KEY environment
+            variable, or WHITEBOXXAI_API_KEY, the name SDK 1.2.0 read)
+        base_url: Base URL for WhiteBoxXAI API (default: the WHITEBOX_BASE_URL
+            environment variable, else https://api.whiteboxxai.com)
         timeout: Request timeout in seconds (default: 30)
         max_retries: Maximum number of retry attempts (default: 3)
         enable_offline: Enable offline mode (queues operations when API unavailable)
-        offline_dir: Directory for offline queue storage (default: ./whiteboxxai_offline)
+        offline_dir: Directory for offline queue storage (default: ./WHITEBOX_offline,
+            or ./whiteboxxai_offline, the SDK 1.2.0 default, if only that exists)
         offline_max_queue_size: Maximum operations to queue (default: 10000, 0 = unlimited)
         offline_auto_sync: Enable automatic syncing (default: True)
         offline_sync_interval: Seconds between sync attempts (default: 60)
@@ -76,8 +102,14 @@ class WhiteBoxXAI:
 
     Example:
         >>> client = WhiteBoxXAI(api_key="your_api_key")
-        >>> model = client.models.register(name="fraud_detection", model_type="classification")
-        >>> client.predictions.log(model_id=model.id, inputs=features, outputs=prediction)
+        >>> model = client.models.register(
+        ...     name="fraud_detection",
+        ...     version="1.0.0",
+        ...     model_type="random_forest",
+        ...     features=["amount", "merchant_category"],
+        ...     baseline_metrics={"accuracy": 0.94},
+        ... )
+        >>> client.predictions.log(model_id=model["id"], inputs=features, outputs=prediction)
 
         With offline mode:
         >>> client = WhiteBoxXAI(
@@ -91,12 +123,12 @@ class WhiteBoxXAI:
 
     def __init__(
         self,
-        api_key: str,
-        base_url: str = "https://api.whiteboxxai.com",
+        api_key: str | None = None,
+        base_url: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
         enable_offline: bool = False,
-        offline_dir: str = "./whiteboxxai_offline",
+        offline_dir: str | None = None,
         offline_max_queue_size: int = 10000,
         offline_auto_sync: bool = True,
         offline_sync_interval: int = 60,
@@ -112,8 +144,8 @@ class WhiteBoxXAI:
         )
 
         # Initialize HTTP clients
-        self._sync_client: Optional[httpx.Client] = None
-        self._async_client: Optional[httpx.AsyncClient] = None
+        self._sync_client: httpx.Client | None = None
+        self._async_client: httpx.AsyncClient | None = None
 
         # Initialize offline mode
         self._offline_manager = None
@@ -136,14 +168,19 @@ class WhiteBoxXAI:
         self.drift = DriftResource(self)
         self.fairness = FairnessResource(self)
         self.alerts = AlertsResource(self)
+        self.reports = ReportTypesResource(self)
+        self.alert_intelligence = AlertIntelligenceResource(self)
+        self.alert_management = AlertManagementResource(self)
         self.risk_register = RiskRegisterResource(self)
         self.governance = GovernanceResource(self)
+        self.compliance = ComplianceResource(self)
         self.llm = LLMResource(self)
         self.rag = RAGResource(self)
         self.safety = SafetyResource(self)
         self.llm_xai = LLMXAIResource(self)
         self.agent_workflows = AgentWorkflowsResource(self)
         self.metrics = MetricsResource(self)
+        self.prompts = PromptsResource(self)
 
     @property
     def sync_client(self) -> httpx.Client:
@@ -167,7 +204,7 @@ class WhiteBoxXAI:
             )
         return self._async_client
 
-    def _get_headers(self) -> Dict[str, str]:
+    def _get_headers(self) -> dict[str, str]:
         """Get request headers with authentication."""
         return {
             "Authorization": f"Bearer {self.config.api_key}",
@@ -178,17 +215,17 @@ class WhiteBoxXAI:
     @retry(
         stop=stop_after_attempt(3),
         wait=_retry_wait,
-        retry=retry_if_exception_type((APIConnectionError, ServerError, RateLimitError)),
+        retry=retry_if_exception(_should_retry),
         reraise=True,
     )
     def request(
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Make synchronous HTTP request with retry logic.
 
@@ -219,7 +256,11 @@ class WhiteBoxXAI:
 
         try:
             response = self.sync_client.request(
-                method=method, url=url, json=data, params=params, **kwargs
+                method=method,
+                url=url,
+                json=data,
+                params=params,
+                **with_run_header(kwargs),
             )
             return self._handle_response(response)
         except httpx.TransportError as e:
@@ -230,17 +271,17 @@ class WhiteBoxXAI:
     @retry(
         stop=stop_after_attempt(3),
         wait=_retry_wait,
-        retry=retry_if_exception_type((APIConnectionError, ServerError, RateLimitError)),
+        retry=retry_if_exception(_should_retry),
         reraise=True,
     )
     async def arequest(
         self,
         method: str,
         endpoint: str,
-        data: Optional[Dict[str, Any]] = None,
-        params: Optional[Dict[str, Any]] = None,
+        data: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Make asynchronous HTTP request with retry logic.
 
@@ -268,7 +309,11 @@ class WhiteBoxXAI:
 
         try:
             response = await self.async_client.request(
-                method=method, url=url, json=data, params=params, **kwargs
+                method=method,
+                url=url,
+                json=data,
+                params=params,
+                **with_run_header(kwargs),
             )
             return self._handle_response(response)
         except httpx.TransportError as e:
@@ -276,7 +321,7 @@ class WhiteBoxXAI:
         except httpx.HTTPError as e:
             raise APIError(f"Request failed: {str(e)}") from e
 
-    def _handle_response(self, response: httpx.Response) -> Dict[str, Any]:
+    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
         """
         Handle HTTP response and raise appropriate exceptions.
 
@@ -313,8 +358,16 @@ class WhiteBoxXAI:
             )
         elif response.status_code == 429:
             retry_after = response.headers.get("Retry-After")
+            # Not every 429 is a plan quota: a locked-out two-factor attempt is
+            # one too, and the backend's own words are the only way to tell them
+            # apart.
+            try:
+                detail = response.json().get("detail")
+            except Exception:
+                detail = None
             raise RateLimitError(
-                "Rate limit exceeded. Please retry later.",
+                "Rate limit exceeded. Please retry later."
+                + (f" ({detail})" if isinstance(detail, str) and detail else ""),
                 retry_after=(
                     int(retry_after)
                     if isinstance(retry_after, str) and retry_after.isdigit()
@@ -351,8 +404,8 @@ class WhiteBoxXAI:
     # ------------------------------------------------------------------
     # Offline-queue replay targets.
     #
-    # These mirror the four sync write methods on ModelsResource/
-    # PredictionsResource (resources.py) that catch APIConnectionError and
+    # These mirror the sync write methods on ModelsResource/PredictionsResource/
+    # LLMResource (resources.py) that catch APIConnectionError and
     # enqueue instead of raising when offline mode is enabled. Each one
     # re-issues the exact request/params those methods already built --
     # none of them re-derive any business logic (e.g. git-context
@@ -361,21 +414,24 @@ class WhiteBoxXAI:
     # `data` the original call enqueued.
     # ------------------------------------------------------------------
 
-    def _api_predict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _api_predict(self, data: dict[str, Any]) -> dict[str, Any]:
         return self.request("POST", "/api/v1/predictions/log", data=data)
 
-    def _api_log_batch(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _api_log_batch(self, data: dict[str, Any]) -> dict[str, Any]:
         return self.request("POST", "/api/v1/predictions/log/batch", data=data)
 
-    def _api_register_model(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def _api_register_model(self, data: dict[str, Any]) -> dict[str, Any]:
         return self.request("POST", "/api/v1/models/", data=data)
+
+    def _api_llm_log(self, data: dict[str, Any]) -> dict[str, Any]:
+        return self.request("POST", "/api/v1/llm/logs", data=data)
 
     def _api_update_baseline(
         self,
         model_id: str,
-        data: Dict[str, Any],
-        params: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         return self.request(
             "PATCH",
             f"/api/v1/models/{model_id}/baseline",
@@ -387,7 +443,7 @@ class WhiteBoxXAI:
         """Check if offline mode is enabled."""
         return self._offline_manager is not None
 
-    def sync_offline_queue(self, batch_size: int = 100) -> Dict[str, int]:
+    def sync_offline_queue(self, batch_size: int = 100) -> dict[str, int]:
         """
         Manually sync offline queue with API.
 
@@ -405,7 +461,7 @@ class WhiteBoxXAI:
 
         return self._offline_manager.sync(batch_size=batch_size)
 
-    def get_offline_status(self) -> Dict[str, Any]:
+    def get_offline_status(self) -> dict[str, Any]:
         """
         Get offline mode status.
 

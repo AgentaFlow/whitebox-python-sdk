@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,10 @@ except ImportError:
 
 import numpy as np  # noqa: E402
 
+from whiteboxxai.integrations._registration import (  # noqa: E402
+    positional_feature_names,
+    registration_fields,
+)
 from whiteboxxai.monitor import ModelMonitor  # noqa: E402
 
 
@@ -70,9 +74,9 @@ class KerasMonitor(ModelMonitor):
     def __init__(
         self,
         client,
-        model: Optional["keras.Model"] = None,
-        model_name: Optional[str] = None,
-        model_type: str = "regression",
+        model: keras.Model | None = None,
+        model_name: str | None = None,
+        model_type: str | None = None,
         **kwargs,
     ):
         """
@@ -82,7 +86,9 @@ class KerasMonitor(ModelMonitor):
             client: WhiteBoxXAI client instance
             model: Keras model to monitor
             model_name: Name for the model
-            model_type: Type of model (classification, regression)
+            model_type: Default for register_from_model(): one of the API's
+                model types (default ``neural_network``); a task name such as
+                ``"classification"`` is kept as ``task`` metadata
             **kwargs: Additional arguments for ModelMonitor
         """
         if not TENSORFLOW_AVAILABLE:
@@ -96,10 +102,12 @@ class KerasMonitor(ModelMonitor):
 
     def register_from_model(
         self,
-        name: Optional[str] = None,
-        model_type: Optional[str] = None,
-        version: Optional[str] = None,
-        framework_version: Optional[str] = None,
+        name: str | None = None,
+        model_type: str | None = None,
+        version: str | None = None,
+        framework_version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """
@@ -107,13 +115,21 @@ class KerasMonitor(ModelMonitor):
 
         Args:
             name: Model name (default: model class name)
-            model_type: Model type (classification, regression)
-            version: Model version
+            model_type: One of the API's model types (default: the monitor's
+                ``model_type``, else ``neural_network``)
+            version: Model version (default ``1.0.0``)
             framework_version: TensorFlow version
+            features: Feature names (default: ``feature_0..feature_{n-1}`` for a
+                flat ``(batch, n)`` input, else a single ``input`` feature)
+            baseline_metrics: Baseline metrics, e.g. ``{"mse": 0.12}``
             **kwargs: Additional metadata
 
         Returns:
             Model ID
+
+        Raises:
+            ValueError: No model, an invalid ``model_type``, or no feature names
+                could be determined.
         """
         if self.model is None:
             raise ValueError("No model provided")
@@ -121,9 +137,6 @@ class KerasMonitor(ModelMonitor):
         # Auto-detect model name
         if name is None:
             name = self._model_name or self.model.__class__.__name__
-
-        # Use provided or instance model type
-        model_type = model_type or self._model_type
 
         # Get TensorFlow version
         if framework_version is None:
@@ -154,22 +167,39 @@ class KerasMonitor(ModelMonitor):
             logger.debug(f"Could not read model input/output shape: {e}")
 
         # Register model
-        self.model_id = self.client.register_model(
-            name=name,
-            model_type=model_type,
-            framework="tensorflow",
+        fields = registration_fields(
+            model_type=model_type or self._model_type,
+            default_model_type="neural_network",
             version=version,
+            features=features,
+            inferred_features=self._infer_features(),
+            baseline_metrics=baseline_metrics,
             metadata=metadata,
         )
+        self.register_model(name=name, framework="tensorflow", metadata=metadata, **fields)
 
         self._registered = True
         return self.model_id
 
+    def _infer_features(self) -> list[str] | None:
+        """Feature names for the wrapped model's input, if it has one."""
+        shape = getattr(self.model, "input_shape", None)
+        if shape is None:
+            return None
+        if (
+            isinstance(shape, tuple)
+            and len(shape) == 2
+            and isinstance(shape[1], int)
+            and shape[1] > 0
+        ):
+            return positional_feature_names(shape[1])
+        return ["input"]
+
     def predict(
         self,
-        inputs: Union[np.ndarray, tf.Tensor],
+        inputs: np.ndarray | tf.Tensor,
         log: bool = True,
-        actuals: Optional[np.ndarray] = None,
+        actuals: np.ndarray | None = None,
         **kwargs: Any,
     ) -> np.ndarray:
         """
@@ -223,7 +253,7 @@ class KerasMonitor(ModelMonitor):
                 # Batch prediction
                 batch = []
                 for i in range(len(inputs_np)):
-                    item: Dict[str, Any] = {
+                    item: dict[str, Any] = {
                         "inputs": inputs_np[i],
                         "output": predictions_np[i],
                     }
@@ -236,8 +266,8 @@ class KerasMonitor(ModelMonitor):
 
     def set_baseline(
         self,
-        baseline_data: Union[np.ndarray, tf.Tensor],
-        baseline_labels: Optional[Union[np.ndarray, tf.Tensor]] = None,
+        baseline_data: np.ndarray | tf.Tensor,
+        baseline_labels: np.ndarray | tf.Tensor | None = None,
     ) -> None:
         """
         Set baseline data for drift detection.
@@ -263,7 +293,7 @@ class KerasMonitor(ModelMonitor):
         # Set baseline through parent class
         super().set_baseline(baseline_data, baseline_predictions)
 
-    def log_custom_metric(self, name: str, data: Dict[str, Any]) -> None:
+    def log_custom_metric(self, name: str, data: dict[str, Any]) -> None:
         """
         Log a custom named metric (e.g. training epoch, checkpoint).
 
@@ -279,8 +309,8 @@ class KerasMonitor(ModelMonitor):
     def log_epoch(
         self,
         epoch: int,
-        train_loss: Optional[float] = None,
-        val_loss: Optional[float] = None,
+        train_loss: float | None = None,
+        val_loss: float | None = None,
         **metrics: Any,
     ) -> None:
         """
@@ -305,7 +335,7 @@ class KerasMonitor(ModelMonitor):
         self,
         epoch: int,
         checkpoint_path: str,
-        metrics: Optional[Dict[str, Any]] = None,
+        metrics: dict[str, Any] | None = None,
     ) -> None:
         """
         Log a model checkpoint.
@@ -326,7 +356,10 @@ class KerasMonitor(ModelMonitor):
     def register_saved_model(
         self,
         model_path: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
     ) -> None:
         """
         Register a SavedModel with WhiteBoxXAI.
@@ -334,6 +367,13 @@ class KerasMonitor(ModelMonitor):
         Args:
             model_path: Path to SavedModel directory
             metadata: Additional metadata
+            version: Model version (default ``1.0.0``)
+            features: Feature names (default: inferred from the monitor's model;
+                required when the monitor has no model)
+            baseline_metrics: Baseline metrics, e.g. ``{"mse": 0.12}``
+
+        Raises:
+            ValueError: No feature names were given and none could be inferred.
         """
         model_metadata = {
             "framework": "tensorflow",
@@ -343,11 +383,20 @@ class KerasMonitor(ModelMonitor):
         }
 
         if not self._registered:
-            self.model_id = self.client.register_model(
-                name=self._model_name or "saved_model",
+            fields = registration_fields(
                 model_type=self._model_type,
+                default_model_type="neural_network",
+                version=version,
+                features=features,
+                inferred_features=self._infer_features(),
+                baseline_metrics=baseline_metrics,
+                metadata=model_metadata,
+            )
+            self.register_model(
+                name=self._model_name or "saved_model",
                 framework="tensorflow",
                 metadata=model_metadata,
+                **fields,
             )
             self._registered = True
 
@@ -397,7 +446,7 @@ class WhiteBoxXAICallback(keras.callbacks.Callback):
         if not self.monitor._registered:
             self.monitor.register_from_model()
 
-    def on_epoch_end(self, epoch: int, logs: Optional[Dict[str, Any]] = None):
+    def on_epoch_end(self, epoch: int, logs: dict[str, Any] | None = None):
         """Called at the end of each epoch."""
         if logs is None:
             logs = {}
@@ -422,7 +471,7 @@ class WhiteBoxXAICallback(keras.callbacks.Callback):
                 **metrics,
             )
 
-    def on_train_end(self, logs: Optional[Dict[str, Any]] = None):
+    def on_train_end(self, logs: dict[str, Any] | None = None):
         """Called at the end of training."""
         if logs is None:
             logs = {}
@@ -454,9 +503,9 @@ class TorchMonitor(ModelMonitor):
 
 
 def wrap_keras_model(
-    model: "keras.Model",
+    model: keras.Model,
     monitor: KerasMonitor,
-) -> "keras.Model":
+) -> keras.Model:
     """
     Wrap a Keras model to automatically log predictions.
 

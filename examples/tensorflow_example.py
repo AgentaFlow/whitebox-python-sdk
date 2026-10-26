@@ -77,7 +77,6 @@ def main():
         client=client,
         model=model,
         model_name="keras_binary_classifier",
-        model_type="classification",
     )
 
     # Register model

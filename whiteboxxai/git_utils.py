@@ -5,11 +5,12 @@ Utilities for automatically detecting Git context (repository, commit, branch)
 for model registration.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import shutil
 import subprocess
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +24,12 @@ class GitContext:
 
     def __init__(
         self,
-        repository_url: Optional[str] = None,
-        commit_sha: Optional[str] = None,
-        commit_message: Optional[str] = None,
-        commit_author: Optional[str] = None,
-        branch: Optional[str] = None,
-        tag: Optional[str] = None,
+        repository_url: str | None = None,
+        commit_sha: str | None = None,
+        commit_message: str | None = None,
+        commit_author: str | None = None,
+        branch: str | None = None,
+        tag: str | None = None,
         is_dirty: bool = False,
     ):
         """Initialize Git context."""
@@ -40,7 +41,7 @@ class GitContext:
         self.tag = tag
         self.is_dirty = is_dirty
 
-    def to_dict(self) -> Dict[str, Optional[str]]:
+    def to_dict(self) -> dict[str, str | None]:
         """Convert to dictionary for API submission."""
         return {
             "github_repository_url": self.repository_url,
@@ -65,7 +66,7 @@ class GitContext:
         return f"GitContext({', '.join(parts)})"
 
 
-def detect_git_context(path: Optional[str] = None) -> Optional[GitContext]:
+def detect_git_context(path: str | None = None) -> GitContext | None:
     """
     Auto-detect Git context from the current directory or specified path.
 
@@ -162,7 +163,7 @@ def detect_git_context(path: Optional[str] = None) -> Optional[GitContext]:
         return None
 
 
-def _detect_git_context_subprocess(path: Optional[str] = None) -> Optional[GitContext]:
+def _detect_git_context_subprocess(path: str | None = None) -> GitContext | None:
     """
     Fallback Git detection using subprocess (when GitPython not available).
 

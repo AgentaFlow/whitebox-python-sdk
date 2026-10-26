@@ -118,6 +118,62 @@ class TestModelsResource:
     async def test_adelete(self, client, mock_arequest):
         assert await client.models.adelete("m1") == SENTINEL
 
+    def test_compare_versions(self, client, mock_request):
+        assert client.models.compare_versions("v1", "v2") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/github/diff/compare",
+            data={"version1_id": "v1", "version2_id": "v2"},
+        )
+
+    async def test_acompare_versions(self, client, mock_arequest):
+        assert await client.models.acompare_versions("v1", "v2") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/github/diff/compare",
+            data={"version1_id": "v1", "version2_id": "v2"},
+        )
+
+    def test_version_changelog(self, client, mock_request):
+        assert client.models.version_changelog("v1", "v2") == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/github/diff/changelog",
+            params={"version1_id": "v1", "version2_id": "v2"},
+        )
+
+    async def test_aversion_changelog(self, client, mock_arequest):
+        assert await client.models.aversion_changelog("v1", "v2") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "GET",
+            "/api/v1/github/diff/changelog",
+            params={"version1_id": "v1", "version2_id": "v2"},
+        )
+
+    def test_list_git_versions(self, client, mock_request):
+        assert client.models.list_git_versions("m1", limit=10) == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/github/diff/model/m1/versions",
+            params={"limit": 10},
+        )
+
+    async def test_alist_git_versions(self, client, mock_arequest):
+        assert await client.models.alist_git_versions("m1", limit=10) == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "GET",
+            "/api/v1/github/diff/model/m1/versions",
+            params={"limit": 10},
+        )
+
+    def test_architecture_changes_timeline(self, client, mock_request):
+        assert client.models.architecture_changes_timeline("m1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/github/diff/architecture-changes/m1")
+
+    async def test_aarchitecture_changes_timeline(self, client, mock_arequest):
+        assert await client.models.aarchitecture_changes_timeline("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/github/diff/architecture-changes/m1")
+
 
 class TestPredictionsResource:
     def test_log(self, client, mock_request):
@@ -174,10 +230,43 @@ class TestPredictionsResource:
 
 class TestExplanationsResource:
     def test_generate(self, client, mock_request):
-        assert client.explanations.generate(1, method="lime") == SENTINEL
+        assert client.explanations.generate("m1", {"age": 42}, method="lime") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/generate",
+            data={
+                "model_id": "m1",
+                "instance": {"age": 42},
+                "method": "lime",
+                "prediction_id": None,
+                "num_features": 10,
+                "num_samples": 5000,
+                "use_cache": True,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
+            },
+        )
 
     async def test_agenerate(self, client, mock_arequest):
-        assert await client.explanations.agenerate(1) == SENTINEL
+        result = await client.explanations.agenerate("m1", {"age": 42})
+        assert result == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/generate",
+            data={
+                "model_id": "m1",
+                "instance": {"age": 42},
+                "method": None,
+                "prediction_id": None,
+                "num_features": 10,
+                "num_samples": 5000,
+                "use_cache": True,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
+            },
+        )
 
     def test_get(self, client, mock_request):
         assert client.explanations.get(1) == SENTINEL
@@ -197,6 +286,9 @@ class TestExplanationsResource:
                 "prediction_id": None,
                 "num_features": 10,
                 "num_samples": 5000,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
             },
         )
 
@@ -213,6 +305,211 @@ class TestExplanationsResource:
                 "prediction_id": None,
                 "num_features": 10,
                 "num_samples": 5000,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
+            },
+        )
+
+    def test_generate_bulk(self, client, mock_request):
+        instances = [{"age": 42}, {"age": 30}]
+        assert client.explanations.generate_bulk("m1", instances) == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/generate/bulk",
+            data={
+                "model_id": "m1",
+                "instances": instances,
+                "method": None,
+                "num_features": 10,
+                "num_samples": 5000,
+                "parallel": True,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
+            },
+        )
+
+    async def test_agenerate_bulk(self, client, mock_arequest):
+        instances = [{"age": 42}]
+        result = await client.explanations.agenerate_bulk("m1", instances)
+        assert result == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/generate/bulk",
+            data={
+                "model_id": "m1",
+                "instances": instances,
+                "method": None,
+                "num_features": 10,
+                "num_samples": 5000,
+                "parallel": True,
+                "total_cfs": 3,
+                "desired_class": "opposite",
+                "features_to_vary": "all",
+            },
+        )
+
+    def test_list_by_model(self, client, mock_request):
+        assert client.explanations.list_by_model("m1", method="shap") == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/explanations/model/m1",
+            params={"method": "shap", "limit": 50, "offset": 0},
+        )
+
+    async def test_alist_by_model(self, client, mock_arequest):
+        assert await client.explanations.alist_by_model("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "GET",
+            "/api/v1/explanations/model/m1",
+            params={"limit": 50, "offset": 0},
+        )
+
+    def test_get_by_prediction(self, client, mock_request):
+        assert client.explanations.get_by_prediction("p1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/explanations/prediction/p1")
+
+    async def test_aget_by_prediction(self, client, mock_arequest):
+        assert await client.explanations.aget_by_prediction("p1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/explanations/prediction/p1")
+
+    def test_get_stats(self, client, mock_request):
+        assert client.explanations.get_stats("m1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/explanations/model/m1/stats")
+
+    async def test_aget_stats(self, client, mock_arequest):
+        assert await client.explanations.aget_stats("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/explanations/model/m1/stats")
+
+    def test_set_config(self, client, mock_request):
+        assert client.explanations.set_config("m1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/config",
+            data={
+                "model_id": "m1",
+                "enabled": True,
+                "default_method": "shap_kernel",
+                "auto_explain": False,
+                "cache_enabled": True,
+                "cache_ttl_hours": 24,
+                "lime_config": None,
+                "shap_config": None,
+                "visualization_config": None,
+            },
+        )
+
+    async def test_aset_config(self, client, mock_arequest):
+        assert await client.explanations.aset_config("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/config",
+            data={
+                "model_id": "m1",
+                "enabled": True,
+                "default_method": "shap_kernel",
+                "auto_explain": False,
+                "cache_enabled": True,
+                "cache_ttl_hours": 24,
+                "lime_config": None,
+                "shap_config": None,
+                "visualization_config": None,
+            },
+        )
+
+    def test_get_config(self, client, mock_request):
+        assert client.explanations.get_config("m1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/explanations/config/m1")
+
+    async def test_aget_config(self, client, mock_arequest):
+        assert await client.explanations.aget_config("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/explanations/config/m1")
+
+    def test_delete_config(self, client, mock_request):
+        assert client.explanations.delete_config("m1") == SENTINEL
+        mock_request.assert_called_once_with("DELETE", "/api/v1/explanations/config/m1")
+
+    async def test_adelete_config(self, client, mock_arequest):
+        assert await client.explanations.adelete_config("m1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("DELETE", "/api/v1/explanations/config/m1")
+
+    def test_compare(self, client, mock_request):
+        assert client.explanations.compare(["e1", "e2"]) == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/compare",
+            data={
+                "explanation_ids": ["e1", "e2"],
+                "comparison_type": "feature_importance",
+            },
+        )
+
+    async def test_acompare(self, client, mock_arequest):
+        assert await client.explanations.acompare(["e1", "e2"]) == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/compare",
+            data={
+                "explanation_ids": ["e1", "e2"],
+                "comparison_type": "feature_importance",
+            },
+        )
+
+    def test_visualize(self, client, mock_request):
+        assert client.explanations.visualize("e1", "waterfall") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/visualizations/single",
+            data={
+                "explanation_id": "e1",
+                "plot_type": "waterfall",
+                "max_features": 10,
+                "config": None,
+            },
+        )
+
+    async def test_avisualize(self, client, mock_arequest):
+        assert await client.explanations.avisualize("e1", "waterfall") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/visualizations/single",
+            data={
+                "explanation_id": "e1",
+                "plot_type": "waterfall",
+                "max_features": 10,
+                "config": None,
+            },
+        )
+
+    def test_visualize_multi(self, client, mock_request):
+        assert client.explanations.visualize_multi(["e1", "e2"], "summary") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/explanations/visualizations/multi",
+            data={
+                "explanation_ids": ["e1", "e2"],
+                "plot_type": "summary",
+                "feature_index": None,
+                "interaction_index": None,
+                "max_features": 20,
+                "highlight_index": None,
+            },
+        )
+
+    async def test_avisualize_multi(self, client, mock_arequest):
+        result = await client.explanations.avisualize_multi(["e1", "e2"], "summary")
+        assert result == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/explanations/visualizations/multi",
+            data={
+                "explanation_ids": ["e1", "e2"],
+                "plot_type": "summary",
+                "feature_index": None,
+                "interaction_index": None,
+                "max_features": 20,
+                "highlight_index": None,
             },
         )
 
@@ -409,6 +706,448 @@ class TestAlertsResource:
         assert await client.alerts.astatistics() == SENTINEL
 
 
+class TestAlertIntelligenceResource:
+    def test_detect_correlations(self, client, mock_request):
+        assert client.alert_intelligence.detect_correlations("a1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/alerts/a1/correlations",
+            params={"look_back_hours": 24, "min_score": 0.5},
+        )
+
+    async def test_adetect_correlations(self, client, mock_arequest):
+        assert await client.alert_intelligence.adetect_correlations("a1") == SENTINEL
+
+    def test_get_correlation_clusters(self, client, mock_request):
+        assert client.alert_intelligence.get_correlation_clusters() == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "GET",
+            "/api/v1/alert-intelligence/correlations/clusters",
+        )
+        assert "organization_id" not in mock_request.call_args.kwargs["params"]
+
+    async def test_aget_correlation_clusters(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_correlation_clusters() == SENTINEL
+
+    def test_analyze_root_cause(self, client, mock_request):
+        assert client.alert_intelligence.analyze_root_cause("a1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/alerts/a1/root-cause",
+            params={"analyze_history": True},
+        )
+
+    async def test_aanalyze_root_cause(self, client, mock_arequest):
+        assert await client.alert_intelligence.aanalyze_root_cause("a1") == SENTINEL
+
+    def test_verify_root_cause(self, client, mock_request):
+        assert client.alert_intelligence.verify_root_cause(1, True) == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-intelligence/root-causes/1/verify",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data == {"root_cause_id": 1, "verified": True, "notes": None}
+
+    async def test_averify_root_cause(self, client, mock_arequest):
+        assert await client.alert_intelligence.averify_root_cause(1, True) == SENTINEL
+
+    def test_get_similar_incidents(self, client, mock_request):
+        assert client.alert_intelligence.get_similar_incidents("drift") == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/root-causes/similar",
+            params={"cause_type": "drift", "limit": 10},
+        )
+
+    async def test_aget_similar_incidents(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_similar_incidents("drift") == SENTINEL
+
+    def test_calculate_priority(self, client, mock_request):
+        assert client.alert_intelligence.calculate_priority("a1") == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-intelligence/alerts/a1/priority",
+        )
+
+    async def test_acalculate_priority(self, client, mock_arequest):
+        assert await client.alert_intelligence.acalculate_priority("a1") == SENTINEL
+
+    def test_adjust_priority(self, client, mock_request):
+        assert (
+            client.alert_intelligence.adjust_priority("a1", 90.0, "critical", "spike") == SENTINEL
+        )
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "PATCH",
+            "/api/v1/alert-intelligence/alerts/a1/priority",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data == {
+            "alert_id": "a1",
+            "new_priority_score": 90.0,
+            "new_priority_level": "critical",
+            "adjustment_reason": "spike",
+        }
+
+    async def test_aadjust_priority(self, client, mock_arequest):
+        assert (
+            await client.alert_intelligence.aadjust_priority("a1", 90.0, "critical", "spike")
+            == SENTINEL
+        )
+
+    def test_get_priority_distribution(self, client, mock_request):
+        assert client.alert_intelligence.get_priority_distribution() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/priority/distribution",
+            params={"hours_back": 24},
+        )
+
+    async def test_aget_priority_distribution(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_priority_distribution() == SENTINEL
+
+    def test_get_priority_queue(self, client, mock_request):
+        assert client.alert_intelligence.get_priority_queue() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/priority/queue",
+            params={"limit": 20},
+        )
+
+    async def test_aget_priority_queue(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_priority_queue() == SENTINEL
+
+    def test_detect_patterns(self, client, mock_request):
+        assert client.alert_intelligence.detect_patterns() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/patterns",
+            params={"hours_back": 168},
+        )
+
+    async def test_adetect_patterns(self, client, mock_arequest):
+        assert await client.alert_intelligence.adetect_patterns() == SENTINEL
+
+    def test_get_pattern(self, client, mock_request):
+        assert client.alert_intelligence.get_pattern(5) == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-intelligence/patterns/5")
+
+    async def test_aget_pattern(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_pattern(5) == SENTINEL
+
+    def test_deactivate_pattern(self, client, mock_request):
+        assert client.alert_intelligence.deactivate_pattern(5) == SENTINEL
+        mock_request.assert_called_once_with(
+            "PATCH", "/api/v1/alert-intelligence/patterns/5/deactivate"
+        )
+
+    async def test_adeactivate_pattern(self, client, mock_arequest):
+        assert await client.alert_intelligence.adeactivate_pattern(5) == SENTINEL
+
+    def test_apply_fatigue_reduction(self, client, mock_request):
+        assert client.alert_intelligence.apply_fatigue_reduction() == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-intelligence/fatigue-reduction/apply",
+        )
+        assert "params" not in mock_request.call_args.kwargs
+        assert mock_request.call_args.kwargs["data"]["similarity_threshold"] == 0.8
+
+    async def test_aapply_fatigue_reduction(self, client, mock_arequest):
+        assert await client.alert_intelligence.aapply_fatigue_reduction() == SENTINEL
+
+    def test_get_throttle_recommendations(self, client, mock_request):
+        assert client.alert_intelligence.get_throttle_recommendations() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/fatigue-reduction/recommendations",
+        )
+
+    async def test_aget_throttle_recommendations(self, client, mock_arequest):
+        assert await client.alert_intelligence.aget_throttle_recommendations() == SENTINEL
+
+    def test_ml_group_alerts(self, client, mock_request):
+        assert client.alert_intelligence.ml_group_alerts() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/grouping/ml",
+            params={"clustering_method": "kmeans"},
+        )
+
+    async def test_aml_group_alerts(self, client, mock_arequest):
+        assert await client.alert_intelligence.aml_group_alerts() == SENTINEL
+
+    def test_temporal_group_alerts(self, client, mock_request):
+        assert client.alert_intelligence.temporal_group_alerts() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/grouping/temporal",
+            params={
+                "time_window_minutes": 60,
+                "similarity_threshold": 0.7,
+            },
+        )
+
+    async def test_atemporal_group_alerts(self, client, mock_arequest):
+        assert await client.alert_intelligence.atemporal_group_alerts() == SENTINEL
+
+    def test_predict_trends(self, client, mock_request):
+        assert client.alert_intelligence.predict_trends() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/trends/predict",
+            params={"time_horizon": "next_day"},
+        )
+
+    async def test_apredict_trends(self, client, mock_arequest):
+        assert await client.alert_intelligence.apredict_trends() == SENTINEL
+
+    def test_detect_seasonality(self, client, mock_request):
+        assert client.alert_intelligence.detect_seasonality() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-intelligence/trends/seasonality",
+            params={"days_back": 30},
+        )
+
+    async def test_adetect_seasonality(self, client, mock_arequest):
+        assert await client.alert_intelligence.adetect_seasonality() == SENTINEL
+
+    def test_enhanced_trend_analysis(self, client, mock_request):
+        assert client.alert_intelligence.enhanced_trend_analysis() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/trends/enhanced",
+            params={"metric": "alert_count", "hours_back": 168},
+        )
+
+    async def test_aenhanced_trend_analysis(self, client, mock_arequest):
+        assert await client.alert_intelligence.aenhanced_trend_analysis() == SENTINEL
+
+    def test_forecast_volume(self, client, mock_request):
+        assert client.alert_intelligence.forecast_volume() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-intelligence/trends/forecast",
+            params={"forecast_hours": 24},
+        )
+
+    async def test_aforecast_volume(self, client, mock_arequest):
+        assert await client.alert_intelligence.aforecast_volume() == SENTINEL
+
+
+class TestAlertManagementResource:
+    def test_get_history(self, client, mock_request):
+        assert client.alert_management.get_history("a1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-management/alerts/a1/history")
+
+    async def test_aget_history(self, client, mock_arequest):
+        assert await client.alert_management.aget_history("a1") == SENTINEL
+
+    def test_get_analytics(self, client, mock_request):
+        assert client.alert_management.get_analytics() == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-management/analytics", params={})
+
+    async def test_aget_analytics(self, client, mock_arequest):
+        assert await client.alert_management.aget_analytics() == SENTINEL
+
+    def test_get_trend(self, client, mock_request):
+        assert client.alert_management.get_trend("2026-01-01", "2026-01-02") == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-management/analytics/trend",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data["time_range"] == {"start": "2026-01-01", "end": "2026-01-02"}
+        assert data["interval"] == "hour"
+
+    async def test_aget_trend(self, client, mock_arequest):
+        assert await client.alert_management.aget_trend("2026-01-01", "2026-01-02") == SENTINEL
+
+    def test_get_velocity(self, client, mock_request):
+        assert client.alert_management.get_velocity() == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-management/analytics/velocity")
+
+    async def test_aget_velocity(self, client, mock_arequest):
+        assert await client.alert_management.aget_velocity() == SENTINEL
+
+    def test_get_grouping(self, client, mock_request):
+        assert client.alert_management.get_grouping("severity") == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/alert-management/analytics/grouping",
+            params={"group_by": "severity"},
+        )
+
+    async def test_aget_grouping(self, client, mock_arequest):
+        assert await client.alert_management.aget_grouping("severity") == SENTINEL
+
+    def test_detect_fatigue(self, client, mock_request):
+        assert client.alert_management.detect_fatigue() == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-management/analytics/fatigue")
+
+    async def test_adetect_fatigue(self, client, mock_arequest):
+        assert await client.alert_management.adetect_fatigue() == SENTINEL
+
+    def test_acknowledge(self, client, mock_request):
+        assert client.alert_management.acknowledge("a1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-management/alerts/a1/acknowledge",
+            params={},
+        )
+
+    async def test_aacknowledge(self, client, mock_arequest):
+        assert await client.alert_management.aacknowledge("a1") == SENTINEL
+
+    def test_resolve(self, client, mock_request):
+        assert client.alert_management.resolve("a1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-management/alerts/a1/resolve",
+            params={},
+        )
+
+    async def test_aresolve(self, client, mock_arequest):
+        assert await client.alert_management.aresolve("a1") == SENTINEL
+
+    def test_snooze(self, client, mock_request):
+        assert client.alert_management.snooze("a1", 30) == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/alert-management/alerts/a1/snooze",
+            params={"snooze_minutes": 30},
+        )
+
+    async def test_asnooze(self, client, mock_arequest):
+        assert await client.alert_management.asnooze("a1", 30) == SENTINEL
+
+    def test_bulk_action(self, client, mock_request):
+        assert client.alert_management.bulk_action(["a1", "a2"], "acknowledge", "u1") == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-management/alerts/bulk-action",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data == {
+            "alert_ids": ["a1", "a2"],
+            "action": "acknowledge",
+            "user_id": "u1",
+        }
+
+    async def test_abulk_action(self, client, mock_arequest):
+        assert await client.alert_management.abulk_action(["a1"], "resolve", "u1") == SENTINEL
+
+    def test_create_comment(self, client, mock_request):
+        assert client.alert_management.create_comment("a1", "looking into it") == (SENTINEL)
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-management/alerts/a1/comments",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data == {
+            "alert_id": "a1",
+            "comment": "looking into it",
+            "comment_type": "note",
+        }
+
+    async def test_acreate_comment(self, client, mock_arequest):
+        assert await client.alert_management.acreate_comment("a1", "looking into it") == SENTINEL
+
+    def test_get_comments(self, client, mock_request):
+        assert client.alert_management.get_comments("a1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/alert-management/alerts/a1/comments")
+
+    async def test_aget_comments(self, client, mock_arequest):
+        assert await client.alert_management.aget_comments("a1") == SENTINEL
+
+    def test_create_escalation_policy(self, client, mock_request):
+        rules = [{"level": 1, "delay_minutes": 15}]
+        assert client.alert_management.create_escalation_policy("p1", rules) == SENTINEL
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == (
+            "POST",
+            "/api/v1/alert-management/escalation-policies",
+        )
+        data = mock_request.call_args.kwargs["data"]
+        assert data["name"] == "p1"
+        assert data["escalation_rules"] == rules
+        # organization_id is always overwritten server-side; the SDK sends
+        # a placeholder since the schema requires the field to be present.
+        assert data["organization_id"] == ""
+
+    async def test_acreate_escalation_policy(self, client, mock_arequest):
+        rules = [{"level": 1, "delay_minutes": 15}]
+        assert await client.alert_management.acreate_escalation_policy("p1", rules) == SENTINEL
+
+    def test_list_escalation_policies(self, client, mock_request):
+        assert client.alert_management.list_escalation_policies() == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET", "/api/v1/alert-management/escalation-policies", params={}
+        )
+
+    async def test_alist_escalation_policies(self, client, mock_arequest):
+        assert await client.alert_management.alist_escalation_policies() == SENTINEL
+
+    def test_get_escalation_policy(self, client, mock_request):
+        assert client.alert_management.get_escalation_policy("p1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "GET", "/api/v1/alert-management/escalation-policies/p1"
+        )
+
+    async def test_aget_escalation_policy(self, client, mock_arequest):
+        assert await client.alert_management.aget_escalation_policy("p1") == SENTINEL
+
+    def test_update_escalation_policy(self, client, mock_request):
+        assert client.alert_management.update_escalation_policy("p1", is_active=False) == SENTINEL
+        mock_request.assert_called_once_with(
+            "PATCH",
+            "/api/v1/alert-management/escalation-policies/p1",
+            data={"is_active": False},
+        )
+
+    async def test_aupdate_escalation_policy(self, client, mock_arequest):
+        assert (
+            await client.alert_management.aupdate_escalation_policy("p1", is_active=False)
+            == SENTINEL
+        )
+
+    def test_delete_escalation_policy(self, client, mock_request):
+        assert client.alert_management.delete_escalation_policy("p1") == SENTINEL
+        mock_request.assert_called_once_with(
+            "DELETE", "/api/v1/alert-management/escalation-policies/p1"
+        )
+
+    async def test_adelete_escalation_policy(self, client, mock_arequest):
+        assert await client.alert_management.adelete_escalation_policy("p1") == SENTINEL
+
+    def test_process_pending_escalations(self, client, mock_request):
+        assert client.alert_management.process_pending_escalations() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST", "/api/v1/alert-management/maintenance/process-escalations"
+        )
+
+    async def test_aprocess_pending_escalations(self, client, mock_arequest):
+        assert await client.alert_management.aprocess_pending_escalations() == SENTINEL
+
+    def test_unsnooze_expired_alerts(self, client, mock_request):
+        assert client.alert_management.unsnooze_expired_alerts() == SENTINEL
+        mock_request.assert_called_once_with(
+            "POST", "/api/v1/alert-management/maintenance/unsnooze-alerts"
+        )
+
+    async def test_aunsnooze_expired_alerts(self, client, mock_arequest):
+        assert await client.alert_management.aunsnooze_expired_alerts() == SENTINEL
+
+
 class TestRiskRegisterResource:
     def test_list(self, client, mock_request):
         assert client.risk_register.list(status="identified", severity="high") == SENTINEL
@@ -443,11 +1182,74 @@ class TestGovernanceResource:
     async def test_alist_review_requests(self, client, mock_arequest):
         assert await client.governance.alist_review_requests() == SENTINEL
 
+    def test_get_review_request(self, client, mock_request):
+        assert client.governance.get_review_request("rr1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/governance/review-boards/requests/rr1")
+
+    async def test_aget_review_request(self, client, mock_arequest):
+        assert await client.governance.aget_review_request("rr1") == SENTINEL
+        mock_arequest.assert_awaited_once_with(
+            "GET", "/api/v1/governance/review-boards/requests/rr1"
+        )
+
     def test_raci_grid(self, client, mock_request):
         assert client.governance.raci_grid(board_id="b1") == SENTINEL
 
     async def test_araci_grid(self, client, mock_arequest):
         assert await client.governance.araci_grid() == SENTINEL
+
+    def test_submit_decision(self, client, mock_request):
+        assert (
+            client.governance.submit_decision(
+                "rr1",
+                "approve",
+                justification="Verified fairness and drift metrics.",
+                conditions="Monitor weekly",
+                evidence_snapshot_hash="ab" * 32,
+                totp_code="123456",
+            )
+            == SENTINEL
+        )
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/governance/review-boards/requests/rr1/decisions",
+            data={
+                "decision": "approve",
+                "justification": "Verified fairness and drift metrics.",
+                "conditions": "Monitor weekly",
+                "evidence_snapshot_hash": "ab" * 32,
+                "totp_code": "123456",
+            },
+        )
+
+    def test_submit_decision_requires_the_evidence_hash(self, client, mock_request):
+        # Keyword-only and required: a vote with no evidence to bind it to would
+        # only be refused by the backend, so fail before the request is made.
+        with pytest.raises(TypeError):
+            client.governance.submit_decision("rr1", "approve")
+        mock_request.assert_not_called()
+
+    async def test_asubmit_decision(self, client, mock_arequest):
+        assert (
+            await client.governance.asubmit_decision(
+                "rr1",
+                "deny",
+                justification="PSI threshold exceeded.",
+                evidence_snapshot_hash="cd" * 32,
+                totp_code="ABCD1234",
+            )
+            == SENTINEL
+        )
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/governance/review-boards/requests/rr1/decisions",
+            data={
+                "decision": "deny",
+                "justification": "PSI threshold exceeded.",
+                "evidence_snapshot_hash": "cd" * 32,
+                "totp_code": "ABCD1234",
+            },
+        )
 
 
 class TestLLMResource:
@@ -1312,3 +2114,101 @@ class TestRequestOrQueueFallback:
                     result = client.models.register("m", "classification")
 
         assert result == {"status": "queued", "operation_id": "op-123"}
+
+
+class TestReportTypesResource:
+    """Tests for ReportTypesResource."""
+
+    def test_list(self, client, mock_request):
+        assert client.reports.list() == {"ok": True}
+        mock_request.assert_called_once_with("GET", "/api/v1/report-types")
+
+    async def test_alist(self, client, mock_arequest):
+        assert await client.reports.alist() == {"ok": True}
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/report-types")
+
+    def test_generate(self, client, mock_request):
+        assert client.reports.generate("model_card", model_id="m1", format="pdf") == {"ok": True}
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/report-types/model_card/generate",
+            data={"format": "pdf", "model_id": "m1"},
+        )
+
+    async def test_agenerate(self, client, mock_arequest):
+        assert await client.reports.agenerate("model_card", model_id="m1", format="docx") == {
+            "ok": True
+        }
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/report-types/model_card/generate",
+            data={"format": "docx", "model_id": "m1"},
+        )
+
+    def test_preview(self, client, mock_request):
+        assert client.reports.preview("model_card", model_id="m1") == {"ok": True}
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/export/templates/preview",
+            data={"report_type_id": "model_card", "model_id": "m1"},
+        )
+
+    async def test_apreview(self, client, mock_arequest):
+        assert await client.reports.apreview("model_card", model_id="m1") == {"ok": True}
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/export/templates/preview",
+            data={"report_type_id": "model_card", "model_id": "m1"},
+        )
+
+
+class TestComplianceResource:
+    """Tests for ComplianceResource (ISO/IEC 42001 & Control Catalog)."""
+
+    def test_iso42001_score(self, client, mock_request):
+        assert client.compliance.iso42001_score() == {"ok": True}
+        mock_request.assert_called_once_with("GET", "/api/v1/compliance/iso42001/score")
+
+    async def test_aiso42001_score(self, client, mock_arequest):
+        assert await client.compliance.aiso42001_score() == {"ok": True}
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/compliance/iso42001/score")
+
+    def test_iso42001_gaps(self, client, mock_request):
+        assert client.compliance.iso42001_gaps(clause_filter="8", severity_filter="high") == {
+            "ok": True
+        }
+        mock_request.assert_called_once_with(
+            "GET",
+            "/api/v1/compliance/iso42001/gaps",
+            params={"clause_filter": "8", "severity_filter": "high"},
+        )
+
+    async def test_aiso42001_gaps(self, client, mock_arequest):
+        assert await client.compliance.aiso42001_gaps(
+            clause_filter="4", severity_filter="critical"
+        ) == {"ok": True}
+        mock_arequest.assert_awaited_once_with(
+            "GET",
+            "/api/v1/compliance/iso42001/gaps",
+            params={"clause_filter": "4", "severity_filter": "critical"},
+        )
+
+    def test_list_frameworks(self, client, mock_request):
+        assert client.compliance.list_frameworks() == {"ok": True}
+        mock_request.assert_called_once_with("GET", "/api/v1/compliance/frameworks")
+
+    async def test_alist_frameworks(self, client, mock_arequest):
+        assert await client.compliance.alist_frameworks() == {"ok": True}
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/compliance/frameworks")
+
+    def test_get_framework_controls(self, client, mock_request):
+        assert client.compliance.get_framework_controls("iso_42001") == {"ok": True}
+        mock_request.assert_called_once_with(
+            "GET", "/api/v1/compliance/frameworks/iso_42001/controls"
+        )
+
+    async def test_aget_framework_controls(self, client, mock_arequest):
+        assert await client.compliance.aget_framework_controls("eu_ai_act") == {"ok": True}
+        mock_arequest.assert_awaited_once_with(
+            "GET", "/api/v1/compliance/frameworks/eu_ai_act/controls"
+        )

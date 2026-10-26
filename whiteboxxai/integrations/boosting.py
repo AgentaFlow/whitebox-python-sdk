@@ -36,12 +36,15 @@ Example:
     >>> predictions = monitor.predict(model, X_test, y_test)
 """
 
+from __future__ import annotations
+
 import logging
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
+from whiteboxxai.integrations._registration import positional_feature_names, registration_fields
 from whiteboxxai.monitor import ModelMonitor
 
 logger = logging.getLogger(__name__)
@@ -53,7 +56,7 @@ try:
     XGBOOST_AVAILABLE = True
 except ImportError:
     XGBOOST_AVAILABLE = False
-    xgb = None
+    xgb = None  # type: ignore[assignment, unused-ignore]
 
 try:
     import lightgbm as lgb
@@ -61,15 +64,15 @@ try:
     LIGHTGBM_AVAILABLE = True
 except ImportError:
     LIGHTGBM_AVAILABLE = False
-    lgb = None
+    lgb = None  # type: ignore[assignment, unused-ignore]
 
 
 def _build_prediction_batch(
     inputs: np.ndarray,
     predictions: np.ndarray,
-    actuals: Optional[np.ndarray] = None,
-    probabilities: Optional[np.ndarray] = None,
-) -> List[Dict[str, Any]]:
+    actuals: np.ndarray | None = None,
+    probabilities: np.ndarray | None = None,
+) -> list[dict[str, Any]]:
     """Build per-sample dicts for ModelMonitor.log_batch() from parallel arrays."""
 
     def _item(value: Any) -> Any:
@@ -77,7 +80,7 @@ def _build_prediction_batch(
 
     batch = []
     for i in range(len(inputs)):
-        item: Dict[str, Any] = {
+        item: dict[str, Any] = {
             "inputs": _item(inputs[i]),
             "output": _item(predictions[i]),
         }
@@ -137,15 +140,18 @@ class XGBoostMonitor(ModelMonitor):
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
         self.importance_type = importance_type
-        self._feature_names: Optional[List[str]] = None
+        self._feature_names: list[str] | None = None
 
     def register_from_model(
         self,
         model: Any,
-        X_train: Optional[np.ndarray] = None,
-        y_train: Optional[np.ndarray] = None,
-        model_type: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        X_train: np.ndarray | None = None,
+        y_train: np.ndarray | None = None,
+        model_type: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
     ) -> str:
         """
         Register XGBoost model with WhiteBoxXAI.
@@ -157,14 +163,24 @@ class XGBoostMonitor(ModelMonitor):
             model: XGBoost model (Booster, XGBClassifier, XGBRegressor, etc.)
             X_train: Training features for baseline
             y_train: Training labels for baseline
-            model_type: Model type override (auto-detected if None)
+            model_type: One of the API's model types (default ``xgboost``).
+                A task name such as ``"classification"`` is kept as ``task``
+                metadata.
             metadata: Additional metadata
+            version: Model version (default ``1.0.0``)
+            features: Feature names (default: the model's/X_train's column names,
+                else ``feature_0..feature_{n-1}`` from the feature count)
+            baseline_metrics: Baseline metrics, e.g. ``{"accuracy": 0.94}``
 
         Returns:
             Model ID from registration
+
+        Raises:
+            ValueError: Invalid ``model_type``, or no feature names could be
+                determined.
         """
         # Extract model information
-        model_metadata = metadata or {}
+        model_metadata = dict(metadata or {})
 
         # Get feature names
         if hasattr(model, "feature_names_in_"):
@@ -205,25 +221,40 @@ class XGBoostMonitor(ModelMonitor):
             except Exception as e:
                 warnings.warn(f"Failed to extract feature importance: {e}", stacklevel=2)
 
-        # Detect model type
-        if model_type is None:
-            if hasattr(model, "_estimator_type"):
-                model_type = model._estimator_type
-            elif isinstance(model, xgb.XGBClassifier):
-                model_type = "classification"
-            elif isinstance(model, xgb.XGBRegressor):
-                model_type = "regression"
+        # Record the task (classification/regression/ranking) as metadata: the
+        # API's model_type is a framework family, not a task.
+        task = {"classifier": "classification", "regressor": "regression"}.get(
+            getattr(model, "_estimator_type", "")
+        )
+        if task is None:
+            if isinstance(model, xgb.XGBRegressor):
+                task = "regression"
             elif isinstance(model, xgb.XGBRanker):
-                model_type = "ranking"
+                task = "ranking"
             else:
-                model_type = "classification"  # Default
+                task = "classification"
+        model_metadata.setdefault("task", task)
 
         model_metadata["framework"] = "xgboost"
         model_metadata["xgboost_version"] = xgb.__version__
 
         # Register model
+        num_features = model_metadata.get("num_features")
+        fields = registration_fields(
+            model_type=model_type,
+            default_model_type="xgboost",
+            version=version,
+            features=features,
+            inferred_features=self._feature_names
+            or (positional_feature_names(num_features) if num_features else None),
+            baseline_metrics=baseline_metrics,
+            metadata=model_metadata,
+        )
         model_id = self.register_model(
-            name=self.model_name, model_type=model_type, metadata=model_metadata
+            name=self.model_name,
+            framework="xgboost",
+            metadata=model_metadata,
+            **fields,
         )
 
         # Set baseline if training data provided
@@ -236,9 +267,9 @@ class XGBoostMonitor(ModelMonitor):
         self,
         model: Any,
         X: np.ndarray,
-        y_true: Optional[np.ndarray] = None,
+        y_true: np.ndarray | None = None,
         log_predictions: bool = True,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> np.ndarray:
         """
         Make predictions and log to WhiteBoxXAI.
@@ -277,7 +308,7 @@ class XGBoostMonitor(ModelMonitor):
 
         return predictions
 
-    def _get_feature_importance(self, model: Any) -> Optional[Dict[str, float]]:
+    def _get_feature_importance(self, model: Any) -> dict[str, float] | None:
         """
         Extract feature importance from XGBoost model.
 
@@ -360,15 +391,18 @@ class LightGBMMonitor(ModelMonitor):
         super().__init__(client=client, model_name=model_name, **kwargs)
         self.track_feature_importance = track_feature_importance
         self.importance_type = importance_type
-        self._feature_names: Optional[List[str]] = None
+        self._feature_names: list[str] | None = None
 
     def register_from_model(
         self,
         model: Any,
-        X_train: Optional[np.ndarray] = None,
-        y_train: Optional[np.ndarray] = None,
-        model_type: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        X_train: np.ndarray | None = None,
+        y_train: np.ndarray | None = None,
+        model_type: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
     ) -> str:
         """
         Register LightGBM model with WhiteBoxXAI.
@@ -380,14 +414,24 @@ class LightGBMMonitor(ModelMonitor):
             model: LightGBM model (Booster, LGBMClassifier, LGBMRegressor, etc.)
             X_train: Training features for baseline
             y_train: Training labels for baseline
-            model_type: Model type override (auto-detected if None)
+            model_type: One of the API's model types (default ``custom``).
+                A task name such as ``"classification"`` is kept as ``task``
+                metadata.
             metadata: Additional metadata
+            version: Model version (default ``1.0.0``)
+            features: Feature names (default: the model's/X_train's column names,
+                else ``feature_0..feature_{n-1}`` from the feature count)
+            baseline_metrics: Baseline metrics, e.g. ``{"accuracy": 0.94}``
 
         Returns:
             Model ID from registration
+
+        Raises:
+            ValueError: Invalid ``model_type``, or no feature names could be
+                determined.
         """
         # Extract model information
-        model_metadata = metadata or {}
+        model_metadata = dict(metadata or {})
 
         # Get feature names
         if hasattr(model, "feature_name_"):
@@ -430,25 +474,40 @@ class LightGBMMonitor(ModelMonitor):
             except Exception as e:
                 warnings.warn(f"Failed to extract feature importance: {e}", stacklevel=2)
 
-        # Detect model type
-        if model_type is None:
-            if hasattr(model, "_estimator_type"):
-                model_type = model._estimator_type
-            elif isinstance(model, lgb.LGBMClassifier):
-                model_type = "classification"
-            elif isinstance(model, lgb.LGBMRegressor):
-                model_type = "regression"
+        # Record the task (classification/regression/ranking) as metadata: the
+        # API's model_type is a framework family, not a task.
+        task = {"classifier": "classification", "regressor": "regression"}.get(
+            getattr(model, "_estimator_type", "")
+        )
+        if task is None:
+            if isinstance(model, lgb.LGBMRegressor):
+                task = "regression"
             elif isinstance(model, lgb.LGBMRanker):
-                model_type = "ranking"
+                task = "ranking"
             else:
-                model_type = "classification"  # Default
+                task = "classification"
+        model_metadata.setdefault("task", task)
 
         model_metadata["framework"] = "lightgbm"
         model_metadata["lightgbm_version"] = lgb.__version__
 
         # Register model
+        num_features = model_metadata.get("num_features")
+        fields = registration_fields(
+            model_type=model_type,
+            default_model_type="custom",
+            version=version,
+            features=features,
+            inferred_features=self._feature_names
+            or (positional_feature_names(num_features) if num_features else None),
+            baseline_metrics=baseline_metrics,
+            metadata=model_metadata,
+        )
         model_id = self.register_model(
-            name=self.model_name, model_type=model_type, metadata=model_metadata
+            name=self.model_name,
+            framework="lightgbm",
+            metadata=model_metadata,
+            **fields,
         )
 
         # Set baseline if training data provided
@@ -461,9 +520,9 @@ class LightGBMMonitor(ModelMonitor):
         self,
         model: Any,
         X: np.ndarray,
-        y_true: Optional[np.ndarray] = None,
+        y_true: np.ndarray | None = None,
         log_predictions: bool = True,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> np.ndarray:
         """
         Make predictions and log to WhiteBoxXAI.
@@ -502,7 +561,7 @@ class LightGBMMonitor(ModelMonitor):
 
         return predictions
 
-    def _get_feature_importance(self, model: Any) -> Optional[Dict[str, float]]:
+    def _get_feature_importance(self, model: Any) -> dict[str, float] | None:
         """
         Extract feature importance from LightGBM model.
 

@@ -10,7 +10,7 @@ from whiteboxxai import WhiteBoxXAI
 from whiteboxxai.integrations.transformers import TransformersMonitor, wrap_transformers_pipeline
 
 # Optional: Set API key
-os.environ["WHITEBOXXAI_API_KEY"] = "your-api-key-here"
+os.environ["WHITEBOX_API_KEY"] = "your-api-key-here"
 
 
 def example_sentiment_analysis():
@@ -22,7 +22,7 @@ def example_sentiment_analysis():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Load sentiment analysis pipeline
     classifier = pipeline("sentiment-analysis")
@@ -79,7 +79,7 @@ def example_ner():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Load NER pipeline
     ner_pipeline = pipeline("ner", aggregation_strategy="simple")
@@ -116,7 +116,7 @@ def example_text_generation():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Load text generation pipeline (using smaller GPT-2 for demo)
     generator = pipeline("text-generation", model="gpt2")
@@ -161,7 +161,7 @@ def example_wrapped_pipeline():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Load pipeline
     classifier = pipeline("sentiment-analysis")
@@ -203,7 +203,7 @@ def example_batch_prediction():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Load pipeline
     classifier = pipeline("sentiment-analysis")

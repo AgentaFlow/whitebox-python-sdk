@@ -4,11 +4,13 @@ Local Caching
 Simple TTL-based cache for API responses.
 """
 
+from __future__ import annotations
+
 import hashlib
 import json
 import time
 from collections import OrderedDict
-from typing import Any, Optional
+from typing import Any
 
 
 class TTLCache:
@@ -34,7 +36,7 @@ class TTLCache:
         self._cache: OrderedDict = OrderedDict()
         self._timestamps: dict = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """
         Get value from cache.
 

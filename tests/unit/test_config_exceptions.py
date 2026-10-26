@@ -4,6 +4,7 @@ Tests for SDK Config and Exceptions
 Tests for SDK configuration and exception handling.
 """
 
+
 import pytest
 
 from whiteboxxai.config import Config
@@ -84,6 +85,54 @@ class TestConfig:
         except ValueError:
             # Acceptable to reject invalid URLs
             pass
+
+
+class TestConfigEnvironmentVariables:
+    """WHITEBOX_* is the documented name; WHITEBOXXAI_* is what SDK 1.2.0 read and
+    must keep working so upgrading doesn't break an existing setup."""
+
+    @pytest.fixture(autouse=True)
+    def clean_env(self, monkeypatch):
+        for name in (
+            "WHITEBOX_API_KEY",
+            "WHITEBOXXAI_API_KEY",
+            "WHITEBOX_BASE_URL",
+            "WHITEBOXXAI_BASE_URL",
+        ):
+            monkeypatch.delenv(name, raising=False)
+
+    def test_api_key_from_whitebox_name(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOX_API_KEY", "new-key")
+        assert Config().api_key == "new-key"
+
+    def test_api_key_from_the_1_2_0_name(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOXXAI_API_KEY", "old-key")
+        assert Config().api_key == "old-key"
+
+    def test_the_documented_name_wins_when_both_are_set(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOX_API_KEY", "new-key")
+        monkeypatch.setenv("WHITEBOXXAI_API_KEY", "old-key")
+        assert Config().api_key == "new-key"
+
+    def test_an_explicit_argument_wins_over_the_environment(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOX_API_KEY", "env-key")
+        assert Config(api_key="arg-key").api_key == "arg-key"
+
+    def test_an_empty_documented_variable_falls_back_to_the_old_one(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOX_API_KEY", "")
+        monkeypatch.setenv("WHITEBOXXAI_API_KEY", "old-key")
+        assert Config().api_key == "old-key"
+
+    def test_no_api_key_anywhere_names_the_documented_variable(self):
+        with pytest.raises(ValueError, match="WHITEBOX_API_KEY"):
+            Config()
+
+    def test_base_url_from_either_name(self, monkeypatch):
+        monkeypatch.setenv("WHITEBOXXAI_BASE_URL", "https://old.example.com")
+        assert Config(api_key="k").base_url == "https://old.example.com"
+
+        monkeypatch.setenv("WHITEBOX_BASE_URL", "https://new.example.com")
+        assert Config(api_key="k").base_url == "https://new.example.com"
 
 
 class TestWhiteBoxXAIError:

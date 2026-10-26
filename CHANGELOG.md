@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-26
+
+Ports the work developed in the `whitebox-xai-azure` monorepo's `sdk/` directory since the
+1.2.0 cut: the Phase 6 Report Engine, prompt governance, governance runs, ISO/IEC 42001
+compliance, review-board voting, Git-backed model diffs, DiCE counterfactuals and the alert
+intelligence/management resources. It also fixes the integration helpers that could not
+register a model against the live API (issues #12, #13 and #14).
+
+### Added
+- `governance_run()` context manager (`whiteboxxai.runs.governance_run`) and automatic
+  `X-WhiteBox-Run-Id` header injection across synchronous and asynchronous client requests
+  and `LangChainMonitor` runs.
+- `PromptsResource` (`client.prompts`) with 14 methods: `list_templates`, `get_template`,
+  `create_template`, `list_versions`, `get_version`, `create_version`, `advance_stage`,
+  `deploy`, `rollback`, `compute_drift`, `list_drift_reports`, `get_drift_report`, and
+  `get_incidents` (+ async variants).
+- `ReportTypesResource` (`client.reports`) with `list`, `generate`, and `preview` (+ async
+  variants) wrapping the report types and preview endpoints. `generate()` takes
+  `format="pdf"`, `"html"` or `"docx"`.
+- `ComplianceResource` (`client.compliance`) with `iso42001_score`, `iso42001_gaps`,
+  `list_frameworks` and `get_framework_controls` (+ async variants) wrapping ISO/IEC 42001
+  readiness and Control Catalog endpoints.
+- `AlertIntelligenceResource` (`client.alert_intelligence`) and `AlertManagementResource`
+  (`client.alert_management`). Neither takes an `organization_id`: the backend derives the
+  organization from the API key.
+- `ModelsResource.compare_versions()`, `version_changelog()`, `list_git_versions()` and
+  `architecture_changes_timeline()` (+ async variants) wrapping Git-backed model diff and
+  architecture timeline endpoints.
+- `GovernanceResource.get_review_request()` and `submit_decision()` (+ async variants).
+  `submit_decision()` takes a required keyword-only `evidence_snapshot_hash` (from the
+  request detail the voter was shown) and `totp_code` (a current authenticator or backup
+  code); the backend refuses the vote if the request changed since, or the code is missing,
+  wrong or already used.
+- DiCE counterfactual parameters (`total_cfs`, `desired_class`, `features_to_vary`) on
+  `client.explanations.generate()`, `generate_bulk()` and `generate_async()` (+ async
+  variants), and further `ExplanationsResource` methods: `compare`, `get_by_prediction`,
+  `list_by_model`, `get_stats`, `get_config`, `set_config`, `delete_config`, `visualize`
+  and `visualize_multi`.
+- Optional `features` and `baseline_metrics` arguments on every `register_from_model()` /
+  `register_application()` / `register_saved_model()` helper (see Fixed).
+
+### Changed
+- `RateLimitError` now carries the backend's own explanation in its message when the 429
+  response has one, so a two-factor lockout is not mistaken for a plan quota.
+- `request()`/`arequest()` no longer sleep through a 429 that asks for more than
+  `MAX_AUTO_RETRY_WAIT_SECONDS` (60); the `RateLimitError` is raised at once with
+  `retry_after` set. Shorter waits are retried as before.
+- The SDK reads its API key and base URL from `WHITEBOX_API_KEY` / `WHITEBOX_BASE_URL`.
+  The names 1.2.0 read, `WHITEBOXXAI_API_KEY` / `WHITEBOXXAI_BASE_URL`, are still honored as
+  a fallback, so an existing environment keeps working after upgrading.
+- The default offline queue directory is `./WHITEBOX_offline` (was `./whiteboxxai_offline`).
+  If only the old directory exists it is reused, so operations queued by 1.2.0 are not
+  orphaned. An explicit `offline_dir=` is always used as given. The `offline_dir` default of
+  `WhiteBoxXAI()` and `OfflineManager()` is now `None`.
+- `OfflineManager.sync()` no longer marks an operation it cannot replay as synced.
+- `register_from_model()` raises `ValueError` for a `model_type` the API does not accept,
+  instead of sending it and getting a 422. Task names such as `"classification"` are still
+  accepted there (see Fixed).
+- Documentation states that the SDK authenticates with a scoped, long-lived API key (API Keys
+  in your WhiteBoxXAI settings); short-lived session JWTs are not supported for programmatic
+  access. This is a documentation change: the SDK has always sent `api_key` as the bearer
+  token.
+- Documentation states that explanations run on the model artifact stored on the platform, so
+  they only work for models registered through GitHub auto-registration with
+  `storage_mode: full`. A model registered through the SDK or the dashboard stores metadata
+  only, and its explanation request ends in a failed explanation.
+
+### Fixed
+- `WhiteBoxXAI()` raised `TypeError: missing 1 required positional argument: 'api_key'`, so the
+  documented `WHITEBOX_API_KEY` / `WHITEBOX_BASE_URL` environment variables could not be used
+  through the client (only through `Config`). `api_key` and `base_url` are now optional on
+  `WhiteBoxXAI`; an explicit argument still wins, and a missing key raises `ValueError` naming
+  the variable.
+- **Integration helpers could not register a model against the live API** (issues #12, #13,
+  #14). `ModelCreate` needs a `version`, `features` and `baseline_metrics`, and `model_type`
+  is a strict enum (`xgboost`, `random_forest`, `neural_network`, `linear_model`, `llm`,
+  `custom`); the helpers sent task names such as `"classification"` and omitted the rest, so
+  every registration returned a 422. `SklearnMonitor`, `TorchMonitor`, `KerasMonitor`,
+  `TransformersMonitor`, `XGBoostMonitor` and `LightGBMMonitor` `register_from_model()` now pick
+  a valid `model_type` for the framework, keep the task (classification/regression/...) in
+  `metadata["task"]`, and take `version` (default `1.0.0`), `features` and `baseline_metrics`
+  (default `{}`). `features` default to the model's own feature names, else
+  `feature_0..feature_{n-1}` from its input width; when neither is available a `ValueError`
+  asks for `features=[...]` instead of sending a request that would be rejected.
+  `wrap_xgboost_model(auto_register=True)` takes the same path.
+- `LangChainMonitor.register_application()` (and so `create_callback_handler()`),
+  `KerasMonitor.register_saved_model()` and `TransformersMonitor.register_from_model()` called
+  `client.register_model()`, which does not exist on `WhiteBoxXAI`, raising `AttributeError`.
+  They now go through `ModelMonitor.register_model()`. LangChain applications register as
+  `llm`.
+- `integrations.langchain_agents` called `agent_workflows` methods that do not exist
+  (`create`, `create_interaction`, `get_analytics`) and passed `create_execution()` arguments
+  it does not take, and the resulting `TypeError` was swallowed, so nothing was recorded.
+  `LangGraphMultiAgentMonitor`, `monitor_langchain_agent()` and `MultiAgentCallbackHandler` now
+  use `create_and_start()`, `start(inputs=...)`, `log_interaction()`, `analytics()` and
+  `complete(status=...)`, and the handler opens an execution per top-level chain run.
+  `MultiAgentCallbackHandler` takes an optional `agent_id` and otherwise registers the agent on
+  first use; `LangGraphMultiAgentMonitor.register_agent()` now returns the agent ID. Logging
+  failures are reported through `logging` instead of `print`. The API has no route to close an
+  execution, so how it ended (duration, LLM and tool call counts, tokens, cost, outputs or
+  error) is logged as an `execution_end` interaction.
+- `LLMResource.log_call()` posted straight to `/api/v1/llm/logs`, so in offline mode the
+  LangChain handler's main logging path raised instead of queueing. It now goes through the
+  offline queue (`OperationType.LLM_LOG`, replayed by `WhiteBoxXAI._api_llm_log`).
+- The README, examples and migration guide showed `model_type="classification"` and omitted
+  the registration fields the API requires.
+- The migration guide's install command was `pip install whiteboxai`; the package is
+  `whitebox-xai-sdk`.
+
 ## [1.2.0] - 2026-08-27
 
 Ports the MCP server M2 domain-coverage work (issue #141), the ISO 42001

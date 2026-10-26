@@ -6,7 +6,8 @@ Integration for monitoring PyTorch models.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 try:
     import torch
@@ -25,6 +26,8 @@ except ImportError:
 
     nn = _NNStub()
 
+
+from whiteboxxai.integrations._registration import positional_feature_names, registration_fields
 from whiteboxxai.monitor import ModelMonitor
 
 
@@ -49,7 +52,9 @@ class TorchMonitor(ModelMonitor):
         # Setup monitoring
         client = WhiteBoxXAI(api_key="your-api-key")
         monitor = TorchMonitor(client, model=model)
-        monitor.register_from_model(model_type="classification")
+        monitor.register_from_model(
+            version="1.0.0", baseline_metrics={"accuracy": 0.94}
+        )
 
         # Wrap model for automatic monitoring
         monitored_model = monitor.wrap_model(model)
@@ -59,7 +64,7 @@ class TorchMonitor(ModelMonitor):
         ```
     """
 
-    def __init__(self, client, model: Optional[nn.Module] = None, **kwargs):
+    def __init__(self, client, model: nn.Module | None = None, **kwargs):
         """Initialize PyTorch monitor."""
         if not TORCH_AVAILABLE:
             raise ImportError("PyTorch is not installed. Install with: pip install torch")
@@ -69,9 +74,11 @@ class TorchMonitor(ModelMonitor):
 
     def register_from_model(
         self,
-        name: Optional[str] = None,
-        model_type: str = "classification",
-        version: Optional[str] = None,
+        name: str | None = None,
+        model_type: str | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """
@@ -79,40 +86,53 @@ class TorchMonitor(ModelMonitor):
 
         Args:
             name: Model name (default: class name)
-            model_type: Model type (classification, regression, etc.)
-            version: Model version
+            model_type: One of the API's model types (default
+                ``neural_network``). A task name such as ``"classification"`` is
+                kept as ``task`` metadata.
+            version: Model version (default ``1.0.0``)
+            features: Feature names (default: ``feature_0..feature_{n-1}``, with
+                n read from the first layer's ``in_features``; required when the
+                module has no such layer)
+            baseline_metrics: Baseline metrics, e.g. ``{"accuracy": 0.94}``
             **kwargs: Additional metadata
 
         Returns:
             Model ID
+
+        Raises:
+            ValueError: No model, an invalid ``model_type``, or no feature names
+                could be determined.
         """
-        if self.model is None:
-            raise ValueError("No model provided")
-
-        # Generate name from model class
-        if name is None:
-            name = self.model.__class__.__name__
-
-        # Extract model metadata
-        metadata = self._extract_model_metadata()
-        metadata.update(kwargs)
-
-        return self.register_model(
-            name=name,
-            model_type=model_type,
-            framework="pytorch",
-            version=version,
-            **metadata,
+        name, fields, metadata = self._prepare_registration(
+            name, model_type, version, features, baseline_metrics, kwargs
         )
+        return self.register_model(name=name, framework="pytorch", **fields, **metadata)
 
     async def aregister_from_model(
         self,
-        name: Optional[str] = None,
-        model_type: str = "classification",
-        version: Optional[str] = None,
+        name: str | None = None,
+        model_type: str | None = None,
+        version: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """Async version of register_from_model()."""
+        name, fields, metadata = self._prepare_registration(
+            name, model_type, version, features, baseline_metrics, kwargs
+        )
+        return await self.aregister_model(name=name, framework="pytorch", **fields, **metadata)
+
+    def _prepare_registration(
+        self,
+        name: str | None,
+        model_type: str | None,
+        version: str | None,
+        features: list[str] | None,
+        baseline_metrics: dict[str, Any] | None,
+        extra_metadata: dict[str, Any],
+    ) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        """Resolve (name, API-required fields, metadata) for registration."""
         if self.model is None:
             raise ValueError("No model provided")
 
@@ -120,17 +140,28 @@ class TorchMonitor(ModelMonitor):
             name = self.model.__class__.__name__
 
         metadata = self._extract_model_metadata()
-        metadata.update(kwargs)
+        metadata.update(extra_metadata)
 
-        return await self.aregister_model(
-            name=name,
-            model_type=model_type,
-            framework="pytorch",
-            version=version,
-            **metadata,
+        input_width = next(
+            (
+                module.in_features
+                for module in self.model.modules()
+                if isinstance(getattr(module, "in_features", None), int)
+            ),
+            None,
         )
+        fields = registration_fields(
+            model_type=model_type,
+            default_model_type="neural_network",
+            version=version,
+            features=features,
+            inferred_features=(positional_feature_names(input_width) if input_width else None),
+            baseline_metrics=baseline_metrics,
+            metadata=metadata,
+        )
+        return name, fields, metadata
 
-    def wrap_model(self, model: nn.Module) -> "TorchWrapper":
+    def wrap_model(self, model: nn.Module) -> TorchWrapper:
         """
         Wrap PyTorch model for automatic monitoring.
 
@@ -142,7 +173,7 @@ class TorchMonitor(ModelMonitor):
         """
         return TorchWrapper(model, self)
 
-    def _extract_model_metadata(self) -> Dict[str, Any]:
+    def _extract_model_metadata(self) -> dict[str, Any]:
         """Extract metadata from PyTorch model."""
         metadata = {}
 
@@ -223,7 +254,7 @@ class TorchWrapper(nn.Module):
             return getattr(self.model, name)
 
 
-def monitor_forward(monitor: TorchMonitor, input_extractor: Optional[Callable] = None):
+def monitor_forward(monitor: TorchMonitor, input_extractor: Callable | None = None):
     """
     Decorator to monitor PyTorch forward passes.
 
