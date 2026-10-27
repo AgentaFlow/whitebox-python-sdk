@@ -18,9 +18,11 @@ def main():
     print("Registering model...")
     model_id = monitor.register_model(
         name="fraud_detection_v1",
-        model_type="classification",
+        model_type="random_forest",
         framework="sklearn",
         version="1.0.0",
+        features=["amount", "merchant_category"],
+        baseline_metrics={"accuracy": 0.94},
         description="Fraud detection model using Random Forest",
     )
     print(f"Model registered with ID: {model_id}")

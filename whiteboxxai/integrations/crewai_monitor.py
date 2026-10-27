@@ -5,8 +5,10 @@ Monitor CrewAI multi-agent workflows with automatic tracking of agents,
 tasks, interactions, and costs.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from whiteboxxai import WhiteBoxXAI
 
@@ -79,8 +81,8 @@ class CrewAIMonitor:
     def __init__(
         self,
         api_key: str,
-        api_url: Optional[str] = None,
-        organization_id: Optional[str] = None,
+        api_url: str | None = None,
+        organization_id: str | None = None,
     ):
         """
         Initialize CrewAI monitor.
@@ -107,7 +109,7 @@ class CrewAIMonitor:
         self,
         crew: Any,  # crewai.Crew
         workflow_name: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> str:
         """
         Start monitoring a CrewAI crew workflow.
@@ -263,8 +265,8 @@ class CrewAIMonitor:
     def log_agent_execution(
         self,
         agent: Any,
-        inputs: Optional[Dict] = None,
-        outputs: Optional[Dict] = None,
+        inputs: dict | None = None,
+        outputs: dict | None = None,
         tokens_used: int = 0,
         cost: float = 0.0,
     ) -> None:
@@ -308,8 +310,8 @@ class CrewAIMonitor:
         self,
         task: Any,
         status: str = "completed",
-        output_data: Optional[Dict] = None,
-        error_message: Optional[str] = None,
+        output_data: dict | None = None,
+        error_message: str | None = None,
     ) -> None:
         """
         Log task completion.
@@ -348,7 +350,7 @@ class CrewAIMonitor:
         from_agent: Any,
         to_agent: Any,
         interaction_type: str = "delegation",
-        message: Optional[str] = None,
+        message: str | None = None,
     ) -> None:
         """
         Log agent-to-agent interaction.
@@ -390,9 +392,9 @@ class CrewAIMonitor:
     def complete_monitoring(
         self,
         status: str = "completed",
-        outputs: Optional[Dict] = None,
-        error_message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        outputs: dict | None = None,
+        error_message: str | None = None,
+    ) -> dict[str, Any]:
         """
         Complete workflow monitoring.
 
@@ -435,7 +437,7 @@ class CrewAIMonitor:
             logger.error(f"Error completing monitoring: {str(e)}")
             raise
 
-    def get_analytics(self) -> Dict[str, Any]:
+    def get_analytics(self) -> dict[str, Any]:
         """
         Get workflow analytics.
 
@@ -467,8 +469,8 @@ def monitor_crew(
     crew: Any,
     workflow_name: str,
     api_key: str,
-    api_url: Optional[str] = None,
-    metadata: Optional[Dict] = None,
+    api_url: str | None = None,
+    metadata: dict | None = None,
 ) -> CrewAIMonitor:
     """
     Convenience function to start monitoring a CrewAI crew.

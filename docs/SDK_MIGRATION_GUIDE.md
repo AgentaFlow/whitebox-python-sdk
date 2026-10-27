@@ -11,7 +11,7 @@ This document provides comprehensive instructions for migrating the WhiteBoxXAI 
 #### 1. **Easier Distribution & Installation**
 ```bash
 # Users can install directly from PyPI
-pip install whiteboxai
+pip install whitebox-xai-sdk
 
 # Or from GitHub
 pip install git+https://github.com/AgentaFlow/whiteboxai-python-sdk.git
@@ -647,7 +647,10 @@ monitor = ModelMonitor(client)
 # Register model
 model_id = monitor.register_model(
     name="fraud_detection",
-    model_type="classification"
+    model_type="random_forest",
+    version="1.0.0",
+    features=["amount"],
+    baseline_metrics={"accuracy": 0.94},
 )
 
 # Log predictions
@@ -915,8 +918,11 @@ monitor = ModelMonitor(client)
 # Register model
 model_id = monitor.register_model(
     name="fraud_detection",
-    model_type="classification",
-    framework="sklearn"
+    model_type="random_forest",
+    framework="sklearn",
+    version="1.0.0",
+    features=["amount", "merchant"],
+    baseline_metrics={"accuracy": 0.94},
 )
 
 # Log predictions

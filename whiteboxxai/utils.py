@@ -4,8 +4,10 @@ SDK Utilities
 General utility functions for the WhiteBoxXAI SDK.
 """
 
+from __future__ import annotations
+
 import json
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -71,7 +73,7 @@ def validate_model_type(model_type: str) -> bool:
     return True
 
 
-def extract_feature_names(data: Union[np.ndarray, pd.DataFrame, Dict]) -> List[str]:
+def extract_feature_names(data: np.ndarray | pd.DataFrame | dict) -> list[str]:
     """
     Extract feature names from data.
 
@@ -127,7 +129,7 @@ def truncate_string(text: str, max_length: int = 100, suffix: str = "...") -> st
     return text[: max_length - len(suffix)] + suffix
 
 
-def dict_to_query_params(params: Dict[str, Any]) -> str:
+def dict_to_query_params(params: dict[str, Any]) -> str:
     """
     Convert dictionary to URL query parameters.
 
@@ -148,7 +150,7 @@ def dict_to_query_params(params: Dict[str, Any]) -> str:
     return "&".join(parts)
 
 
-def deep_merge(dict1: Dict, dict2: Dict) -> Dict:
+def deep_merge(dict1: dict, dict2: dict) -> dict:
     """
     Deep merge two dictionaries.
 
@@ -234,7 +236,7 @@ def validate_features(features: Any) -> bool:
         raise ValueError(f"Unsupported features type: {type(features)}")
 
 
-def format_features(features: Any) -> Union[List[Any], Dict[str, Any]]:
+def format_features(features: Any) -> list[Any] | dict[str, Any]:
     """
     Format features for API transmission.
 
@@ -271,7 +273,7 @@ def validate_prediction(prediction: Any) -> bool:
     return True
 
 
-def serialize_numpy(arr: Any) -> List:
+def serialize_numpy(arr: Any) -> list:
     """
     Serialize numpy array (or array-like) to list.
 
@@ -288,7 +290,7 @@ def serialize_numpy(arr: Any) -> List:
     return list(arr)
 
 
-def deserialize_numpy(data: List) -> np.ndarray:
+def deserialize_numpy(data: list) -> np.ndarray:
     """
     Deserialize list to numpy array.
 
@@ -301,7 +303,7 @@ def deserialize_numpy(data: List) -> np.ndarray:
     return np.array(data)
 
 
-def compute_metrics(y_true: Any, y_pred: Any, task: str = "classification") -> Dict[str, float]:
+def compute_metrics(y_true: Any, y_pred: Any, task: str = "classification") -> dict[str, float]:
     """
     Compute basic metrics for predictions.
 
@@ -328,7 +330,7 @@ def compute_metrics(y_true: Any, y_pred: Any, task: str = "classification") -> D
             f"(got {y_true.shape[0]} and {y_pred.shape[0]})."
         )
 
-    metrics: Dict[str, float] = {}
+    metrics: dict[str, float] = {}
 
     if task == "classification":
         metrics["accuracy"] = float(np.mean(y_true == y_pred))

@@ -83,7 +83,6 @@ def main():
     # Register model
     model_id = monitor.register_from_model(
         name="pytorch_classifier",
-        model_type="classification",
         version="1.0.0",
     )
     print(f"Model registered with ID: {model_id}")

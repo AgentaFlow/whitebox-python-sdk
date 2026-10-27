@@ -19,7 +19,7 @@ Example:
     >>> client = WhiteBoxXAI(
     ...     api_key="your-api-key",
     ...     enable_offline=True,
-    ...     offline_dir="./whiteboxxai_offline"
+    ...     offline_dir="./WHITEBOX_offline"
     ... )
     >>>
     >>> # Operations are queued when offline
@@ -29,6 +29,9 @@ Example:
     >>> client.sync_offline_queue()
 """
 
+from __future__ import annotations
+
+import contextlib
 import json
 import logging
 import os
@@ -36,7 +39,7 @@ import sqlite3
 import threading
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,7 @@ class OperationType(Enum):
     REGISTER_MODEL = "register_model"
     UPDATE_BASELINE = "update_baseline"
     LOG_BATCH = "log_batch"
+    LLM_LOG = "llm_log"
 
 
 class OperationPriority(Enum):
@@ -101,7 +105,7 @@ class OfflineQueue:
         # Ensure directory exists
         os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-        with sqlite3.connect(self.db_path) as conn:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS queue (
@@ -164,7 +168,7 @@ class OfflineQueue:
     def enqueue(
         self,
         operation_type: OperationType,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         priority: OperationPriority = OperationPriority.NORMAL,
     ) -> int:
         """
@@ -189,7 +193,7 @@ class OfflineQueue:
                     raise ValueError(f"Queue is full ({current_size}/{self.max_queue_size})")
 
             # Insert operation
-            with sqlite3.connect(self.db_path) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
                 cursor = conn.execute(
                     """
                     INSERT INTO queue (operation_type, priority, data)
@@ -203,7 +207,7 @@ class OfflineQueue:
             logger.info(f"Queued operation {op_id}: {operation_type.value}")
             return op_id
 
-    def dequeue(self, limit: int = 100) -> List[Tuple[int, OperationType, Dict[str, Any]]]:
+    def dequeue(self, limit: int = 100) -> list[tuple[int, OperationType, dict[str, Any]]]:
         """
         Claim up to `limit` pending operations, atomically marking them
         'processing' so they can't also be claimed by a second, concurrent
@@ -230,7 +234,7 @@ class OfflineQueue:
             List of (id, operation_type, data) tuples
         """
         with self._lock:
-            with sqlite3.connect(self.db_path, isolation_level=None) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path, isolation_level=None)) as conn:
                 conn.execute("BEGIN IMMEDIATE")
                 try:
                     cursor = conn.execute(
@@ -276,7 +280,7 @@ class OfflineQueue:
             operation_id: Operation ID
         """
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
                 conn.execute(
                     """
                     UPDATE queue
@@ -305,7 +309,7 @@ class OfflineQueue:
             max_retries: Maximum retry attempts
         """
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
                 # Not using SQLite's RETURNING clause (3.35+, 2021): this
                 # SDK runs on arbitrary customer machines with whatever
                 # sqlite3 build their Python ships, not a controlled
@@ -356,7 +360,7 @@ class OfflineQueue:
         Returns:
             Number of operations
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
             if status:
                 cursor = conn.execute("SELECT COUNT(*) FROM queue WHERE status = ?", (status,))
             else:
@@ -364,14 +368,14 @@ class OfflineQueue:
 
             return cursor.fetchone()[0]
 
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> dict[str, int]:
         """
         Get queue statistics.
 
         Returns:
             Dictionary with counts by status
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT status, COUNT(*) as count
@@ -403,7 +407,7 @@ class OfflineQueue:
             older_than_days: Remove operations older than this many days
         """
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
                 cursor = conn.execute(
                     """
                     DELETE FROM queue
@@ -421,20 +425,20 @@ class OfflineQueue:
     def clear_all(self):
         """Clear all operations from queue (use with caution)."""
         with self._lock:
-            with sqlite3.connect(self.db_path) as conn:
+            with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
                 conn.execute("DELETE FROM queue")
                 conn.commit()
 
         logger.warning("Cleared all operations from queue")
 
-    def get_failed_operations(self) -> List[Dict[str, Any]]:
+    def get_failed_operations(self) -> list[dict[str, Any]]:
         """
         Get all permanently failed operations.
 
         Returns:
             List of failed operation details
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with contextlib.closing(sqlite3.connect(self.db_path)) as conn:
             cursor = conn.execute(
                 """
                 SELECT id, operation_type, data, created_at, retry_count, last_error
@@ -461,6 +465,26 @@ class OfflineQueue:
             return failed
 
 
+DEFAULT_OFFLINE_DIR = "./WHITEBOX_offline"
+
+# SDK 1.2.0 stored the queue here. Operations a 1.2.0 process queued while offline
+# are still in it, so it keeps being used when it is the only one that exists.
+LEGACY_OFFLINE_DIR = "./whiteboxxai_offline"
+
+
+def _default_offline_dir() -> str:
+    """The default queue directory: DEFAULT_OFFLINE_DIR, unless only the SDK 1.2.0
+    one exists, in which case that is reused rather than orphaning its queue."""
+    if not Path(DEFAULT_OFFLINE_DIR).exists() and Path(LEGACY_OFFLINE_DIR).exists():
+        logger.info(
+            "Using existing offline queue directory %s (the default is now %s)",
+            LEGACY_OFFLINE_DIR,
+            DEFAULT_OFFLINE_DIR,
+        )
+        return LEGACY_OFFLINE_DIR
+    return DEFAULT_OFFLINE_DIR
+
+
 class OfflineManager:
     """
     Manages offline mode for WhiteBoxXAI SDK.
@@ -475,7 +499,7 @@ class OfflineManager:
 
     def __init__(
         self,
-        offline_dir: str = "./whiteboxxai_offline",
+        offline_dir: str | None = None,
         max_queue_size: int = 10000,
         auto_sync: bool = True,
         sync_interval: int = 60,
@@ -485,13 +509,14 @@ class OfflineManager:
         Initialize offline manager.
 
         Args:
-            offline_dir: Directory for offline storage
+            offline_dir: Directory for offline storage (default: ./WHITEBOX_offline,
+                or ./whiteboxxai_offline, the SDK 1.2.0 default, if only that exists)
             max_queue_size: Maximum operations to queue
             auto_sync: Enable automatic syncing
             sync_interval: Seconds between sync attempts
             max_retries: Maximum retry attempts
         """
-        self.offline_dir = Path(offline_dir)
+        self.offline_dir = Path(offline_dir or _default_offline_dir())
         self.offline_dir.mkdir(parents=True, exist_ok=True)
 
         db_path = str(self.offline_dir / "queue.db")
@@ -544,7 +569,7 @@ class OfflineManager:
             # Wait for next sync interval
             self._stop_sync.wait(self.sync_interval)
 
-    def sync(self, batch_size: int = 100) -> Dict[str, int]:
+    def sync(self, batch_size: int = 100) -> dict[str, int]:
         """
         Sync queued operations with API.
 
@@ -579,6 +604,11 @@ class OfflineManager:
                     self._client._api_update_baseline(**data)
                 elif op_type == OperationType.LOG_BATCH:
                     self._client._api_log_batch(**data)
+                elif op_type == OperationType.LLM_LOG:
+                    self._client._api_llm_log(**data)
+                else:
+                    # Don't mark an operation we can't replay as synced.
+                    raise ValueError(f"Unsupported operation type: {op_type}")
 
                 # Mark success
                 self.queue.mark_success(op_id)
@@ -599,7 +629,7 @@ class OfflineManager:
 
         return stats
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """
         Get offline mode status.
 

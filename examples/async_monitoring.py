@@ -21,9 +21,11 @@ async def register_and_log():
         print("Registering model...")
         model_id = await monitor.aregister_model(
             name="async_fraud_detector",
-            model_type="classification",
+            model_type="random_forest",
             framework="sklearn",
             version="1.0.0",
+            features=["amount", "merchant_category"],
+            baseline_metrics={"accuracy": 0.94},
         )
         print(f"Model registered with ID: {model_id}")
 

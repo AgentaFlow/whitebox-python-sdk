@@ -2,10 +2,21 @@
 SDK Configuration
 """
 
+from __future__ import annotations
+
 import os
-from typing import Any, Optional
+from typing import Any
 
 from whiteboxxai import __version__ as _sdk_version
+
+
+def _getenv(*names: str) -> str | None:
+    """First non-empty value among the named environment variables."""
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    return None
 
 
 class Config:
@@ -25,24 +36,27 @@ class Config:
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
         **kwargs: Any,
     ):
         """Initialize configuration."""
-        # API key (from parameter or environment)
-        self.api_key = api_key or os.getenv("WHITEBOXXAI_API_KEY")
+        # API key (from parameter or environment). WHITEBOXXAI_API_KEY is the name
+        # SDK 1.2.0 read; it is still honored so upgrading doesn't break existing setups.
+        self.api_key = api_key or _getenv("WHITEBOX_API_KEY", "WHITEBOXXAI_API_KEY")
         if not self.api_key:
             raise ValueError(
                 "API key is required. Provide via 'api_key' parameter or "
-                "WHITEBOXXAI_API_KEY environment variable."
+                "WHITEBOX_API_KEY environment variable."
             )
 
-        # Base URL
+        # Base URL (WHITEBOXXAI_BASE_URL: the SDK 1.2.0 name, still honored)
         self.base_url = (
-            base_url or os.getenv("WHITEBOXXAI_BASE_URL") or "https://api.whiteboxxai.com"
+            base_url
+            or _getenv("WHITEBOX_BASE_URL", "WHITEBOXXAI_BASE_URL")
+            or "https://api.whiteboxxai.com"
         )
 
         # Request settings

@@ -4,8 +4,12 @@ Privacy Utilities
 PII detection and data masking utilities.
 """
 
+from __future__ import annotations
+
 import re
-from typing import Any, Callable, Dict, List, Optional, Pattern
+from collections.abc import Callable
+from re import Pattern
+from typing import Any
 
 
 def _luhn_ok(digits: str) -> bool:
@@ -48,7 +52,7 @@ class PIIDetector:
 
     def __init__(self):
         """Initialize PII detector with regex patterns."""
-        self.patterns: Dict[str, Pattern] = {
+        self.patterns: dict[str, Pattern] = {
             "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
             "phone": re.compile(r"\b(?:\+?1[-.]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"),
             "ssn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b"),
@@ -59,12 +63,12 @@ class PIIDetector:
         # against the matched text before it's accepted as a real
         # detection. A type with no entry here is accepted on regex match
         # alone (as before).
-        self.validators: Dict[str, Callable[[str], bool]] = {
+        self.validators: dict[str, Callable[[str], bool]] = {
             "credit_card": lambda v: _luhn_ok(re.sub(r"[-\s]", "", v)),
             "ip_address": _valid_ipv4,
         }
 
-    def detect(self, text: str) -> List[Dict[str, Any]]:
+    def detect(self, text: str) -> list[dict[str, Any]]:
         """
         Detect PII in text.
 
@@ -135,7 +139,7 @@ class DataMasker:
     Mask sensitive data in structured formats (dict, list).
     """
 
-    def __init__(self, pii_detector: Optional[PIIDetector] = None):
+    def __init__(self, pii_detector: PIIDetector | None = None):
         """
         Initialize data masker.
 
@@ -214,7 +218,7 @@ _pii_detector = PIIDetector()
 _data_masker = DataMasker(_pii_detector)
 
 
-def detect_pii(text: str) -> List[Dict[str, Any]]:
+def detect_pii(text: str) -> list[dict[str, Any]]:
     """
     Detect PII in text using global detector.
 

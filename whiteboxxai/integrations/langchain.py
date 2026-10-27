@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import time
 import warnings
-from typing import Any, Dict, List, Optional
+from contextlib import nullcontext
+from typing import Any
 
 # langchain_core is the modern, lighter-weight home for these types and may
 # be installed without the full legacy langchain package. Try it first, then
@@ -45,7 +46,9 @@ try:
 except ImportError:
     Chain = object
 
+from whiteboxxai.integrations._registration import registration_fields
 from whiteboxxai.monitor import ModelMonitor
+from whiteboxxai.runs import governance_run
 
 
 class LangChainMonitor(ModelMonitor):
@@ -76,7 +79,7 @@ class LangChainMonitor(ModelMonitor):
 
         # Register application
         monitor.register_application(
-            name="LangChain Q&A",
+            name="LangChain QA",
             version="1.0.0"
         )
 
@@ -93,7 +96,7 @@ class LangChainMonitor(ModelMonitor):
     def __init__(
         self,
         client,
-        application_name: Optional[str] = None,
+        application_name: str | None = None,
         track_tokens: bool = True,
         track_cost: bool = True,
         **kwargs,
@@ -119,18 +122,25 @@ class LangChainMonitor(ModelMonitor):
 
     def register_application(
         self,
-        name: Optional[str] = None,
-        version: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        version: str | None = None,
+        description: str | None = None,
+        features: list[str] | None = None,
+        baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> int:
         """
         Register LangChain application with WhiteBoxXAI.
 
+        The application is registered as an ``llm`` model.
+
         Args:
-            name: Application name
-            version: Application version
+            name: Application name (letters, digits, spaces, ``-`` and ``_``
+                only -- the API rejects other characters)
+            version: Application version (default ``1.0.0``)
             description: Application description
+            features: Input names of the application (default: ``["input"]``)
+            baseline_metrics: Baseline metrics, if any
             **kwargs: Additional metadata
 
         Returns:
@@ -149,19 +159,27 @@ class LangChainMonitor(ModelMonitor):
         }
 
         # Register as a model (application)
-        self.model_id = self.client.register_model(
-            name=name,
-            model_type="generation",  # LangChain apps are typically generative
-            framework="langchain",
+        fields = registration_fields(
+            model_type="llm",  # LangChain apps are typically generative
+            default_model_type="llm",
             version=version,
+            features=features,
+            inferred_features=["input"],
+            baseline_metrics=baseline_metrics,
+            metadata=metadata,
+        )
+        self.register_model(
+            name=name,
+            framework="langchain",
             description=description,
             metadata=metadata,
+            **fields,
         )
 
         self._registered = True
         return self.model_id
 
-    def create_callback_handler(self) -> "WhiteBoxXAICallbackHandler":
+    def create_callback_handler(self) -> WhiteBoxXAICallbackHandler:
         """
         Create a LangChain callback handler for automatic logging.
 
@@ -182,11 +200,11 @@ class LangChainMonitor(ModelMonitor):
     def log_chain_execution(
         self,
         chain_name: str,
-        inputs: Dict[str, Any],
-        outputs: Dict[str, Any],
+        inputs: dict[str, Any],
+        outputs: dict[str, Any],
         execution_time: float,
-        llm_calls: Optional[List[Dict]] = None,
-        tool_calls: Optional[List[Dict]] = None,
+        llm_calls: list[dict] | None = None,
+        tool_calls: list[dict] | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -224,10 +242,10 @@ class LangChainMonitor(ModelMonitor):
     def log_agent_execution(
         self,
         agent_name: str,
-        inputs: Dict[str, Any],
-        outputs: Dict[str, Any],
+        inputs: dict[str, Any],
+        outputs: dict[str, Any],
         execution_time: float,
-        steps: List[Dict],
+        steps: list[dict],
         **kwargs: Any,
     ) -> None:
         """
@@ -261,12 +279,12 @@ class LangChainMonitor(ModelMonitor):
         prompt: str,
         response: str,
         model: str,
-        provider: Optional[str] = None,
-        prompt_tokens: Optional[int] = None,
-        completion_tokens: Optional[int] = None,
-        tokens_used: Optional[int] = None,
-        latency: Optional[float] = None,
-        finish_reason: Optional[str] = None,
+        provider: str | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        tokens_used: int | None = None,
+        latency: float | None = None,
+        finish_reason: str | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -312,7 +330,7 @@ class LangChainMonitor(ModelMonitor):
         tool_name: str,
         tool_input: Any,
         tool_output: Any,
-        execution_time: Optional[float] = None,
+        execution_time: float | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -340,12 +358,12 @@ class LangChainMonitor(ModelMonitor):
     def log_rag_retrieval(
         self,
         query: str,
-        documents: List[Dict],
+        documents: list[dict],
         num_retrieved: int,
-        retrieval_time: Optional[float] = None,
-        relevance_scores: Optional[List[float]] = None,
-        ground_truth_ids: Optional[List[str]] = None,
-        answer: Optional[str] = None,
+        retrieval_time: float | None = None,
+        relevance_scores: list[float] | None = None,
+        ground_truth_ids: list[str] | None = None,
+        answer: str | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -432,21 +450,46 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
         self._chain_inputs = {}
         self._agent_inputs = {}
         self._agent_steps = {}
+        # run_id -> the root run it belongs to. Everything one top-level
+        # invocation logs (its LLM calls, tool steps, the chain itself) is
+        # sent under that root's governance_run, so it is billed as one
+        # Governance Event per 100 records instead of one per record.
+        self._run_roots: dict[Any, Any] = {}
+
+    def _note_run(self, kwargs: dict[str, Any]) -> None:
+        run_id = kwargs.get("run_id")
+        if run_id is None:
+            return
+        parent = kwargs.get("parent_run_id")
+        self._run_roots[run_id] = run_id if parent is None else self._run_roots.get(parent, parent)
+
+    def _run_scope(self, kwargs: dict[str, Any]) -> Any:
+        """A governance_run for the root of the run these kwargs describe."""
+        run_id = kwargs.get("run_id")
+        parent = kwargs.get("parent_run_id")
+        root = self._run_roots.get(run_id)
+        if root is None:
+            root = self._run_roots.get(parent, parent) if parent else run_id
+        return governance_run(str(root)) if root is not None else nullcontext()
+
+    def _release_run(self, kwargs: dict[str, Any]) -> None:
+        self._run_roots.pop(kwargs.get("run_id"), None)
 
     def on_chain_start(
         self,
-        serialized: Dict[str, Any],
-        inputs: Dict[str, Any],
+        serialized: dict[str, Any],
+        inputs: dict[str, Any],
         **kwargs: Any,
     ) -> None:
         """Called when a chain starts running."""
+        self._note_run(kwargs)
         run_id = kwargs.get("run_id", id(serialized))
         self._chain_start_times[run_id] = time.time()
         self._chain_inputs[run_id] = inputs
 
     def on_chain_end(
         self,
-        outputs: Dict[str, Any],
+        outputs: dict[str, Any],
         **kwargs: Any,
     ) -> None:
         """Called when a chain ends running."""
@@ -460,12 +503,13 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
 
             # Log chain execution
             try:
-                self.monitor.log_chain_execution(
-                    chain_name=chain_name,
-                    inputs=inputs,
-                    outputs=outputs,
-                    execution_time=execution_time,
-                )
+                with self._run_scope(kwargs):
+                    self.monitor.log_chain_execution(
+                        chain_name=chain_name,
+                        inputs=inputs,
+                        outputs=outputs,
+                        execution_time=execution_time,
+                    )
             except Exception as e:
                 warnings.warn(f"Failed to log chain execution: {e}", stacklevel=2)
 
@@ -473,6 +517,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
             del self._chain_start_times[run_id]
             if run_id in self._chain_inputs:
                 del self._chain_inputs[run_id]
+        self._release_run(kwargs)
 
     def on_chain_error(
         self,
@@ -481,6 +526,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
     ) -> None:
         """Called when a chain errors."""
         run_id = kwargs.get("run_id")
+        self._release_run(kwargs)
         if run_id in self._chain_start_times:
             # Cleanup on error
             del self._chain_start_times[run_id]
@@ -519,13 +565,14 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
 
             # Log agent execution
             try:
-                self.monitor.log_agent_execution(
-                    agent_name=kwargs.get("name", "unknown_agent"),
-                    inputs=inputs,
-                    outputs=finish.return_values,
-                    execution_time=execution_time,
-                    steps=steps,
-                )
+                with self._run_scope(kwargs):
+                    self.monitor.log_agent_execution(
+                        agent_name=kwargs.get("name", "unknown_agent"),
+                        inputs=inputs,
+                        outputs=finish.return_values,
+                        execution_time=execution_time,
+                        steps=steps,
+                    )
             except Exception as e:
                 warnings.warn(f"Failed to log agent execution: {e}", stacklevel=2)
 
@@ -538,11 +585,12 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
 
     def on_llm_start(
         self,
-        serialized: Dict[str, Any],
-        prompts: List[str],
+        serialized: dict[str, Any],
+        prompts: list[str],
         **kwargs: Any,
     ) -> None:
         """Called when an LLM starts generating."""
+        self._note_run(kwargs)
         run_id = kwargs.get("run_id", id(serialized))
         self._llm_start_times[run_id] = time.time()
 
@@ -587,19 +635,23 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
                 # Log LLM call (if configured)
                 if self.monitor._track_tokens or self.monitor._track_cost:
                     try:
-                        self.monitor.log_llm_call(
-                            prompt="",  # Prompt tracked separately
-                            response=response_text,
-                            model=kwargs.get("invocation_params", {}).get("model_name", "unknown"),
-                            prompt_tokens=prompt_tokens,
-                            completion_tokens=completion_tokens,
-                            latency=latency,
-                        )
+                        with self._run_scope(kwargs):
+                            self.monitor.log_llm_call(
+                                prompt="",  # Prompt tracked separately
+                                response=response_text,
+                                model=kwargs.get("invocation_params", {}).get(
+                                    "model_name", "unknown"
+                                ),
+                                prompt_tokens=prompt_tokens,
+                                completion_tokens=completion_tokens,
+                                latency=latency,
+                            )
                     except Exception as e:
                         warnings.warn(f"Failed to log LLM call: {e}", stacklevel=2)
 
             # Cleanup
             del self._llm_start_times[run_id]
+        self._release_run(kwargs)
 
     def on_llm_error(
         self,
@@ -608,16 +660,18 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
     ) -> None:
         """Called when an LLM errors."""
         run_id = kwargs.get("run_id")
+        self._release_run(kwargs)
         if run_id in self._llm_start_times:
             del self._llm_start_times[run_id]
 
     def on_tool_start(
         self,
-        serialized: Dict[str, Any],
+        serialized: dict[str, Any],
         input_str: str,
         **kwargs: Any,
     ) -> None:
         """Called when a tool starts running."""
+        self._note_run(kwargs)
         run_id = kwargs.get("run_id", id(serialized))
         self._tool_start_times[run_id] = time.time()
 
@@ -633,17 +687,19 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
 
             # Log tool call
             try:
-                self.monitor.log_tool_call(
-                    tool_name=kwargs.get("name", "unknown_tool"),
-                    tool_input=kwargs.get("input_str", ""),
-                    tool_output=output,
-                    execution_time=execution_time,
-                )
+                with self._run_scope(kwargs):
+                    self.monitor.log_tool_call(
+                        tool_name=kwargs.get("name", "unknown_tool"),
+                        tool_input=kwargs.get("input_str", ""),
+                        tool_output=output,
+                        execution_time=execution_time,
+                    )
             except Exception as e:
                 warnings.warn(f"Failed to log tool call: {e}", stacklevel=2)
 
             # Cleanup
             del self._tool_start_times[run_id]
+        self._release_run(kwargs)
 
     def on_tool_error(
         self,
@@ -652,6 +708,7 @@ class WhiteBoxXAICallbackHandler(BaseCallbackHandler):
     ) -> None:
         """Called when a tool errors."""
         run_id = kwargs.get("run_id")
+        self._release_run(kwargs)
         if run_id in self._tool_start_times:
             del self._tool_start_times[run_id]
 

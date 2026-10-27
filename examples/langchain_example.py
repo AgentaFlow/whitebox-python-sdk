@@ -13,7 +13,7 @@ from whiteboxxai import WhiteBoxXAI
 from whiteboxxai.integrations.langchain import LangChainMonitor, wrap_langchain_chain
 
 # Optional: Set API key
-os.environ["WHITEBOXXAI_API_KEY"] = "your-api-key-here"
+os.environ["WHITEBOX_API_KEY"] = "your-api-key-here"
 
 _SAFE_OPERATORS = {
     ast.Add: operator.add,
@@ -53,7 +53,7 @@ def example_simple_chain():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -109,7 +109,7 @@ def example_sequential_chain():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -168,7 +168,7 @@ def example_agent():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -232,7 +232,7 @@ def example_rag_chain():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(
@@ -309,7 +309,7 @@ def example_manual_logging():
     print("=" * 60)
 
     # Initialize WhiteBoxXAI client
-    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOXXAI_API_KEY"))
+    client = WhiteBoxXAI(api_key=os.getenv("WHITEBOX_API_KEY"))
 
     # Create monitor
     monitor = LangChainMonitor(

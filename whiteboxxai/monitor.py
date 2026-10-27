@@ -4,7 +4,9 @@ Model Monitoring
 Simplified monitoring interface for ML models.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -40,11 +42,11 @@ class ModelMonitor:
     def __init__(
         self,
         client: "WhiteBoxXAI",
-        model_id: Optional[int] = None,
-        model_name: Optional[str] = None,
+        model_id: int | None = None,
+        model_name: str | None = None,
         auto_explain: bool = False,
         sampling_rate: float = 1.0,
-        buffer_size: Optional[int] = None,
+        buffer_size: int | None = None,
     ):
         """
         Initialize model monitor.
@@ -67,10 +69,10 @@ class ModelMonitor:
         self.auto_explain = auto_explain
         self.sampling_rate = sampling_rate
         self.buffer_size = buffer_size
-        self._buffer: List[Dict[str, Any]] = []
+        self._buffer: list[dict[str, Any]] = []
         self._prediction_count = 0
-        self._baseline_data: Optional[np.ndarray] = None
-        self._baseline_labels: Optional[np.ndarray] = None
+        self._baseline_data: np.ndarray | None = None
+        self._baseline_labels: np.ndarray | None = None
 
     def __enter__(self) -> "ModelMonitor":
         return self
@@ -82,8 +84,8 @@ class ModelMonitor:
         self,
         name: str,
         model_type: str,
-        framework: Optional[str] = None,
-        version: Optional[str] = None,
+        framework: str | None = None,
+        version: str | None = None,
         **kwargs: Any,
     ) -> int:
         """
@@ -91,7 +93,8 @@ class ModelMonitor:
 
         Args:
             name: Model name
-            model_type: Model type (classification, regression, etc.)
+            model_type: One of xgboost, random_forest, neural_network,
+                linear_model, llm, custom
             framework: ML framework
             version: Model version
             **kwargs: Additional metadata
@@ -114,8 +117,8 @@ class ModelMonitor:
         self,
         name: str,
         model_type: str,
-        framework: Optional[str] = None,
-        version: Optional[str] = None,
+        framework: str | None = None,
+        version: str | None = None,
         **kwargs: Any,
     ) -> int:
         """Async version of register_model()."""
@@ -134,9 +137,9 @@ class ModelMonitor:
         self,
         inputs: Any,
         output: Any,
-        explain: Optional[bool] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        explain: bool | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """
         Log a single prediction.
 
@@ -176,7 +179,9 @@ class ModelMonitor:
         )
 
         if explain and isinstance(result, dict) and result.get("id"):
-            result["explanation"] = self.client.explanations.generate(prediction_id=result["id"])
+            result["explanation"] = self.client.explanations.generate(
+                self.model_id, inputs, prediction_id=result["id"]
+            )
 
         return result
 
@@ -184,9 +189,9 @@ class ModelMonitor:
         self,
         inputs: Any,
         output: Any,
-        explain: Optional[bool] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
+        explain: bool | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
         """Async version of log_prediction()."""
         if output is None:
             raise ValueError("output cannot be None.")
@@ -216,13 +221,13 @@ class ModelMonitor:
 
         if explain and isinstance(result, dict) and result.get("id"):
             result["explanation"] = await self.client.explanations.agenerate(
-                prediction_id=result["id"]
+                self.model_id, inputs, prediction_id=result["id"]
             )
 
         return result
 
     @staticmethod
-    def _normalize_batch_item(prediction: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_batch_item(prediction: dict[str, Any]) -> dict[str, Any]:
         """Map the SDK's `inputs`/`output` shorthand keys to the
         `input_data`/`output_data` keys the predictions API expects."""
         if "inputs" in prediction or "output" in prediction:
@@ -236,8 +241,8 @@ class ModelMonitor:
 
     def log_batch(
         self,
-        predictions: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        predictions: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """
         Log multiple predictions in batch.
 
@@ -264,8 +269,8 @@ class ModelMonitor:
 
     async def alog_batch(
         self,
-        predictions: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        predictions: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Async version of log_batch()."""
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
@@ -281,7 +286,7 @@ class ModelMonitor:
             predictions=predictions,
         )
 
-    def flush(self) -> Optional[Dict[str, Any]]:
+    def flush(self) -> dict[str, Any] | None:
         """Send any buffered predictions as a batch and clear the buffer."""
         if not self._buffer:
             return None
@@ -291,7 +296,7 @@ class ModelMonitor:
             predictions=predictions,
         )
 
-    async def aflush(self) -> Optional[Dict[str, Any]]:
+    async def aflush(self) -> dict[str, Any] | None:
         """Async version of flush()."""
         if not self._buffer:
             return None
@@ -306,7 +311,7 @@ class ModelMonitor:
         this monitor instance so far."""
         return self._prediction_count
 
-    def get_drift_reports(self, limit: int = 10, skip: int = 0) -> List[Dict[str, Any]]:
+    def get_drift_reports(self, limit: int = 10, skip: int = 0) -> list[dict[str, Any]]:
         """Get persisted drift reports for this model, most recent first."""
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
@@ -319,50 +324,37 @@ class ModelMonitor:
         threshold: float,
         condition: str,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Create an alert rule for this model.
 
         Args:
             metric: Metric to monitor (e.g. "accuracy")
             threshold: Threshold value that triggers the alert
-            condition: Comparison condition ("below", "above", "below_or_equal",
-                "above_or_equal", "equal", "not_equal")
-            **kwargs: Additional alert configuration (name, severity, etc.)
+            condition: Comparison condition (e.g. "below", "above")
+            **kwargs: Additional alert configuration (name, etc.)
 
         Returns:
             Created alert rule data
         """
         name = kwargs.pop("name", f"{self.model_id}_{metric}_{condition}_{threshold}")
-        severity = kwargs.pop("severity", "medium")
-        operator = {
-            "below": "lt",
-            "above": "gt",
-            "below_or_equal": "lte",
-            "above_or_equal": "gte",
-            "equal": "eq",
-            "not_equal": "ne",
-        }.get(condition, condition)
         return self.client.alerts.create(
             name=name,
             alert_type="threshold",
-            severity=severity,
-            conditions=[
-                {
-                    "metric_name": metric,
-                    "operator": operator,
-                    "threshold": threshold,
-                }
-            ],
+            conditions={
+                "metric": metric,
+                "threshold": threshold,
+                "condition": condition,
+            },
             model_id=self.model_id,
             **kwargs,
         )
 
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
+    def get_active_alerts(self) -> list[dict[str, Any]]:
         """Get alert rules for this model."""
         return self.client.alerts.list(model_id=self.model_id)
 
-    def set_baseline(self, data: np.ndarray, labels: Optional[np.ndarray] = None) -> None:
+    def set_baseline(self, data: np.ndarray, labels: np.ndarray | None = None) -> None:
         """
         Set baseline data for drift detection.
 
@@ -375,9 +367,9 @@ class ModelMonitor:
 
     def detect_drift(
         self,
-        current_data: Optional[np.ndarray] = None,
+        current_data: np.ndarray | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Detect drift for the model.
 
@@ -402,9 +394,9 @@ class ModelMonitor:
 
     async def adetect_drift(
         self,
-        current_data: Optional[np.ndarray] = None,
+        current_data: np.ndarray | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Async version of detect_drift()."""
         if self.model_id is None:
             raise ValueError("Model not registered. Call register_model() first.")
@@ -424,7 +416,7 @@ class ModelMonitor:
             return True
         return np.random.random() < self.sampling_rate
 
-    def _sample_predictions(self, predictions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _sample_predictions(self, predictions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Sample predictions based on sampling rate."""
         n_samples = int(len(predictions) * self.sampling_rate)
         if n_samples == 0:

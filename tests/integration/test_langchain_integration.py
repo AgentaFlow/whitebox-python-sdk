@@ -1,7 +1,7 @@
 """Unit tests for LangChain multi-agent integration."""
 
-from datetime import datetime
-from unittest.mock import Mock
+import logging
+from unittest.mock import Mock, create_autospec
 
 import pytest
 
@@ -21,24 +21,38 @@ from whiteboxxai.integrations.langchain_agents import (  # noqa: E402
     MultiAgentCallbackHandler,
     monitor_langchain_agent,
 )
+from whiteboxxai.resources import AgentWorkflowsResource  # noqa: E402
 
 
 @pytest.fixture
-def mock_client():
-    """Create a mock WhiteBoxXAI client."""
+def workflows():
+    """The real AgentWorkflowsResource surface, with canned responses.
+
+    create_autospec (not a bare Mock) so a call to a method the resource
+    doesn't have, or with arguments its signature doesn't accept, raises --
+    a bare Mock accepts anything, which is how this integration shipped
+    calling create()/create_interaction()/get_analytics() and
+    create_execution(agent_name=..., status=...), none of which exist.
+    """
+    resource = create_autospec(AgentWorkflowsResource, instance=True)
+    resource.create_and_start.return_value = {"id": "workflow_123", "status": "pending"}
+    resource.register_agent.return_value = {"id": "agent_1"}
+    resource.create_execution.return_value = {"id": "exec_123"}
+    resource.log_interaction.return_value = {"id": "interaction_1"}
+    resource.analytics.return_value = {"total_cost": 0.15, "total_tokens": 750}
+    return resource
+
+
+@pytest.fixture
+def mock_client(workflows):
+    """A mock WhiteBoxXAI client exposing the autospec'd agent_workflows."""
     client = Mock()
-    client.agent_workflows = Mock()
+    client.agent_workflows = workflows
     return client
 
 
 @pytest.fixture
-def mock_workflow_response():
-    """Mock workflow creation response."""
-    return {"id": "workflow_123", "status": "pending"}
-
-
-@pytest.fixture
-def callback_handler(mock_client, mock_workflow_response):
+def callback_handler(mock_client):
     """Create a MultiAgentCallbackHandler instance."""
     return MultiAgentCallbackHandler(
         client=mock_client,
@@ -64,69 +78,97 @@ class TestMultiAgentCallbackHandler:
         assert handler.workflow_id == "workflow_123"
         assert handler.agent_name == "test_agent"
         assert handler.agent_role == "Test Role"
+        assert handler.agent_id is None
         assert handler.track_tokens is True
         assert handler.track_costs is True
         assert handler.llm_call_count == 0
         assert handler.tool_call_count == 0
 
-    def test_on_chain_start(self, callback_handler):
-        """Test chain start callback."""
+    def test_on_chain_start_opens_an_execution(self, callback_handler, workflows):
+        """A top-level chain run registers the agent and opens an execution."""
         inputs = {"input": "test query"}
 
         callback_handler.on_chain_start(serialized={"name": "test_chain"}, inputs=inputs)
 
+        workflows.register_agent.assert_called_once_with(
+            "workflow_123", name="test_agent", role="Test Agent"
+        )
+        workflows.create_execution.assert_called_once_with("workflow_123", "agent_1", inputs=inputs)
+        assert callback_handler.agent_id == "agent_1"
+        assert callback_handler.current_execution_id == "exec_123"
         assert callback_handler.execution_inputs == inputs
         assert callback_handler.execution_start_time is not None
         assert callback_handler.llm_call_count == 0
         assert callback_handler.tool_call_count == 0
 
-    def test_on_chain_end(self, callback_handler, mock_client):
-        """Test chain end callback."""
-        callback_handler.execution_start_time = datetime.utcnow()
-        callback_handler.execution_inputs = {"input": "test"}
+    def test_known_agent_id_is_not_registered_again(self, mock_client, workflows):
+        """An agent_id from register_agent() is used as given."""
+        handler = MultiAgentCallbackHandler(
+            client=mock_client,
+            workflow_id="workflow_123",
+            agent_name="test_agent",
+            agent_id="agent_42",
+        )
+
+        handler.on_chain_start(serialized={}, inputs={"input": "q"})
+
+        workflows.register_agent.assert_not_called()
+        workflows.create_execution.assert_called_once_with(
+            "workflow_123", "agent_42", inputs={"input": "q"}
+        )
+
+    def test_nested_chain_is_not_a_separate_execution(self, callback_handler, workflows):
+        """Only the top-level chain run (no parent_run_id) is an execution."""
+        callback_handler.on_chain_start(
+            serialized={}, inputs={"input": "q"}, parent_run_id="run_parent"
+        )
+        callback_handler.on_chain_end(outputs={}, parent_run_id="run_parent")
+
+        workflows.create_execution.assert_not_called()
+        workflows.log_interaction.assert_not_called()
+        assert callback_handler.execution_start_time is None
+
+    def test_on_chain_end_logs_how_the_execution_ended(self, callback_handler, workflows):
+        """The outcome is logged as an execution_end interaction."""
+        callback_handler.on_chain_start(serialized={}, inputs={"input": "test"})
         callback_handler.llm_call_count = 2
         callback_handler.tool_call_count = 1
         callback_handler.total_tokens = 150
         callback_handler.total_cost = 0.003
 
-        mock_client.agent_workflows.create_execution.return_value = {"id": "exec_123"}
-
         outputs = {"output": "test result"}
         callback_handler.on_chain_end(outputs=outputs)
 
-        # Verify execution was logged
-        mock_client.agent_workflows.create_execution.assert_called_once()
-        call_args = mock_client.agent_workflows.create_execution.call_args
-
-        assert call_args.kwargs["workflow_id"] == "workflow_123"
-        assert call_args.kwargs["agent_name"] == "test_agent"
-        assert call_args.kwargs["status"] == "completed"
-        assert call_args.kwargs["inputs"] == {"input": "test"}
-        assert call_args.kwargs["outputs"] == outputs
-        assert call_args.kwargs["llm_call_count"] == 2
-        assert call_args.kwargs["tool_call_count"] == 1
-        assert call_args.kwargs["tokens_used"] == 150
-        assert call_args.kwargs["cost"] == 0.003
+        workflows.log_interaction.assert_called_once()
+        call_args = workflows.log_interaction.call_args
+        assert call_args.args == ("workflow_123",)
+        assert call_args.kwargs["interaction_type"] == "execution_end"
+        assert call_args.kwargs["from_agent_id"] == "agent_1"
+        assert call_args.kwargs["from_execution_id"] == "exec_123"
+        meta = call_args.kwargs["meta_data"]
+        assert meta["status"] == "completed"
+        assert meta["outputs"] == outputs
+        assert meta["llm_call_count"] == 2
+        assert meta["tool_call_count"] == 1
+        assert meta["tokens_used"] == 150
+        assert meta["cost"] == 0.003
+        assert meta["duration_ms"] >= 0
 
         # Verify state was reset
         assert callback_handler.execution_start_time is None
+        assert callback_handler.current_execution_id is None
 
-    def test_on_chain_error(self, callback_handler, mock_client):
-        """Test chain error callback."""
-        callback_handler.execution_start_time = datetime.utcnow()
-        callback_handler.execution_inputs = {"input": "test"}
-        callback_handler.llm_call_count = 1
+    def test_on_chain_error_logs_a_failed_execution(self, callback_handler, workflows):
+        """A failed chain run is logged with the error."""
+        callback_handler.on_chain_start(serialized={}, inputs={"input": "test"})
 
-        error = ValueError("Test error")
-        callback_handler.on_chain_error(error=error)
+        callback_handler.on_chain_error(error=ValueError("Test error"))
 
-        # Verify failed execution was logged
-        mock_client.agent_workflows.create_execution.assert_called_once()
-        call_args = mock_client.agent_workflows.create_execution.call_args
-
-        assert call_args.kwargs["status"] == "failed"
-        assert "error" in call_args.kwargs["outputs"]
-        assert "Test error" in call_args.kwargs["outputs"]["error"]
+        call_args = workflows.log_interaction.call_args
+        assert call_args.kwargs["interaction_type"] == "execution_end"
+        meta = call_args.kwargs["meta_data"]
+        assert meta["status"] == "failed"
+        assert "Test error" in meta["error"]
 
     def test_on_llm_start(self, callback_handler):
         """Test LLM start callback."""
@@ -153,9 +195,8 @@ class TestMultiAgentCallbackHandler:
         assert callback_handler.total_tokens == 100
         assert callback_handler.total_cost > 0  # Should estimate cost
 
-    def test_on_agent_action(self, callback_handler, mock_client):
+    def test_on_agent_action(self, callback_handler, workflows):
         """Test agent action (tool call) callback."""
-        # Mock AgentAction
         mock_action = Mock()
         mock_action.tool = "search"
         mock_action.tool_input = "AI safety"
@@ -163,45 +204,36 @@ class TestMultiAgentCallbackHandler:
 
         callback_handler.on_agent_action(action=mock_action)
 
-        # Verify tool call was logged as interaction
-        mock_client.agent_workflows.create_interaction.assert_called_once()
-        call_args = mock_client.agent_workflows.create_interaction.call_args
-
-        assert call_args.kwargs["workflow_id"] == "workflow_123"
-        assert call_args.kwargs["from_agent"] == "test_agent"
-        assert call_args.kwargs["to_agent"] == "tool"
+        workflows.log_interaction.assert_called_once()
+        call_args = workflows.log_interaction.call_args
+        assert call_args.args == ("workflow_123",)
         assert call_args.kwargs["interaction_type"] == "tool_call"
+        assert call_args.kwargs["from_agent_id"] == "agent_1"
         assert "search" in call_args.kwargs["message"]
+        assert call_args.kwargs["meta_data"]["tool"] == "search"
 
         # Verify tool count incremented
         assert callback_handler.tool_call_count == 1
 
-    def test_on_tool_end(self, callback_handler, mock_client):
+    def test_on_tool_end(self, callback_handler, workflows):
         """Test tool end callback."""
         output = "Search results for AI safety"
 
         callback_handler.on_tool_end(output=output)
 
-        # Verify tool result was logged as interaction
-        mock_client.agent_workflows.create_interaction.assert_called_once()
-        call_args = mock_client.agent_workflows.create_interaction.call_args
-
-        assert call_args.kwargs["from_agent"] == "tool"
-        assert call_args.kwargs["to_agent"] == "test_agent"
-        assert call_args.kwargs["interaction_type"] == "response"
+        workflows.log_interaction.assert_called_once()
+        call_args = workflows.log_interaction.call_args
+        assert call_args.kwargs["interaction_type"] == "tool_result"
+        assert call_args.kwargs["from_agent_id"] == "agent_1"
         assert output in call_args.kwargs["message"]
 
-    def test_on_tool_error(self, callback_handler, mock_client):
+    def test_on_tool_error(self, callback_handler, workflows):
         """Test tool error callback."""
-        error = RuntimeError("Tool failed")
+        callback_handler.on_tool_error(error=RuntimeError("Tool failed"))
 
-        callback_handler.on_tool_error(error=error)
-
-        # Verify tool error was logged
-        mock_client.agent_workflows.create_interaction.assert_called_once()
-        call_args = mock_client.agent_workflows.create_interaction.call_args
-
-        assert call_args.kwargs["interaction_type"] == "response"
+        workflows.log_interaction.assert_called_once()
+        call_args = workflows.log_interaction.call_args
+        assert call_args.kwargs["interaction_type"] == "tool_result"
         assert "Tool error" in call_args.kwargs["message"]
         assert "RuntimeError" in call_args.kwargs["meta_data"]["error_type"]
 
@@ -223,56 +255,49 @@ class TestLangGraphMultiAgentMonitor:
         assert monitor.workflow_id is None
         assert len(monitor.callbacks) == 0
 
-    def test_start_monitoring(self, mock_client, mock_workflow_response):
+    def test_start_monitoring(self, mock_client, workflows):
         """Test starting workflow monitoring."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
         monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
 
         inputs = {"query": "test"}
         workflow_id = monitor.start_monitoring(inputs=inputs)
 
-        # Verify workflow was created
-        mock_client.agent_workflows.create.assert_called_once_with(
-            name="Test Workflow", framework="langchain", inputs=inputs, meta_data={}
+        workflows.create_and_start.assert_called_once_with(
+            name="Test Workflow", framework="langchain", meta_data={}
         )
-
-        # Verify workflow was started
-        mock_client.agent_workflows.start.assert_called_once_with("workflow_123")
+        workflows.start.assert_called_once_with("workflow_123", inputs=inputs)
 
         assert workflow_id == "workflow_123"
         assert monitor.workflow_id == "workflow_123"
         assert monitor.start_time is not None
 
-    def test_register_agent(self, mock_client, mock_workflow_response):
+    def test_register_agent(self, mock_client, workflows):
         """Test agent registration."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
         monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
-        monitor.register_agent(
+        agent_id = monitor.register_agent(
             agent_name="researcher",
             role="Research Agent",
             model_name="gpt-4",
             tools=["search", "scrape"],
         )
 
-        # Verify agent was registered
-        mock_client.agent_workflows.register_agent.assert_called_once_with(
+        workflows.register_agent.assert_called_once_with(
             workflow_id="workflow_123",
             name="researcher",
             role="Research Agent",
             model_name="gpt-4",
             tools=["search", "scrape"],
         )
+        assert agent_id == "agent_1"
+        assert monitor.agent_ids == {"researcher": "agent_1"}
 
-    def test_get_callbacks(self, mock_client, mock_workflow_response):
+    def test_get_callbacks(self, mock_client):
         """Test getting callbacks for an agent."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
         monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
+        monitor.register_agent("researcher")
 
         callbacks = monitor.get_callbacks("researcher", agent_role="Research Agent")
 
@@ -280,15 +305,19 @@ class TestLangGraphMultiAgentMonitor:
         assert isinstance(callbacks[0], MultiAgentCallbackHandler)
         assert callbacks[0].agent_name == "researcher"
         assert callbacks[0].agent_role == "Research Agent"
+        # The handler reuses the registered agent rather than registering again
+        assert callbacks[0].agent_id == "agent_1"
 
         # Getting callbacks again should return the same instance
         callbacks2 = monitor.get_callbacks("researcher")
         assert callbacks2[0] is callbacks[0]
 
-    def test_log_handoff(self, mock_client, mock_workflow_response):
+    def test_log_handoff(self, mock_client, workflows):
         """Test logging agent-to-agent handoff."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
+        workflows.register_agent.side_effect = [
+            {"id": "agent_supervisor"},
+            {"id": "agent_researcher"},
+        ]
         monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
@@ -299,37 +328,29 @@ class TestLangGraphMultiAgentMonitor:
             meta_data={"topic": "AI safety"},
         )
 
-        # Verify handoff was logged
-        mock_client.agent_workflows.create_interaction.assert_called_once_with(
+        # Agents the handoff names but that weren't registered yet are registered
+        assert workflows.register_agent.call_count == 2
+        workflows.log_interaction.assert_called_once_with(
             workflow_id="workflow_123",
-            from_agent="supervisor",
-            to_agent="researcher",
             interaction_type="handoff",
+            from_agent_id="agent_supervisor",
+            to_agent_id="agent_researcher",
             message="Please research this topic",
             meta_data={"topic": "AI safety"},
         )
 
-    def test_complete_monitoring(self, mock_client, mock_workflow_response):
+    def test_complete_monitoring(self, mock_client, workflows):
         """Test completing workflow monitoring."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-        mock_client.agent_workflows.get_analytics.return_value = {
-            "total_cost": 0.15,
-            "total_tokens": 750,
-        }
-
         monitor = LangGraphMultiAgentMonitor(client=mock_client, workflow_name="Test Workflow")
         monitor.start_monitoring()
 
         outputs = {"result": "completed successfully"}
         summary = monitor.complete_monitoring(outputs=outputs, status="completed")
 
-        # Verify workflow was completed
-        mock_client.agent_workflows.complete.assert_called_once_with(
-            workflow_id="workflow_123", outputs=outputs, status="completed"
+        workflows.complete.assert_called_once_with(
+            workflow_id="workflow_123", status="completed", outputs=outputs
         )
-
-        # Verify analytics were retrieved
-        mock_client.agent_workflows.get_analytics.assert_called_once_with("workflow_123")
+        workflows.analytics.assert_called_once_with("workflow_123")
 
         assert summary["workflow_id"] == "workflow_123"
         assert summary["status"] == "completed"
@@ -341,11 +362,8 @@ class TestLangGraphMultiAgentMonitor:
 class TestMonitorLangChainAgent:
     """Tests for monitor_langchain_agent helper function."""
 
-    def test_successful_execution(self, mock_client, mock_workflow_response):
+    def test_successful_execution(self, mock_client, workflows):
         """Test successful agent execution monitoring."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
-        # Mock agent executor
         mock_executor = Mock()
         mock_executor.run.return_value = "Agent result"
 
@@ -357,32 +375,24 @@ class TestMonitorLangChainAgent:
             inputs={"input": "test query"},
         )
 
-        # Verify workflow was created
-        mock_client.agent_workflows.create.assert_called_once()
-
-        # Verify workflow was started
-        mock_client.agent_workflows.start.assert_called_once_with("workflow_123")
+        workflows.create_and_start.assert_called_once_with(name="Test Task", framework="langchain")
+        workflows.start.assert_called_once_with("workflow_123", inputs={"input": "test query"})
 
         # Verify agent was run with callback
         mock_executor.run.assert_called_once()
         assert "callbacks" in mock_executor.run.call_args.kwargs
 
-        # Verify workflow was completed
-        mock_client.agent_workflows.complete.assert_called_once()
-        complete_args = mock_client.agent_workflows.complete.call_args
-        assert complete_args.args[0] == "workflow_123"
-        assert complete_args.kwargs["outputs"] == {"result": "Agent result"}
+        # complete() requires a status
+        workflows.complete.assert_called_once_with(
+            "workflow_123", status="completed", outputs={"result": "Agent result"}
+        )
 
-        # Verify result
         assert result_dict["result"] == "Agent result"
         assert result_dict["workflow_id"] == "workflow_123"
         assert result_dict["status"] == "completed"
 
-    def test_failed_execution(self, mock_client, mock_workflow_response):
+    def test_failed_execution(self, mock_client, workflows):
         """Test failed agent execution monitoring."""
-        mock_client.agent_workflows.create.return_value = mock_workflow_response
-
-        # Mock agent executor that raises error
         mock_executor = Mock()
         mock_executor.run.side_effect = RuntimeError("Agent failed")
 
@@ -393,12 +403,10 @@ class TestMonitorLangChainAgent:
             agent_name="test_agent",
         )
 
-        # Verify workflow was marked as failed
-        complete_args = mock_client.agent_workflows.complete.call_args
+        complete_args = workflows.complete.call_args
         assert complete_args.kwargs["status"] == "failed"
         assert "error" in complete_args.kwargs["outputs"]
 
-        # Verify result
         assert result_dict["result"] is None
         assert result_dict["status"] == "failed"
         assert "Agent failed" in result_dict["error"]
@@ -407,19 +415,22 @@ class TestMonitorLangChainAgent:
 class TestErrorHandling:
     """Tests for error handling."""
 
-    def test_callback_api_error_handling(self, mock_client):
-        """Test that API errors don't crash the callback."""
-        mock_client.agent_workflows.create_execution.side_effect = Exception("API Error")
+    def test_callback_api_error_handling(self, mock_client, workflows, caplog):
+        """API errors don't crash the callback, and are logged."""
+        workflows.create_execution.side_effect = Exception("API Error")
+        workflows.log_interaction.side_effect = Exception("API Error")
 
         handler = MultiAgentCallbackHandler(
             client=mock_client, workflow_id="workflow_123", agent_name="test"
         )
 
-        handler.execution_start_time = datetime.utcnow()
-        handler.execution_inputs = {}
+        with caplog.at_level(logging.WARNING):
+            handler.on_chain_start(serialized={}, inputs={})
+            handler.on_chain_end(outputs={"result": "test"})
 
-        # Should not raise exception
-        handler.on_chain_end(outputs={"result": "test"})
+        # Failures are visible in the log, not silently dropped
+        assert "Failed to log execution start" in caplog.text
+        assert "Failed to log execution end" in caplog.text
 
         # State should still be reset
         assert handler.execution_start_time is None

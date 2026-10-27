@@ -64,8 +64,8 @@ This guide covers best practices for deploying WhiteBoxXAI monitoring in product
 
 ```bash
 # API Configuration
-WHITEBOXXAI_API_KEY=prod-api-key-here
-WHITEBOXXAI_BASE_URL=https://api.whiteboxxai.yourcompany.com
+WHITEBOX_API_KEY=prod-api-key-here
+WHITEBOX_BASE_URL=https://api.whiteboxxai.yourcompany.com
 WHITEBOXXAI_ENVIRONMENT=production
 
 # Performance Tuning
@@ -98,8 +98,8 @@ WHITEBOXXAI_LOG_LEVEL=info
 whiteboxxai:
   # API Settings
   api:
-    base_url: ${WHITEBOXXAI_BASE_URL}
-    api_key: ${WHITEBOXXAI_API_KEY}
+    base_url: ${WHITEBOX_BASE_URL}
+    api_key: ${WHITEBOX_API_KEY}
     timeout: 30
     max_retries: 3
 
@@ -371,7 +371,7 @@ client = WhiteBoxXAI(
 client = WhiteBoxXAI(api_key='sk-abc123...')  # BAD!
 
 # DO: Use environment variables
-client = WhiteBoxXAI()  # Reads from WHITEBOXXAI_API_KEY
+client = WhiteBoxXAI()  # Reads from WHITEBOX_API_KEY
 
 # DO: Use secrets management
 from your_secrets import get_secret
@@ -630,7 +630,7 @@ def restore_model(backup_file):
         model_config = json.load(f)
 
     # Re-register model
-    client.register_model(**model_config)
+    client.models.register(**model_config)
 
     # Restore baseline data
     if 'baseline' in model_config:
@@ -706,12 +706,12 @@ spec:
       - name: ml-service
         image: your-ml-service:latest
         env:
-        - name: WHITEBOXXAI_API_KEY
+        - name: WHITEBOX_API_KEY
           valueFrom:
             secretKeyRef:
               name: whiteboxxai-secrets
               key: api-key
-        - name: WHITEBOXXAI_BASE_URL
+        - name: WHITEBOX_BASE_URL
           value: "https://api.whiteboxxai.internal"
         resources:
           requests:
