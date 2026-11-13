@@ -128,7 +128,7 @@ class LangChainMonitor(ModelMonitor):
         features: list[str] | None = None,
         baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """
         Register LangChain application with WhiteBoxXAI.
 

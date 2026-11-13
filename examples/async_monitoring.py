@@ -6,8 +6,6 @@ This example demonstrates asynchronous API usage for better performance.
 
 import asyncio
 
-import numpy as np
-
 from whiteboxxai import ModelMonitor, WhiteBoxXAI
 
 
@@ -76,14 +74,10 @@ async def drift_detection():
     async with WhiteBoxXAI(api_key="your-api-key") as client:
         monitor = ModelMonitor(client, model_id=123)
 
-        # Set baseline
-        baseline = np.random.randn(1000, 10)
-        monitor.set_baseline(baseline)
-
-        # Detect drift
+        # Detect drift: computed on the platform over the model's most recently
+        # logged predictions, so log predictions first
         print("Detecting drift...")
-        current_data = np.random.randn(100, 10)
-        drift_result = await monitor.adetect_drift(current_data)
+        drift_result = await monitor.adetect_drift(window_size=1000)
         print(f"Drift result: {drift_result}")
 
 

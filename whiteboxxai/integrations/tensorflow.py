@@ -109,7 +109,7 @@ class KerasMonitor(ModelMonitor):
         features: list[str] | None = None,
         baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """
         Register Keras model with WhiteBoxXAI.
 

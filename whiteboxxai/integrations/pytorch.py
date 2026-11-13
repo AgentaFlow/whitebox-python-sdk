@@ -80,7 +80,7 @@ class TorchMonitor(ModelMonitor):
         features: list[str] | None = None,
         baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """
         Register model from PyTorch module.
 
@@ -116,7 +116,7 @@ class TorchMonitor(ModelMonitor):
         features: list[str] | None = None,
         baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """Async version of register_from_model()."""
         name, fields, metadata = self._prepare_registration(
             name, model_type, version, features, baseline_metrics, kwargs

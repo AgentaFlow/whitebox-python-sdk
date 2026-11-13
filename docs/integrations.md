@@ -18,7 +18,7 @@ model.fit(X_train, y_train)
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = SklearnMonitor(client, model=model)
-monitor.register_from_model(model_type="classification")
+monitor.register_from_model(model_type="random_forest")
 
 # Wrap model for automatic monitoring
 monitored_model = monitor.wrap_model(model)
@@ -42,7 +42,7 @@ model = nn.Sequential(...)
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = TorchMonitor(client, model=model)
-monitor.register_from_model(model_type="classification")
+monitor.register_from_model(model_type="neural_network")
 
 # Wrap model
 monitored_model = monitor.wrap_model(model)
@@ -65,7 +65,7 @@ model = keras.Sequential([...])
 # Setup monitoring
 client = WhiteBoxXAI(api_key="your-api-key")
 monitor = KerasMonitor(client, model=model, model_name="keras_model")
-monitor.register_from_model(model_type="regression")
+monitor.register_from_model(model_type="neural_network")
 
 # Train with monitoring
 callback = WhiteBoxXAICallback(monitor, log_frequency=1)
