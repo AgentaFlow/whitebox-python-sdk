@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Licence metadata now uses an SPDX expression (`license = "MIT"` with `license-files`) and
+  requires `setuptools>=77.0` to build, ahead of setuptools dropping the TOML-table form (#16).
+- **Dropped support for Python 3.9.** The minimum supported version is now Python 3.10
+  (`requires-python = ">=3.10"`). CI runs on 3.10, 3.11 and 3.12; GitHub's `ubuntu-latest`
+  runner no longer provides Python 3.9.
+
 ## [1.3.0] - 2026-10-26
 
 Ports the work developed in the `whitebox-xai-azure` monorepo's `sdk/` directory since the
