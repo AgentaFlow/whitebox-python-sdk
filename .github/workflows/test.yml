@@ -108,6 +108,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # CPU-only torch: the default Linux wheel pulls in CUDA and Triton, and
+        # Triton's native library aborts the process when transformers imports
+        # torch._dynamo in the same process as TensorFlow.
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
         pip install -e ".[dev,all]"
 
     - name: Run integration tests
