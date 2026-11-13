@@ -411,7 +411,7 @@ monitored_model = SklearnMonitor(
     client=client,
     model=model,
     model_name="binary-classifier",
-    model_type="classification",
+    model_type="random_forest",
     version="1.0.0",
     baseline_data=X_train,
     baseline_predictions=y_train,
@@ -535,7 +535,7 @@ monitored_model = SklearnMonitor(
     client=client,
     model=model,
     model_name="my-model",
-    model_type="classification"  # or "regression"
+    model_type="random_forest"  # or "linear_model", "custom"
 )
 ```
 

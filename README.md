@@ -411,19 +411,46 @@ monitor = ModelMonitor(
 
 ### Drift Detection
 
+Drift is computed on the platform over the model's most recently logged predictions, so log
+predictions first:
+
 ```python
-import numpy as np
-
-# Set baseline data
-baseline = np.random.randn(1000, 10)
-monitor.set_baseline(baseline)
-
-# Detect drift
-current_data = np.random.randn(100, 10)
-drift_report = monitor.detect_drift(current_data)
+# Compare the last 1,000 logged predictions against the model's baseline
+drift_report = monitor.detect_drift(window_size=1000, feature_names=["amount", "merchant"])
 
 # Retrieve previously persisted drift reports
 reports = monitor.get_drift_reports(limit=10)
+```
+
+### Report Generation & Downloads
+
+Generate compliance and governance reports as PDF, HTML or DOCX and download them:
+
+```python
+from whiteboxxai import ExportFormat, WhiteBoxXAI
+
+client = WhiteBoxXAI(api_key="your-api-key")
+
+# List available report types
+report_types = client.reports.list()
+
+# Generate a report (format also accepts "pdf", "html" or "docx")
+report = client.reports.generate(
+    "fairness_audit",
+    model_id="model-uuid",
+    format=ExportFormat.DOCX,
+)
+
+# Save it to a file, or keep the bytes in memory
+client.reports.download(report, path="fairness_audit.docx")
+content = client.reports.download(report)
+
+# Async versions are available too
+async def export_async():
+    report = await client.reports.agenerate(
+        "fairness_audit", model_id="model-uuid", format=ExportFormat.PDF
+    )
+    await client.reports.adownload(report, path="fairness_audit.pdf")
 ```
 
 ## Configuration
@@ -509,7 +536,7 @@ Main client for API interaction (`from whiteboxxai import WhiteBoxXAI, governanc
 - `governance` - Review boards, review requests, and two-factor voting
 - `compliance` - ISO/IEC 42001 readiness, gap analysis, and control catalog
 - `risk_register` - AI Risk Register queries, mitigations, and heat maps
-- `reports` - Report Studio generation, types, and templates
+- `reports` - Report Studio generation, types, templates, and downloads (`ExportFormat`: PDF, HTML, DOCX)
 - `prompts` - Prompt template registry, versioning, and drift
 - `llm` - LLM call monitoring, tokens, cost, and latency
 - `llm_xai` - LLM explainability and token importance

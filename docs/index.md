@@ -42,10 +42,15 @@ client = WhiteBoxXAI(api_key="your-api-key")
 monitor = ModelMonitor(client)
 
 # Register model
+# model_type is one of xgboost, random_forest, neural_network, linear_model, llm,
+# custom; version, features and baseline_metrics are required.
 model_id = monitor.register_model(
     name="fraud_detection",
-    model_type="classification",
-    framework="sklearn"
+    model_type="random_forest",
+    framework="sklearn",
+    version="1.0.0",
+    features=["amount", "merchant"],
+    baseline_metrics={"accuracy": 0.94},
 )
 
 # Log predictions
@@ -58,16 +63,19 @@ monitor.log_prediction(
 ### Git Integration
 
 ```python
-from whiteboxxai import WhiteBoxXAI, detect_git_context
+from whiteboxxai import WhiteBoxXAI
 
-# Auto-detect Git context
-git_context = detect_git_context()
-
-# Initialize with Git context
 client = WhiteBoxXAI(api_key="your-api-key")
-model_id = client.models.register(
+
+# auto_detect_git=True attaches the current repository, branch and commit
+model = client.models.register(
     name="my_model",
-    **git_context.to_dict()  # Include Git metadata
+    model_type="random_forest",
+    framework="sklearn",
+    version="1.0.0",
+    features=["amount", "merchant"],
+    baseline_metrics={"accuracy": 0.94},
+    auto_detect_git=True,
 )
 ```
 

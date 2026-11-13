@@ -42,12 +42,16 @@ class GitContext:
         self.is_dirty = is_dirty
 
     def to_dict(self) -> dict[str, str | None]:
-        """Convert to dictionary for API submission."""
+        """Convert to dictionary for API submission.
+
+        Only the fields the backend persists (``models.github_*`` columns).
+        The commit message and author stay on this object for local logging but
+        are not sent: the backend has no column for them, so sending them meant
+        they were silently dropped (issue #1080).
+        """
         return {
             "github_repository_url": self.repository_url,
             "github_commit_hash": self.commit_sha,
-            "github_commit_message": self.commit_message,
-            "github_commit_author": self.commit_author,
             "github_branch": self.branch,
             "github_tag": self.tag,
         }

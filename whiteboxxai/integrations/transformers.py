@@ -125,7 +125,7 @@ class TransformersMonitor(ModelMonitor):
         features: list[str] | None = None,
         baseline_metrics: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """
         Register Transformers model with WhiteBoxXAI.
 

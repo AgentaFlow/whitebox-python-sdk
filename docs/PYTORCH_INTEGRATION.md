@@ -119,7 +119,7 @@ monitor = TorchMonitor(
     model,
     client,
     "classifier",
-    model_type="classification",
+    model_type="neural_network",
     classes=['Class A', 'Class B', 'Class C']
 )
 ```
@@ -694,7 +694,7 @@ monitor = TorchMonitor(
     model=model,
     client=client,
     model_name="pytorch_binary_classifier",
-    model_type="classification",
+    model_type="neural_network",
     classes=['Negative', 'Positive']
 )
 
@@ -802,7 +802,7 @@ monitor = TorchMonitor(
     model=model,
     client=client,
     model_name="mnist_cnn",
-    model_type="classification",
+    model_type="neural_network",
     classes=[str(i) for i in range(10)]
 )
 

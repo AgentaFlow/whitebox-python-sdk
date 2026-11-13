@@ -39,7 +39,7 @@ client = WhiteBoxXAI(api_key="your-api-key")
 You can also set the API key via environment variable:
 
 ```bash
-export WHITEBOXXAI_API_KEY=your-api-key
+export WHITEBOX_API_KEY=your-api-key
 ```
 
 ### 2. Create a Monitor
@@ -53,10 +53,15 @@ monitor = ModelMonitor(client)
 ### 3. Register Your Model
 
 ```python
+# model_type is one of xgboost, random_forest, neural_network, linear_model, llm,
+# custom; version, features and baseline_metrics are required.
 model_id = monitor.register_model(
     name="my_model",
-    model_type="classification",
-    framework="sklearn"
+    model_type="random_forest",
+    framework="sklearn",
+    version="1.0.0",
+    features=["feature1", "feature2"],
+    baseline_metrics={"accuracy": 0.94},
 )
 ```
 

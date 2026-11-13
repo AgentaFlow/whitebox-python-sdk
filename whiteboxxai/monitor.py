@@ -23,7 +23,7 @@ class ModelMonitor:
         from whiteboxxai import WhiteBoxXAI, ModelMonitor
 
         client = WhiteBoxXAI(api_key="your-api-key")
-        monitor = ModelMonitor(client, model_id=123)
+        monitor = ModelMonitor(client, model_id="<model-uuid>")
 
         # Log prediction
         monitor.log_prediction(
@@ -42,7 +42,7 @@ class ModelMonitor:
     def __init__(
         self,
         client: "WhiteBoxXAI",
-        model_id: int | None = None,
+        model_id: str | None = None,
         model_name: str | None = None,
         auto_explain: bool = False,
         sampling_rate: float = 1.0,
@@ -53,8 +53,8 @@ class ModelMonitor:
 
         Args:
             client: WhiteBoxXAI client instance
-            model_id: Model ID (if already registered; can be set later via
-                register_model())
+            model_id: Model ID, a UUID string (if already registered; can be
+                set later via register_model())
             model_name: Model name (for registration)
             auto_explain: Automatically generate explanations
             sampling_rate: Prediction sampling rate (0.0-1.0)
@@ -87,7 +87,7 @@ class ModelMonitor:
         framework: str | None = None,
         version: str | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """
         Register a new model.
 
@@ -100,7 +100,7 @@ class ModelMonitor:
             **kwargs: Additional metadata
 
         Returns:
-            Model ID
+            Model ID (UUID string)
         """
         result = self.client.models.register(
             name=name,
@@ -120,7 +120,7 @@ class ModelMonitor:
         framework: str | None = None,
         version: str | None = None,
         **kwargs: Any,
-    ) -> int:
+    ) -> str:
         """Async version of register_model()."""
         result = await self.client.models.aregister(
             name=name,
@@ -178,9 +178,10 @@ class ModelMonitor:
             metadata=metadata,
         )
 
-        if explain and isinstance(result, dict) and result.get("id"):
+        # The predictions API returns ``prediction_id`` (there is no ``id``).
+        if explain and isinstance(result, dict) and result.get("prediction_id"):
             result["explanation"] = self.client.explanations.generate(
-                self.model_id, inputs, prediction_id=result["id"]
+                self.model_id, inputs, prediction_id=result["prediction_id"]
             )
 
         return result
@@ -219,9 +220,9 @@ class ModelMonitor:
             metadata=metadata,
         )
 
-        if explain and isinstance(result, dict) and result.get("id"):
+        if explain and isinstance(result, dict) and result.get("prediction_id"):
             result["explanation"] = await self.client.explanations.agenerate(
-                self.model_id, inputs, prediction_id=result["id"]
+                self.model_id, inputs, prediction_id=result["prediction_id"]
             )
 
         return result
@@ -356,7 +357,12 @@ class ModelMonitor:
 
     def set_baseline(self, data: np.ndarray, labels: np.ndarray | None = None) -> None:
         """
-        Set baseline data for drift detection.
+        Store baseline data on this monitor instance.
+
+        The baseline is kept locally for the framework integrations that
+        read it (e.g. TensorFlow and Transformers). It is **not** sent to the
+        API: ``detect_drift()`` runs server-side against the model's own
+        logged predictions.
 
         Args:
             data: Baseline data array
@@ -367,15 +373,19 @@ class ModelMonitor:
 
     def detect_drift(
         self,
-        current_data: np.ndarray | None = None,
-        **kwargs: Any,
+        window_size: int = 1000,
+        feature_names: list[str] | None = None,
     ) -> dict[str, Any]:
         """
-        Detect drift for the model.
+        Detect data drift for the model.
+
+        Runs server-side over the model's most recently logged predictions,
+        so log predictions first. The result is not persisted; use
+        ``client.drift.create_report()`` to store a drift report.
 
         Args:
-            current_data: Current data to compare against baseline
-            **kwargs: Additional detection parameters
+            window_size: Number of recent predictions to analyze (100-10000)
+            feature_names: Optional subset of features to analyze
 
         Returns:
             Drift detection results
@@ -385,17 +395,14 @@ class ModelMonitor:
 
         return self.client.drift.detect(
             model_id=self.model_id,
-            reference_data=(
-                self._baseline_data.tolist() if self._baseline_data is not None else None
-            ),
-            current_data=current_data.tolist() if current_data is not None else None,
-            **kwargs,
+            window_size=window_size,
+            feature_names=feature_names,
         )
 
     async def adetect_drift(
         self,
-        current_data: np.ndarray | None = None,
-        **kwargs: Any,
+        window_size: int = 1000,
+        feature_names: list[str] | None = None,
     ) -> dict[str, Any]:
         """Async version of detect_drift()."""
         if self.model_id is None:
@@ -403,11 +410,8 @@ class ModelMonitor:
 
         return await self.client.drift.adetect(
             model_id=self.model_id,
-            reference_data=(
-                self._baseline_data.tolist() if self._baseline_data is not None else None
-            ),
-            current_data=current_data.tolist() if current_data is not None else None,
-            **kwargs,
+            window_size=window_size,
+            feature_names=feature_names,
         )
 
     def _should_sample(self) -> bool:

@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VERSION: '3.9'
+  PYTHON_VERSION: '3.10'
 
 jobs:
   code-quality:
@@ -62,7 +62,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12']
 
     steps:
     - name: Checkout code
@@ -85,7 +85,7 @@ jobs:
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
-      if: matrix.python-version == '3.9'
+      if: matrix.python-version == '3.10'
       with:
         file: ./coverage.xml
         flags: unittests
@@ -108,6 +108,8 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
+        # CPU-only torch, hash-locked; see .github/requirements/torch-cpu.txt for why.
+        pip install --require-hashes --only-binary :all: --no-deps -r .github/requirements/torch-cpu.txt
         pip install -e ".[dev,all]"
 
     - name: Run integration tests

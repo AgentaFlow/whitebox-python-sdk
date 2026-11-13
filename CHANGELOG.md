@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-12
+
+Ports the `whitebox-xai-azure` monorepo's `sdk/` work since the 1.3.0 cut and closes the
+remaining items from issue #14.
+
+### Added
+- `ExportFormat` enum (`PDF`, `HTML`, `DOCX`), exported from `whiteboxxai`. `ExportFormat.from_value()`
+  accepts an enum member or a case-insensitive string and raises `ValueError` for anything else.
+- `client.reports.download()` / `adownload()`: fetch a generated report's bytes with the
+  client's authentication, from the `generate()` result, an export ID or a download URL, and
+  optionally write them to `path`.
+- `client.request_bytes()` / `arequest_bytes()`: authenticated requests that return the raw
+  response body, used by `download()`.
+- `client.reports.generate()` / `agenerate()` take `brand_profile_id`, `template_id` and
+  `settings` (the report's `style`, `sections` and `intros`).
+- `client.llm_xai.rag_attribution()` / `arag_attribution()`: attribute a RAG answer to its
+  retrieved chunks and flag ungrounded claims.
+- `client.llm_xai.get_unified_explanation()` / `aget_unified_explanation()`: the standardized
+  attribution payload for an explanation.
+
+### Changed
+- **Dropped support for Python 3.9.** The minimum supported version is now Python 3.10
+  (`requires-python = ">=3.10"`). CI runs on 3.10, 3.11 and 3.12; GitHub's `ubuntu-latest`
+  runner no longer provides Python 3.9.
+- Licence metadata now uses an SPDX expression (`license = "MIT"` with `license-files`) and
+  requires `setuptools>=77.0` to build, ahead of setuptools dropping the TOML-table form (#16).
+- `ModelMonitor.detect_drift()` / `adetect_drift()` now take `window_size` and `feature_names`
+  and run server-side over recently logged predictions. The `current_data` and `**kwargs`
+  parameters are removed (they could never have worked; see Fixed). `set_baseline()` stores the
+  baseline locally only.
+- Git context sent with `models.register(auto_detect_git=True)` no longer includes the commit
+  message and author. The backend has no field for them and dropped them; they stay on the
+  local `GitContext` object.
+
+### Fixed
+- `client.reports.generate()` / `agenerate()` sent `format` and `model_id` in the JSON body,
+  but the endpoint reads them from the query string and requires `format`, so every call
+  failed with 422. They are now sent as query parameters.
+- `ModelMonitor.detect_drift()` / `adetect_drift()` raised `TypeError` on every call: they
+  passed `reference_data=`/`current_data=` to `client.drift.detect()`, which takes
+  `window_size` and `feature_names`.
+- `ModelMonitor.log_prediction(..., auto_explain=True)` (and `alog_prediction`) never
+  generated an explanation: it read `id` from the response, which carries `prediction_id`.
+- `register_model()` and `register_from_model()` (sklearn, pytorch, tensorflow,
+  transformers, langchain) are annotated `-> str`; they return the model UUID string.
+- `AlertsResource.create()` docstring suggested `alert_type="fairness"`, which the API
+  rejects with 422; the valid value is `"bias"`.
+
+### Security
+- `client.reports.download()` / `adownload()` refuse an absolute URL on a host other than the
+  configured `base_url` and raise `ValueError`. Every request carries
+  `Authorization: Bearer <api key>`, so following such a URL would have sent the API key to
+  that host.
+
+### Known limitations
+- Explanations can be generated only for models whose artifact is stored on the platform,
+  which today means models registered through the GitHub integration with
+  `storage_mode: full`. A model registered with `models.register()` or a framework helper
+  has metadata only, and `client.explanations.generate()` for it fails with a 422 saying no
+  stored model artifact is available. Artifact upload for SDK-registered models is tracked
+  on the platform side.
+- `client.reports.preview()` calls `POST /api/v1/export/templates/preview`, which the
+  platform does not serve yet.
+
 ## [1.3.0] - 2026-10-26
 
 Ports the work developed in the `whitebox-xai-azure` monorepo's `sdk/` directory since the

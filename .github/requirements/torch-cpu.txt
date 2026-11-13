@@ -1,0 +1,12 @@
+# CPU-only torch for the Integration Tests job (.github/workflows/test.yml).
+#
+# The default Linux torch wheel pulls in CUDA and Triton, and Triton's native
+# library aborts the test process when transformers imports torch._dynamo in
+# the same process as TensorFlow. The CPU wheel has neither.
+#
+# Locked to one verified wheel: CPython 3.10 (the job's PYTHON_VERSION), Linux
+# x86_64. Install with --require-hashes --only-binary :all: --no-deps; torch's
+# own dependencies come from the following `pip install -e ".[dev,all]"`.
+# To bump: take the new wheel's sha256 from https://download.pytorch.org/whl/cpu/torch/
+--index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu --hash=sha256:4ce2a6ae7d302bba56ef7c5c92d9f752728896cfe2626a7f3e5293f879e36650

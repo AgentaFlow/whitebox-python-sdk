@@ -4,12 +4,27 @@ Tests for SDK Monitor Module
 Tests for model monitoring functionality.
 """
 
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, create_autospec, patch
 
 import pytest
 
 from whiteboxxai.client import WhiteBoxXAI
 from whiteboxxai.monitor import ModelMonitor
+from whiteboxxai.resources import DriftResource, ExplanationsResource, PredictionsResource
+
+
+def _autospec_client() -> Mock:
+    """A client whose resources enforce the real method signatures.
+
+    A bare ``Mock()`` accepts any keyword, which is how ``detect_drift()``
+    shipped calling ``drift.detect(reference_data=..., current_data=...)`` --
+    a ``TypeError`` for every real user -- while the suite stayed green.
+    """
+    client = Mock(spec=WhiteBoxXAI)
+    client.drift = create_autospec(DriftResource, instance=True)
+    client.predictions = create_autospec(PredictionsResource, instance=True)
+    client.explanations = create_autospec(ExplanationsResource, instance=True)
+    return client
 
 
 class TestModelMonitorInitialization:
@@ -71,20 +86,59 @@ class TestPredictionLogging:
         assert call_args is not None
 
     def test_log_prediction_with_explain(self):
-        """Test prediction logging with explanation."""
-        mock_client = Mock(spec=WhiteBoxXAI)
-        mock_client.predictions = Mock()
-        mock_client.explanations = Mock()
+        """explain=True explains using the response's ``prediction_id``."""
+        client = _autospec_client()
+        client.predictions.log.return_value = {"prediction_id": "p-1"}
+        client.explanations.generate.return_value = {"feature_weights": {"a": 1.0}}
+        monitor = ModelMonitor(client=client, model_id="model-123")
 
-        monitor = ModelMonitor(client=mock_client, model_id="model-123")
+        result = monitor.log_prediction(inputs={"a": 1.0}, output=0.9, explain=True)
 
-        inputs = [1.0, 2.0]
-        output = 0.9
+        client.explanations.generate.assert_called_once_with(
+            "model-123", {"a": 1.0}, prediction_id="p-1"
+        )
+        assert result["explanation"] == {"feature_weights": {"a": 1.0}}
 
-        monitor.log_prediction(inputs=inputs, output=output, explain=True)
+    def test_auto_explain_explains_without_per_call_flag(self):
+        client = _autospec_client()
+        client.predictions.log.return_value = {"prediction_id": "p-1"}
+        monitor = ModelMonitor(client=client, model_id="m", auto_explain=True)
 
-        # Verify explanation was requested
-        # (Implementation-specific verification)
+        result = monitor.log_prediction(inputs={"a": 1.0}, output=0.9)
+
+        client.explanations.generate.assert_called_once()
+        assert "explanation" in result
+
+    def test_explain_false_overrides_auto_explain(self):
+        client = _autospec_client()
+        client.predictions.log.return_value = {"prediction_id": "p-1"}
+        monitor = ModelMonitor(client=client, model_id="m", auto_explain=True)
+
+        result = monitor.log_prediction(inputs={"a": 1.0}, output=0.9, explain=False)
+
+        client.explanations.generate.assert_not_called()
+        assert "explanation" not in result
+
+    def test_no_explanation_when_response_has_no_prediction_id(self):
+        client = _autospec_client()
+        client.predictions.log.return_value = {"model_id": "m"}
+        monitor = ModelMonitor(client=client, model_id="m", auto_explain=True)
+
+        result = monitor.log_prediction(inputs={"a": 1.0}, output=0.9)
+
+        client.explanations.generate.assert_not_called()
+        assert "explanation" not in result
+
+    async def test_async_log_prediction_with_explain(self):
+        client = _autospec_client()
+        client.predictions.alog.return_value = {"prediction_id": "p-1"}
+        client.explanations.agenerate.return_value = {"feature_weights": {}}
+        monitor = ModelMonitor(client=client, model_id="m", auto_explain=True)
+
+        result = await monitor.alog_prediction(inputs={"a": 1.0}, output=0.9)
+
+        client.explanations.agenerate.assert_awaited_once_with("m", {"a": 1.0}, prediction_id="p-1")
+        assert result["explanation"] == {"feature_weights": {}}
 
     @pytest.mark.asyncio
     async def test_async_log_prediction(self):
@@ -149,19 +203,45 @@ class TestBatchPredictionLogging:
 class TestDriftMonitoring:
     """Tests for drift monitoring functionality."""
 
-    def test_detect_drift(self):
-        """Test drift detection."""
-        mock_client = Mock(spec=WhiteBoxXAI)
-        mock_client.drift = Mock()
-        mock_client.drift.detect = Mock(return_value={"drift_detected": True})
+    def test_detect_drift_uses_the_real_resource_signature(self):
+        client = _autospec_client()
+        client.drift.detect.return_value = {"drift_detected": True}
+        monitor = ModelMonitor(client=client, model_id="model-123")
 
-        monitor = ModelMonitor(client=mock_client, model_id="model-123")
+        result = monitor.detect_drift()
 
-        result = monitor.detect_drift(window_size=100)
-
-        # Verify drift detection was called
-        mock_client.drift.detect.assert_called_once()
+        client.drift.detect.assert_called_once_with(
+            model_id="model-123", window_size=1000, feature_names=None
+        )
         assert result["drift_detected"] is True
+
+    def test_detect_drift_forwards_window_and_features(self):
+        client = _autospec_client()
+        monitor = ModelMonitor(client=client, model_id="model-123")
+
+        monitor.detect_drift(window_size=200, feature_names=["a"])
+
+        client.drift.detect.assert_called_once_with(
+            model_id="model-123", window_size=200, feature_names=["a"]
+        )
+
+    def test_detect_drift_requires_a_registered_model(self):
+        monitor = ModelMonitor(client=_autospec_client())
+
+        with pytest.raises(ValueError, match="not registered"):
+            monitor.detect_drift()
+
+    async def test_adetect_drift_uses_the_real_resource_signature(self):
+        client = _autospec_client()
+        client.drift.adetect.return_value = {"drift_detected": False}
+        monitor = ModelMonitor(client=client, model_id="model-123")
+
+        result = await monitor.adetect_drift(window_size=500)
+
+        client.drift.adetect.assert_awaited_once_with(
+            model_id="model-123", window_size=500, feature_names=None
+        )
+        assert result["drift_detected"] is False
 
     def test_get_drift_reports(self):
         """Test getting drift reports."""

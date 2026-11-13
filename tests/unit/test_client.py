@@ -229,6 +229,49 @@ class TestClientHTTPMethods:
         # Note: Retry behavior depends on implementation
         # This test verifies the interface exists
 
+    @patch("httpx.Client.request")
+    def test_request_bytes_success(self, mock_request):
+        """Test synchronous request_bytes returning raw bytes."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"raw binary content \x00\x01\x02"
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        content = client.request_bytes("GET", "/api/v1/export/exports/1/download")
+
+        assert content == b"raw binary content \x00\x01\x02"
+        mock_request.assert_called_once()
+
+    @patch("httpx.Client.request")
+    def test_request_bytes_error_handling(self, mock_request):
+        """Test request_bytes raises appropriate APIError on 404."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.text = "Not found"
+        mock_response.json.return_value = {"detail": "File not found"}
+        mock_response.headers = {}
+        mock_request.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        with pytest.raises(APIError):
+            client.request_bytes("GET", "/api/v1/export/exports/999/download")
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient.request")
+    async def test_arequest_bytes_success(self, mock_arequest):
+        """Test asynchronous arequest_bytes returning raw bytes."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.content = b"async binary data"
+        mock_arequest.return_value = mock_response
+
+        client = WhiteBoxXAI(api_key="test_key")
+        content = await client.arequest_bytes("GET", "/api/v1/export/exports/2/download")
+
+        assert content == b"async binary data"
+        mock_arequest.assert_called_once()
+
 
 class TestRetryClassification:
     """Only transient failures (connection errors, 5xx, 429) should be

@@ -7,7 +7,10 @@ Resource classes for interacting with different WhiteBoxXAI API endpoints.
 from __future__ import annotations
 
 import logging
+from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, List
+from urllib.parse import urlsplit
 
 from whiteboxxai.exceptions import APIConnectionError
 
@@ -221,7 +224,7 @@ class ModelsResource(BaseResource):
         owner_id: str | None = None,
         tags: str | None = None,
         search: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List registered models with optional filters."""
         params: dict[str, Any] = {"skip": skip, "limit": limit}
         if status_filter is not None:
@@ -512,7 +515,7 @@ class PredictionsResource(BaseResource):
     def log_batch(
         self,
         model_id: str,
-        predictions: List[dict[str, Any]],
+        predictions: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """
         Log multiple predictions in batch (max 1000 per call).
@@ -537,7 +540,7 @@ class PredictionsResource(BaseResource):
     async def alog_batch(
         self,
         model_id: str,
-        predictions: List[dict[str, Any]],
+        predictions: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Async version of log_batch()."""
         data = {"model_id": model_id, "predictions": predictions}
@@ -558,7 +561,7 @@ class PredictionsResource(BaseResource):
         end_time: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Query predictions with filters.
 
@@ -583,7 +586,7 @@ class PredictionsResource(BaseResource):
         end_time: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of query()."""
         data: dict[str, Any] = {"model_id": model_id, "limit": limit, "offset": offset}
         if start_time is not None:
@@ -624,7 +627,7 @@ class PredictionsResource(BaseResource):
             "GET", f"/api/v1/predictions/models/{model_id}/stats", params=params
         )
 
-    def get_recent(self, model_id: str, limit: int = 10) -> List[dict[str, Any]]:
+    def get_recent(self, model_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """Get the most recent predictions for a model (max 100)."""
         return self.client.request(
             "GET",
@@ -632,7 +635,7 @@ class PredictionsResource(BaseResource):
             params={"limit": limit},
         )
 
-    async def aget_recent(self, model_id: str, limit: int = 10) -> List[dict[str, Any]]:
+    async def aget_recent(self, model_id: str, limit: int = 10) -> list[dict[str, Any]]:
         """Async version of get_recent()."""
         return await self.client.arequest(
             "GET",
@@ -717,7 +720,7 @@ class ExplanationsResource(BaseResource):
     def generate_bulk(
         self,
         model_id: str,
-        instances: List[dict[str, Any]],
+        instances: list[dict[str, Any]],
         method: str | None = None,
         num_features: int = 10,
         num_samples: int = 5000,
@@ -759,7 +762,7 @@ class ExplanationsResource(BaseResource):
     async def agenerate_bulk(
         self,
         model_id: str,
-        instances: List[dict[str, Any]],
+        instances: list[dict[str, Any]],
         method: str | None = None,
         num_features: int = 10,
         num_samples: int = 5000,
@@ -894,7 +897,7 @@ class ExplanationsResource(BaseResource):
 
     def compare(
         self,
-        explanation_ids: List[str],
+        explanation_ids: list[str],
         comparison_type: str = "feature_importance",
     ) -> dict[str, Any]:
         """
@@ -910,7 +913,7 @@ class ExplanationsResource(BaseResource):
 
     async def acompare(
         self,
-        explanation_ids: List[str],
+        explanation_ids: list[str],
         comparison_type: str = "feature_importance",
     ) -> dict[str, Any]:
         """Async version of compare()."""
@@ -961,7 +964,7 @@ class ExplanationsResource(BaseResource):
 
     def visualize_multi(
         self,
-        explanation_ids: List[str],
+        explanation_ids: list[str],
         plot_type: str,
         feature_index: int | None = None,
         interaction_index: int | None = None,
@@ -991,7 +994,7 @@ class ExplanationsResource(BaseResource):
 
     async def avisualize_multi(
         self,
-        explanation_ids: List[str],
+        explanation_ids: list[str],
         plot_type: str,
         feature_index: int | None = None,
         interaction_index: int | None = None,
@@ -1097,7 +1100,7 @@ class DriftResource(BaseResource):
         self,
         model_id: str,
         window_size: int = 1000,
-        feature_names: List[str] | None = None,
+        feature_names: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Detect data drift for a model (ephemeral, not persisted).
@@ -1119,7 +1122,7 @@ class DriftResource(BaseResource):
         self,
         model_id: str,
         window_size: int = 1000,
-        feature_names: List[str] | None = None,
+        feature_names: list[str] | None = None,
     ) -> dict[str, Any]:
         """Async version of detect()."""
         params: dict[str, Any] = {"window_size": window_size}
@@ -1143,7 +1146,7 @@ class DriftResource(BaseResource):
             params={"model_id": model_id, "window_size": window_size},
         )
 
-    def get_reports(self, model_id: str, limit: int = 10, skip: int = 0) -> List[dict[str, Any]]:
+    def get_reports(self, model_id: str, limit: int = 10, skip: int = 0) -> list[dict[str, Any]]:
         """List drift reports for a model, most recent first."""
         return self.client.request(
             "GET",
@@ -1153,7 +1156,7 @@ class DriftResource(BaseResource):
 
     async def aget_reports(
         self, model_id: str, limit: int = 10, skip: int = 0
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of get_reports()."""
         return await self.client.arequest(
             "GET",
@@ -1186,13 +1189,13 @@ class FairnessResource(BaseResource):
     def audit(
         self,
         model_id: str,
-        sensitive_attributes: List[str],
-        y_true: List[int],
-        y_pred: List[int],
+        sensitive_attributes: list[str],
+        y_true: list[int],
+        y_pred: list[int],
         group_data: dict[str, list[Any]],
-        y_prob: List[float] | None = None,
+        y_prob: list[float] | None = None,
         fairness_thresholds: dict[str, float] | None = None,
-        metrics_to_compute: List[str] | None = None,
+        metrics_to_compute: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Run a bias audit on model predictions.
@@ -1233,13 +1236,13 @@ class FairnessResource(BaseResource):
     async def aaudit(
         self,
         model_id: str,
-        sensitive_attributes: List[str],
-        y_true: List[int],
-        y_pred: List[int],
+        sensitive_attributes: list[str],
+        y_true: list[int],
+        y_pred: list[int],
         group_data: dict[str, list[Any]],
-        y_prob: List[float] | None = None,
+        y_prob: list[float] | None = None,
         fairness_thresholds: dict[str, float] | None = None,
-        metrics_to_compute: List[str] | None = None,
+        metrics_to_compute: list[str] | None = None,
     ) -> dict[str, Any]:
         """Async version of audit()."""
         data: dict[str, Any] = {
@@ -1270,7 +1273,7 @@ class FairnessResource(BaseResource):
         model_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List bias audits, optionally filtered by model."""
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if model_id is not None:
@@ -1282,7 +1285,7 @@ class FairnessResource(BaseResource):
         model_id: str | None = None,
         limit: int = 50,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_audits()."""
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         if model_id is not None:
@@ -1348,11 +1351,11 @@ class AlertsResource(BaseResource):
         name: str,
         alert_type: str,
         severity: str,
-        conditions: List[dict[str, Any]],
+        conditions: list[dict[str, Any]],
         model_id: str | None = None,
         description: str | None = None,
         logic_operator: str = "AND",
-        notification_channels: List[dict[str, Any]] | None = None,
+        notification_channels: list[dict[str, Any]] | None = None,
         throttle_minutes: int = 60,
         cooldown_minutes: int = 0,
         is_active: bool = True,
@@ -1363,7 +1366,9 @@ class AlertsResource(BaseResource):
 
         Args:
             name: Alert rule name
-            alert_type: Alert type (e.g. "drift", "performance", "fairness")
+            alert_type: Alert type. One of "threshold", "drift", "bias",
+                "performance", "anomaly", "safety", "cost", "system"
+                (fairness alerts use "bias"; "fairness" is rejected with 422)
             severity: Severity level (e.g. "low", "medium", "high", "critical")
             conditions: List of dicts, each {metric_name, operator
                 (gt/gte/lt/lte/eq/ne), threshold, window_minutes?, aggregation?},
@@ -1409,7 +1414,7 @@ class AlertsResource(BaseResource):
         is_active: bool | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List alert rules for the caller's organization."""
         params = _drop_none(
             model_id=model_id,
@@ -1623,11 +1628,11 @@ def _alert_rule_payload(
     name: str,
     alert_type: str,
     severity: str,
-    conditions: List[dict[str, Any]],
+    conditions: list[dict[str, Any]],
     model_id: str | None = None,
     description: str | None = None,
     logic_operator: str = "AND",
-    notification_channels: List[dict[str, Any]] | None = None,
+    notification_channels: list[dict[str, Any]] | None = None,
     throttle_minutes: int = 60,
     cooldown_minutes: int = 0,
     is_active: bool = True,
@@ -1653,7 +1658,7 @@ def _alert_rule_payload(
 def _alert_evaluation_context_payload(
     metric_values: dict[str, Any] | None = None,
     model_id: str | None = None,
-    historical_values: List[float] | None = None,
+    historical_values: list[float] | None = None,
     metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Shared request-body builder for AlertsResource.evaluate_rule/aevaluate_rule."""
@@ -1782,7 +1787,7 @@ class AlertIntelligenceResource(BaseResource):
             data=data,
         )
 
-    def get_similar_incidents(self, cause_type: str, limit: int = 10) -> List[dict[str, Any]]:
+    def get_similar_incidents(self, cause_type: str, limit: int = 10) -> list[dict[str, Any]]:
         """Find past alerts sharing the same root-cause type -- useful for
         learning from historical resolutions."""
         params = {"cause_type": cause_type, "limit": limit}
@@ -1792,7 +1797,7 @@ class AlertIntelligenceResource(BaseResource):
 
     async def aget_similar_incidents(
         self, cause_type: str, limit: int = 10
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of get_similar_incidents()."""
         params = {"cause_type": cause_type, "limit": limit}
         return await self.client.arequest(
@@ -1895,14 +1900,14 @@ class AlertIntelligenceResource(BaseResource):
             "GET", "/api/v1/alert-intelligence/priority/distribution", params=params
         )
 
-    def get_priority_queue(self, limit: int = 20) -> List[dict[str, Any]]:
+    def get_priority_queue(self, limit: int = 20) -> list[dict[str, Any]]:
         """Get the prioritized alert queue for triage and assignment."""
         params = {"limit": limit}
         return self.client.request(
             "GET", "/api/v1/alert-intelligence/priority/queue", params=params
         )
 
-    async def aget_priority_queue(self, limit: int = 20) -> List[dict[str, Any]]:
+    async def aget_priority_queue(self, limit: int = 20) -> list[dict[str, Any]]:
         """Async version of get_priority_queue()."""
         params = {"limit": limit}
         return await self.client.arequest(
@@ -1997,7 +2002,7 @@ class AlertIntelligenceResource(BaseResource):
             data=data,
         )
 
-    def get_throttle_recommendations(self) -> List[dict[str, Any]]:
+    def get_throttle_recommendations(self) -> list[dict[str, Any]]:
         """Get recommended alert-throttling rules to reduce fatigue without
         missing critical issues."""
         return self.client.request(
@@ -2005,7 +2010,7 @@ class AlertIntelligenceResource(BaseResource):
             "/api/v1/alert-intelligence/fatigue-reduction/recommendations",
         )
 
-    async def aget_throttle_recommendations(self) -> List[dict[str, Any]]:
+    async def aget_throttle_recommendations(self) -> list[dict[str, Any]]:
         """Async version of get_throttle_recommendations()."""
         return await self.client.arequest(
             "GET",
@@ -2360,7 +2365,7 @@ class AlertManagementResource(BaseResource):
 
     def bulk_action(
         self,
-        alert_ids: List[str],
+        alert_ids: list[str],
         action: str,
         user_id: str,
         notes: str | None = None,
@@ -2383,7 +2388,7 @@ class AlertManagementResource(BaseResource):
 
     async def abulk_action(
         self,
-        alert_ids: List[str],
+        alert_ids: list[str],
         action: str,
         user_id: str,
         notes: str | None = None,
@@ -2429,11 +2434,11 @@ class AlertManagementResource(BaseResource):
             "POST", f"/api/v1/alert-management/alerts/{alert_id}/comments", data=data
         )
 
-    def get_comments(self, alert_id: str) -> List[dict[str, Any]]:
+    def get_comments(self, alert_id: str) -> list[dict[str, Any]]:
         """List all comments on an alert."""
         return self.client.request("GET", f"/api/v1/alert-management/alerts/{alert_id}/comments")
 
-    async def aget_comments(self, alert_id: str) -> List[dict[str, Any]]:
+    async def aget_comments(self, alert_id: str) -> list[dict[str, Any]]:
         """Async version of get_comments()."""
         return await self.client.arequest(
             "GET", f"/api/v1/alert-management/alerts/{alert_id}/comments"
@@ -2444,11 +2449,11 @@ class AlertManagementResource(BaseResource):
     def create_escalation_policy(
         self,
         name: str,
-        escalation_rules: List[dict[str, Any]],
+        escalation_rules: list[dict[str, Any]],
         description: str | None = None,
-        applies_to_severities: List[str] | None = None,
-        applies_to_types: List[str] | None = None,
-        applies_to_model_ids: List[str] | None = None,
+        applies_to_severities: list[str] | None = None,
+        applies_to_types: list[str] | None = None,
+        applies_to_model_ids: list[str] | None = None,
         is_active: bool = True,
     ) -> dict[str, Any]:
         """Create an escalation policy for unacknowledged alerts.
@@ -2474,11 +2479,11 @@ class AlertManagementResource(BaseResource):
     async def acreate_escalation_policy(
         self,
         name: str,
-        escalation_rules: List[dict[str, Any]],
+        escalation_rules: list[dict[str, Any]],
         description: str | None = None,
-        applies_to_severities: List[str] | None = None,
-        applies_to_types: List[str] | None = None,
-        applies_to_model_ids: List[str] | None = None,
+        applies_to_severities: list[str] | None = None,
+        applies_to_types: list[str] | None = None,
+        applies_to_model_ids: list[str] | None = None,
         is_active: bool = True,
     ) -> dict[str, Any]:
         """Async version of create_escalation_policy()."""
@@ -2495,7 +2500,7 @@ class AlertManagementResource(BaseResource):
             "POST", "/api/v1/alert-management/escalation-policies", data=data
         )
 
-    def list_escalation_policies(self, is_active: bool | None = None) -> List[dict[str, Any]]:
+    def list_escalation_policies(self, is_active: bool | None = None) -> list[dict[str, Any]]:
         """List escalation policies for the caller's organization."""
         params = _drop_none(is_active=is_active)
         return self.client.request(
@@ -2504,7 +2509,7 @@ class AlertManagementResource(BaseResource):
 
     async def alist_escalation_policies(
         self, is_active: bool | None = None
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_escalation_policies()."""
         params = _drop_none(is_active=is_active)
         return await self.client.arequest(
@@ -2598,11 +2603,11 @@ def _alert_time_series_query_payload(
 
 def _escalation_policy_payload(
     name: str,
-    escalation_rules: List[dict[str, Any]],
+    escalation_rules: list[dict[str, Any]],
     description: str | None = None,
-    applies_to_severities: List[str] | None = None,
-    applies_to_types: List[str] | None = None,
-    applies_to_model_ids: List[str] | None = None,
+    applies_to_severities: list[str] | None = None,
+    applies_to_types: list[str] | None = None,
+    applies_to_model_ids: list[str] | None = None,
     is_active: bool = True,
 ) -> dict[str, Any]:
     """Shared request-body builder for
@@ -2718,17 +2723,17 @@ class GovernanceResource(BaseResource):
     workflow, not exposed here.
     """
 
-    def list_boards(self) -> List[dict[str, Any]]:
+    def list_boards(self) -> list[dict[str, Any]]:
         """List governance review boards for the organization."""
         return self.client.request("GET", "/api/v1/governance/review-boards")
 
-    async def alist_boards(self) -> List[dict[str, Any]]:
+    async def alist_boards(self) -> list[dict[str, Any]]:
         """Async version of list_boards()."""
         return await self.client.arequest("GET", "/api/v1/governance/review-boards")
 
     def list_review_requests(
         self, board_id: str | None = None, status: str | None = None
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List governance review requests, optionally filtered."""
         params: dict[str, Any] = {}
         if board_id is not None:
@@ -2741,7 +2746,7 @@ class GovernanceResource(BaseResource):
 
     async def alist_review_requests(
         self, board_id: str | None = None, status: str | None = None
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_review_requests()."""
         params: dict[str, Any] = {}
         if board_id is not None:
@@ -2856,7 +2861,7 @@ class LLMResource(BaseResource):
         completion_tokens: int | None = None,
         finish_reason: str | None = None,
         response_metadata: dict[str, Any] | None = None,
-        messages: List[dict[str, Any]] | None = None,
+        messages: list[dict[str, Any]] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
         status: str | None = None,
@@ -2932,7 +2937,7 @@ class LLMResource(BaseResource):
         data = _llm_log_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/logs", data=data)
 
-    def log_calls_batch(self, logs: List[dict[str, Any]]) -> dict[str, Any]:
+    def log_calls_batch(self, logs: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Log multiple LLM calls in one request (max 1000).
 
@@ -2942,7 +2947,7 @@ class LLMResource(BaseResource):
         """
         return self.client.request("POST", "/api/v1/llm/logs/batch", data={"logs": logs})
 
-    async def alog_calls_batch(self, logs: List[dict[str, Any]]) -> dict[str, Any]:
+    async def alog_calls_batch(self, logs: list[dict[str, Any]]) -> dict[str, Any]:
         """Async version of log_calls_batch()."""
         return await self.client.arequest("POST", "/api/v1/llm/logs/batch", data={"logs": logs})
 
@@ -2987,7 +2992,7 @@ class LLMResource(BaseResource):
         limit: int = 100,
         model_id: str | None = None,
         provider: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get recent LLM logs (requires a model_id owned by the caller's org)."""
         params = _drop_none(limit=limit, model_id=model_id, provider=provider)
         return self.client.request("GET", "/api/v1/llm/logs/recent", params=params)
@@ -2997,7 +3002,7 @@ class LLMResource(BaseResource):
         limit: int = 100,
         model_id: str | None = None,
         provider: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of get_recent()."""
         params = _drop_none(limit=limit, model_id=model_id, provider=provider)
         return await self.client.arequest("GET", "/api/v1/llm/logs/recent", params=params)
@@ -3053,11 +3058,11 @@ class LLMResource(BaseResource):
         data = _llm_query_logs_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/logs/query", data=data)
 
-    def session_logs(self, session_id: str) -> List[dict[str, Any]]:
+    def session_logs(self, session_id: str) -> list[dict[str, Any]]:
         """Get all LLM logs for a specific session."""
         return self.client.request("GET", f"/api/v1/llm/logs/session/{session_id}")
 
-    async def asession_logs(self, session_id: str) -> List[dict[str, Any]]:
+    async def asession_logs(self, session_id: str) -> list[dict[str, Any]]:
         """Async version of session_logs()."""
         return await self.client.arequest("GET", f"/api/v1/llm/logs/session/{session_id}")
 
@@ -3131,7 +3136,7 @@ class LLMResource(BaseResource):
         end_time: str | None = None,
         granularity: str = "day",
         model_id: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get token usage trend over time (granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -3147,7 +3152,7 @@ class LLMResource(BaseResource):
         end_time: str | None = None,
         granularity: str = "day",
         model_id: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of trends_tokens()."""
         params = _drop_none(
             start_time=start_time,
@@ -3163,7 +3168,7 @@ class LLMResource(BaseResource):
         end_time: str | None = None,
         granularity: str = "day",
         provider: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get cost trend over time (platform-wide; granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -3179,7 +3184,7 @@ class LLMResource(BaseResource):
         end_time: str | None = None,
         granularity: str = "day",
         provider: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of trends_costs()."""
         params = _drop_none(
             start_time=start_time,
@@ -3199,7 +3204,7 @@ class LLMResource(BaseResource):
         model_id: str | None = None,
         user_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get detailed, grouped usage statistics (granularity: hour/day/week/month)."""
         data = _llm_usage_stats_payload(
             start_time=start_time,
@@ -3213,7 +3218,7 @@ class LLMResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/llm/usage-stats", data=data)
 
-    async def ausage_stats(self, *args: Any, **kwargs: Any) -> List[dict[str, Any]]:
+    async def ausage_stats(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         """Async version of usage_stats()."""
         data = _llm_usage_stats_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm/usage-stats", data=data)
@@ -3357,7 +3362,7 @@ def _llm_log_payload(
     completion_tokens: int | None = None,
     finish_reason: str | None = None,
     response_metadata: dict[str, Any] | None = None,
-    messages: List[dict[str, Any]] | None = None,
+    messages: list[dict[str, Any]] | None = None,
     temperature: float | None = None,
     max_tokens: int | None = None,
     status: str | None = None,
@@ -3411,7 +3416,7 @@ class RAGResource(BaseResource):
     def log_retrieval(
         self,
         query: str,
-        results: List[dict[str, Any]],
+        results: list[dict[str, Any]],
         top_k: int,
         retrieval_method: str,
         query_type: str = "semantic",
@@ -3419,7 +3424,7 @@ class RAGResource(BaseResource):
         retrieval_latency_ms: float | None = None,
         answer: str | None = None,
         answer_latency_ms: float | None = None,
-        ground_truth_ids: List[str] | None = None,
+        ground_truth_ids: list[str] | None = None,
         llm_log_id: str | None = None,
         model_id: str | None = None,
         user_id: str | None = None,
@@ -3483,7 +3488,7 @@ class RAGResource(BaseResource):
     def create_evaluation(
         self,
         name: str,
-        queries: List[str],
+        queries: list[str],
         description: str | None = None,
         evaluation_type: str = "manual",
         model_id: str | None = None,
@@ -3571,7 +3576,7 @@ class RAGResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List RAG evaluations with optional filters."""
         params = _drop_none(
             model_id=model_id,
@@ -3589,7 +3594,7 @@ class RAGResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_evaluations()."""
         params = _drop_none(
             model_id=model_id,
@@ -3619,7 +3624,7 @@ class RAGResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query retrieval logs. model_id is required (owned by the caller's
         organization) until organization-wide RAG log scoping ships."""
         params = {"model_id": model_id, "limit": limit, "offset": offset}
@@ -3646,7 +3651,7 @@ class RAGResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_retrievals()."""
         params = {"model_id": model_id, "limit": limit, "offset": offset}
         params.update(
@@ -3668,7 +3673,7 @@ class RAGResource(BaseResource):
         granularity: str = "day",
         model_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get RAG quality metrics trend over time (granularity: hour/day/week)."""
         params = _drop_none(
             start_time=start_time,
@@ -3686,7 +3691,7 @@ class RAGResource(BaseResource):
         granularity: str = "day",
         model_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of trends()."""
         params = _drop_none(
             start_time=start_time,
@@ -3711,7 +3716,7 @@ class RAGResource(BaseResource):
         end_time: str | None = None,
         model_id: str | None = None,
         environment: str | None = None,
-        k_values: List[int] | None = None,
+        k_values: list[int] | None = None,
     ) -> dict[str, float | None]:
         """Get Precision@K metrics for the given K values (default [1, 3, 5, 10])."""
         params = _drop_none(
@@ -3729,7 +3734,7 @@ class RAGResource(BaseResource):
         end_time: str | None = None,
         model_id: str | None = None,
         environment: str | None = None,
-        k_values: List[int] | None = None,
+        k_values: list[int] | None = None,
     ) -> dict[str, float | None]:
         """Async version of metrics_precision()."""
         params = _drop_none(
@@ -3764,7 +3769,7 @@ class RAGResource(BaseResource):
 
 def _rag_retrieval_payload(
     query: str,
-    results: List[dict[str, Any]],
+    results: list[dict[str, Any]],
     top_k: int,
     retrieval_method: str,
     query_type: str = "semantic",
@@ -3772,7 +3777,7 @@ def _rag_retrieval_payload(
     retrieval_latency_ms: float | None = None,
     answer: str | None = None,
     answer_latency_ms: float | None = None,
-    ground_truth_ids: List[str] | None = None,
+    ground_truth_ids: list[str] | None = None,
     llm_log_id: str | None = None,
     model_id: str | None = None,
     user_id: str | None = None,
@@ -3808,7 +3813,7 @@ def _rag_retrieval_payload(
 
 def _rag_evaluation_payload(
     name: str,
-    queries: List[str],
+    queries: list[str],
     description: str | None = None,
     evaluation_type: str = "manual",
     model_id: str | None = None,
@@ -3895,7 +3900,7 @@ class SafetyResource(BaseResource):
 
     def analyze_batch(
         self,
-        contents: List[str],
+        contents: list[str],
         content_type: str = "text",
         check_toxicity: bool = True,
         check_pii: bool = True,
@@ -3904,7 +3909,7 @@ class SafetyResource(BaseResource):
         model_id: str | None = None,
         user_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Analyze multiple content items in one request (max 100)."""
         data = _safety_analyze_batch_payload(
             contents=contents,
@@ -3919,7 +3924,7 @@ class SafetyResource(BaseResource):
         )
         return self.client.request("POST", "/api/v1/safety/analyze/batch", data=data)
 
-    async def aanalyze_batch(self, *args: Any, **kwargs: Any) -> List[dict[str, Any]]:
+    async def aanalyze_batch(self, *args: Any, **kwargs: Any) -> list[dict[str, Any]]:
         """Async version of analyze_batch()."""
         data = _safety_analyze_batch_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/safety/analyze/batch", data=data)
@@ -3934,7 +3939,7 @@ class SafetyResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Query safety analysis scores with filters."""
         params = _drop_none(
             start_time=start_time,
@@ -3958,7 +3963,7 @@ class SafetyResource(BaseResource):
         environment: str | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of get_scores()."""
         params = _drop_none(
             start_time=start_time,
@@ -4020,7 +4025,7 @@ class SafetyResource(BaseResource):
         granularity: str = "day",
         model_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get content-safety trend over time (per-category toxicity averages,
         PII detections; granularity: hour/day/week)."""
         params = _drop_none(
@@ -4039,7 +4044,7 @@ class SafetyResource(BaseResource):
         granularity: str = "day",
         model_id: str | None = None,
         environment: str | None = None,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of trends()."""
         params = _drop_none(
             start_time=start_time,
@@ -4073,14 +4078,14 @@ class SafetyResource(BaseResource):
 
     def list_thresholds(
         self, model_id: str | None = None, is_active: bool | None = None
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List safety thresholds for the caller's organization."""
         params = _drop_none(model_id=model_id, is_active=is_active)
         return self.client.request("GET", "/api/v1/safety/thresholds", params=params)
 
     async def alist_thresholds(
         self, model_id: str | None = None, is_active: bool | None = None
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_thresholds()."""
         params = _drop_none(model_id=model_id, is_active=is_active)
         return await self.client.arequest("GET", "/api/v1/safety/thresholds", params=params)
@@ -4157,7 +4162,7 @@ def _safety_analyze_payload(
 
 
 def _safety_analyze_batch_payload(
-    contents: List[str],
+    contents: list[str],
     content_type: str = "text",
     check_toxicity: bool = True,
     check_pii: bool = True,
@@ -4190,9 +4195,9 @@ class LLMXAIResource(BaseResource):
         prompt: str,
         completion: str | None = None,
         model_id: str | None = None,
-        layers: List[int] | None = None,
+        layers: list[int] | None = None,
         aggregate_heads: bool = True,
-        attention_weights: List[Any] | None = None,
+        attention_weights: list[Any] | None = None,
         top_k: int = 10,
         llm_log_id: str | None = None,
     ) -> dict[str, Any]:
@@ -4222,6 +4227,8 @@ class LLMXAIResource(BaseResource):
         method: str = "perturbation",
         top_k: int = 10,
         llm_log_id: str | None = None,
+        perturbed_outputs: dict[str, str] | None = None,
+        n_steps: int = 20,
     ) -> dict[str, Any]:
         """Calculate token-level importance scores for a prompt/completion pair."""
         data = _llm_xai_token_importance_payload(
@@ -4231,6 +4238,8 @@ class LLMXAIResource(BaseResource):
             method=method,
             top_k=top_k,
             llm_log_id=llm_log_id,
+            perturbed_outputs=perturbed_outputs,
+            n_steps=n_steps,
         )
         return self.client.request("POST", "/api/v1/llm-xai/token-importance", data=data)
 
@@ -4247,6 +4256,7 @@ class LLMXAIResource(BaseResource):
         num_perturbations: int = 10,
         perturbation_type: str = "mixed",
         llm_log_id: str | None = None,
+        perturbed_outputs: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Test prompt robustness by perturbing it and measuring output stability."""
         data = _llm_xai_sensitivity_payload(
@@ -4256,6 +4266,7 @@ class LLMXAIResource(BaseResource):
             num_perturbations=num_perturbations,
             perturbation_type=perturbation_type,
             llm_log_id=llm_log_id,
+            perturbed_outputs=perturbed_outputs,
         )
         return self.client.request("POST", "/api/v1/llm-xai/sensitivity", data=data)
 
@@ -4274,6 +4285,7 @@ class LLMXAIResource(BaseResource):
         num_candidates: int = 10,
         search_strategy: str = "greedy",
         llm_log_id: str | None = None,
+        candidate_outputs: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Generate minimal prompt edits that change the model's output."""
         data = _llm_xai_counterfactuals_payload(
@@ -4285,6 +4297,7 @@ class LLMXAIResource(BaseResource):
             num_candidates=num_candidates,
             search_strategy=search_strategy,
             llm_log_id=llm_log_id,
+            candidate_outputs=candidate_outputs,
         )
         return self.client.request("POST", "/api/v1/llm-xai/counterfactuals", data=data)
 
@@ -4292,6 +4305,43 @@ class LLMXAIResource(BaseResource):
         """Async version of counterfactuals()."""
         data = _llm_xai_counterfactuals_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/llm-xai/counterfactuals", data=data)
+
+    def rag_attribution(
+        self,
+        query: str | None = None,
+        answer: str | None = None,
+        contexts: list[dict[str, Any]] | None = None,
+        retrieval_log_id: str | None = None,
+        llm_log_id: str | None = None,
+        model_id: str | None = None,
+        baseline_outputs_without_chunk: dict[int, str] | None = None,
+    ) -> dict[str, Any]:
+        """Attribute RAG answers to retrieved chunks and detect ungrounded claims."""
+        data = _llm_xai_rag_attribution_payload(
+            query=query,
+            answer=answer,
+            contexts=contexts,
+            retrieval_log_id=retrieval_log_id,
+            llm_log_id=llm_log_id,
+            model_id=model_id,
+            baseline_outputs_without_chunk=baseline_outputs_without_chunk,
+        )
+        return self.client.request("POST", "/api/v1/llm-xai/rag-attribution", data=data)
+
+    async def arag_attribution(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Async version of rag_attribution()."""
+        data = _llm_xai_rag_attribution_payload(*args, **kwargs)
+        return await self.client.arequest("POST", "/api/v1/llm-xai/rag-attribution", data=data)
+
+    def get_unified_explanation(self, explanation_id: str) -> dict[str, Any]:
+        """Get standardized attribution payload (Issue #94 unified contract) for an explanation."""
+        return self.client.request("GET", f"/api/v1/llm-xai/explanations/{explanation_id}/unified")
+
+    async def aget_unified_explanation(self, explanation_id: str) -> dict[str, Any]:
+        """Async version of get_unified_explanation()."""
+        return await self.client.arequest(
+            "GET", f"/api/v1/llm-xai/explanations/{explanation_id}/unified"
+        )
 
     def debug_prompt(
         self,
@@ -4347,7 +4397,7 @@ class LLMXAIResource(BaseResource):
         explanation_type: str | None = None,
         model_id: str | None = None,
         limit: int = 50,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List explanations, optionally filtered by LLM log, type, or model."""
         params = _drop_none(
             llm_log_id=llm_log_id,
@@ -4363,7 +4413,7 @@ class LLMXAIResource(BaseResource):
         explanation_type: str | None = None,
         model_id: str | None = None,
         limit: int = 50,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_explanations()."""
         params = _drop_none(
             llm_log_id=llm_log_id,
@@ -4379,7 +4429,7 @@ class LLMXAIResource(BaseResource):
         model_id: str | None = None,
         min_quality_score: float | None = None,
         limit: int = 50,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """List prompt analyses, optionally filtered by similar prompt text,
         model, or minimum quality score."""
         params = _drop_none(
@@ -4396,7 +4446,7 @@ class LLMXAIResource(BaseResource):
         model_id: str | None = None,
         min_quality_score: float | None = None,
         limit: int = 50,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of list_prompt_analyses()."""
         params = _drop_none(
             prompt=prompt,
@@ -4487,9 +4537,9 @@ def _llm_xai_attention_payload(
     prompt: str,
     completion: str | None = None,
     model_id: str | None = None,
-    layers: List[int] | None = None,
+    layers: list[int] | None = None,
     aggregate_heads: bool = True,
-    attention_weights: List[Any] | None = None,
+    attention_weights: list[Any] | None = None,
     top_k: int = 10,
     llm_log_id: str | None = None,
 ) -> dict[str, Any]:
@@ -4518,6 +4568,8 @@ def _llm_xai_token_importance_payload(
     method: str = "perturbation",
     top_k: int = 10,
     llm_log_id: str | None = None,
+    perturbed_outputs: dict[str, str] | None = None,
+    n_steps: int = 20,
 ) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.token_importance/atoken_importance."""
     data: dict[str, Any] = {
@@ -4525,8 +4577,15 @@ def _llm_xai_token_importance_payload(
         "completion": completion,
         "method": method,
         "top_k": top_k,
+        "n_steps": n_steps,
     }
-    data.update(_drop_none(model_id=model_id, llm_log_id=llm_log_id))
+    data.update(
+        _drop_none(
+            model_id=model_id,
+            llm_log_id=llm_log_id,
+            perturbed_outputs=perturbed_outputs,
+        )
+    )
     return data
 
 
@@ -4537,6 +4596,7 @@ def _llm_xai_sensitivity_payload(
     num_perturbations: int = 10,
     perturbation_type: str = "mixed",
     llm_log_id: str | None = None,
+    perturbed_outputs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.prompt_sensitivity/aprompt_sensitivity."""
     data: dict[str, Any] = {
@@ -4545,7 +4605,13 @@ def _llm_xai_sensitivity_payload(
         "num_perturbations": num_perturbations,
         "perturbation_type": perturbation_type,
     }
-    data.update(_drop_none(model_id=model_id, llm_log_id=llm_log_id))
+    data.update(
+        _drop_none(
+            model_id=model_id,
+            llm_log_id=llm_log_id,
+            perturbed_outputs=perturbed_outputs,
+        )
+    )
     return data
 
 
@@ -4558,6 +4624,7 @@ def _llm_xai_counterfactuals_payload(
     num_candidates: int = 10,
     search_strategy: str = "greedy",
     llm_log_id: str | None = None,
+    candidate_outputs: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Shared request-body builder for LLMXAIResource.counterfactuals/acounterfactuals."""
     data: dict[str, Any] = {
@@ -4568,7 +4635,38 @@ def _llm_xai_counterfactuals_payload(
         "num_candidates": num_candidates,
         "search_strategy": search_strategy,
     }
-    data.update(_drop_none(model_id=model_id, llm_log_id=llm_log_id))
+    data.update(
+        _drop_none(
+            model_id=model_id,
+            llm_log_id=llm_log_id,
+            candidate_outputs=candidate_outputs,
+        )
+    )
+    return data
+
+
+def _llm_xai_rag_attribution_payload(
+    query: str | None = None,
+    answer: str | None = None,
+    contexts: list[dict[str, Any]] | None = None,
+    retrieval_log_id: str | None = None,
+    llm_log_id: str | None = None,
+    model_id: str | None = None,
+    baseline_outputs_without_chunk: dict[int, str] | None = None,
+) -> dict[str, Any]:
+    """Shared request-body builder for LLMXAIResource.rag_attribution/arag_attribution."""
+    data: dict[str, Any] = {}
+    data.update(
+        _drop_none(
+            query=query,
+            answer=answer,
+            contexts=contexts,
+            retrieval_log_id=retrieval_log_id,
+            llm_log_id=llm_log_id,
+            model_id=model_id,
+            baseline_outputs_without_chunk=baseline_outputs_without_chunk,
+        )
+    )
     return data
 
 
@@ -4621,7 +4719,7 @@ class AgentWorkflowsResource(BaseResource):
         name: str,
         framework: str,
         meta_data: dict[str, Any] | None = None,
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Create a new multi-agent workflow.
 
@@ -4637,7 +4735,7 @@ class AgentWorkflowsResource(BaseResource):
         name: str,
         framework: str,
         meta_data: dict[str, Any] | None = None,
-        tags: List[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """Async version of create_and_start()."""
         data = _drop_none(name=name, framework=framework, meta_data=meta_data, tags=tags)
@@ -5053,7 +5151,7 @@ def _agent_register_payload(
     system_prompt: str | None = None,
     goal: str | None = None,
     backstory: str | None = None,
-    tools: List[str] | None = None,
+    tools: list[str] | None = None,
     capabilities: dict[str, Any] | None = None,
     meta_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -5132,24 +5230,24 @@ class MetricsResource(BaseResource):
         data = _metric_create_payload(*args, **kwargs)
         return await self.client.arequest("POST", "/api/v1/metrics/", data=data)
 
-    def create_batch(self, model_id: str, metrics: List[dict[str, Any]]) -> List[dict[str, Any]]:
+    def create_batch(self, model_id: str, metrics: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Create multiple metrics at once (max 100). Each dict in `metrics`
         needs metric_type/metric_name/metric_value."""
         data = {"model_id": model_id, "metrics": metrics}
         return self.client.request("POST", "/api/v1/metrics/batch", data=data)
 
     async def acreate_batch(
-        self, model_id: str, metrics: List[dict[str, Any]]
-    ) -> List[dict[str, Any]]:
+        self, model_id: str, metrics: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Async version of create_batch()."""
         data = {"model_id": model_id, "metrics": metrics}
         return await self.client.arequest("POST", "/api/v1/metrics/batch", data=data)
 
     def calculate_classification(
         self,
-        y_true: List[Any],
-        y_pred: List[Any],
-        y_pred_proba: List[float] | None = None,
+        y_true: list[Any],
+        y_pred: list[Any],
+        y_pred_proba: list[float] | None = None,
         average: str = "binary",
         pos_label: int = 1,
     ) -> dict[str, float]:
@@ -5163,9 +5261,9 @@ class MetricsResource(BaseResource):
 
     async def acalculate_classification(
         self,
-        y_true: List[Any],
-        y_pred: List[Any],
-        y_pred_proba: List[float] | None = None,
+        y_true: list[Any],
+        y_pred: list[Any],
+        y_pred_proba: list[float] | None = None,
         average: str = "binary",
         pos_label: int = 1,
     ) -> dict[str, float]:
@@ -5176,14 +5274,14 @@ class MetricsResource(BaseResource):
             "POST", "/api/v1/metrics/calculate/classification", data=data, params=params
         )
 
-    def calculate_regression(self, y_true: List[float], y_pred: List[float]) -> dict[str, float]:
+    def calculate_regression(self, y_true: list[float], y_pred: list[float]) -> dict[str, float]:
         """Calculate regression metrics (MAE/MSE/RMSE/R2/etc.) from
         predictions, without persisting anything."""
         data = {"y_true": y_true, "y_pred": y_pred}
         return self.client.request("POST", "/api/v1/metrics/calculate/regression", data=data)
 
     async def acalculate_regression(
-        self, y_true: List[float], y_pred: List[float]
+        self, y_true: list[float], y_pred: list[float]
     ) -> dict[str, float]:
         """Async version of calculate_regression()."""
         data = {"y_true": y_true, "y_pred": y_pred}
@@ -5197,7 +5295,7 @@ class MetricsResource(BaseResource):
         end_date: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get metrics recorded for a model, with optional type/date filters."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
@@ -5211,7 +5309,7 @@ class MetricsResource(BaseResource):
         end_date: str | None = None,
         skip: int = 0,
         limit: int = 100,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of get_model_metrics()."""
         params = {"skip": skip, "limit": limit}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
@@ -5251,7 +5349,7 @@ class MetricsResource(BaseResource):
         start_date: str | None = None,
         end_date: str | None = None,
         force_recompute: bool = False,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get metrics aggregated over `period` (e.g. "daily", "weekly").
         Defaults to the last 30 days if no date range is given."""
         params = {"period": period, "force_recompute": force_recompute}
@@ -5266,7 +5364,7 @@ class MetricsResource(BaseResource):
         start_date: str | None = None,
         end_date: str | None = None,
         force_recompute: bool = False,
-    ) -> List[dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Async version of aggregate()."""
         params = {"period": period, "force_recompute": force_recompute}
         params.update(_drop_none(metric_type=metric_type, start_date=start_date, end_date=end_date))
@@ -5346,6 +5444,29 @@ def _metric_create_payload(
     return data
 
 
+class ExportFormat(str, Enum):
+    """Supported report export formats."""
+
+    PDF = "pdf"
+    HTML = "html"
+    DOCX = "docx"
+
+    @classmethod
+    def from_value(cls, val: ExportFormat | str) -> ExportFormat:
+        """Convert a string or enum instance to ExportFormat, raising ValueError if unsupported."""
+        if isinstance(val, cls):
+            return val
+        if isinstance(val, str):
+            val_norm = val.strip().lower()
+            for member in cls:
+                if member.value == val_norm:
+                    return member
+        supported = [m.value for m in cls]
+        raise ValueError(
+            f"Unsupported export format: {val!r}. Supported formats are: {', '.join(supported)}"
+        )
+
+
 class ReportTypesResource(BaseResource):
     """Report Types API resource.
 
@@ -5366,11 +5487,36 @@ class ReportTypesResource(BaseResource):
         """Async version of list()."""
         return await self.client.arequest("GET", "/api/v1/report-types")
 
+    @staticmethod
+    def _generate_params(
+        format: ExportFormat | str,
+        model_id: str | None,
+        brand_profile_id: int | None,
+        template_id: int | None,
+    ) -> dict[str, Any]:
+        """Query parameters for ``POST /report-types/{id}/generate``.
+
+        The endpoint reads ``format``, ``model_id``, ``brand_profile_id`` and
+        ``template_id`` from the query string; only ``settings`` is the body.
+        """
+        params: dict[str, Any] = {"format": ExportFormat.from_value(format).value}
+        params.update(
+            _drop_none(
+                model_id=model_id or None,
+                brand_profile_id=brand_profile_id,
+                template_id=template_id,
+            )
+        )
+        return params
+
     def generate(
         self,
         report_type_id: str,
         model_id: str | None = None,
-        format: str = "pdf",
+        format: ExportFormat | str = ExportFormat.PDF,
+        brand_profile_id: int | None = None,
+        template_id: int | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Generate a compliance or governance report.
@@ -5378,37 +5524,164 @@ class ReportTypesResource(BaseResource):
         Args:
             report_type_id: The ID of the report type (e.g., 'model_card', 'fairness_audit')
             model_id: The model ID for single-model reports (optional for org-wide reports)
-            format: Output format ('pdf', 'html', or 'docx')
+            format: Output format ('pdf', 'html', 'docx', or ExportFormat enum)
+            brand_profile_id: Optional brand profile to style the report with
+            template_id: Optional saved report template whose model, branding and
+                settings are used where not given here
+            settings: Optional report settings (``style``, ``sections``, ``intros``);
+                replaces the template's settings as a whole
 
         Returns:
-            Dictionary with generation result and download URL.
+            The export record for the generated report; pass it to download().
         """
-        data = {"format": format}
-        if model_id:
-            data["model_id"] = model_id
-
         return self.client.request(
             "POST",
             f"/api/v1/report-types/{report_type_id}/generate",
-            data=data,
+            data=settings,
+            params=self._generate_params(format, model_id, brand_profile_id, template_id),
         )
 
     async def agenerate(
         self,
         report_type_id: str,
         model_id: str | None = None,
-        format: str = "pdf",
+        format: ExportFormat | str = ExportFormat.PDF,
+        brand_profile_id: int | None = None,
+        template_id: int | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Async version of generate()."""
-        data = {"format": format}
-        if model_id:
-            data["model_id"] = model_id
-
         return await self.client.arequest(
             "POST",
             f"/api/v1/report-types/{report_type_id}/generate",
-            data=data,
+            data=settings,
+            params=self._generate_params(format, model_id, brand_profile_id, template_id),
         )
+
+    def _resolve_download_endpoint_and_validate(
+        self,
+        result: dict[str, Any] | int | str,
+        path: str | Path | None = None,
+        format: ExportFormat | str | None = None,
+    ) -> str:
+        """Resolve download URL/endpoint from result and validate export format."""
+        resolved_format: ExportFormat | None = None
+        if format is not None:
+            resolved_format = ExportFormat.from_value(format)
+
+        endpoint: str | None = None
+        if isinstance(result, dict):
+            if resolved_format is None and result.get("export_format"):
+                resolved_format = ExportFormat.from_value(result["export_format"])
+
+            if result.get("download_url"):
+                endpoint = str(result["download_url"])
+            elif result.get("id") is not None:
+                endpoint = f"/api/v1/export/exports/{result['id']}/download"
+            elif result.get("export_id") is not None:
+                endpoint = f"/api/v1/export/exports/{result['export_id']}/download"
+            else:
+                raise ValueError(
+                    "Invalid export result: expected dictionary containing 'id', 'export_id', or 'download_url'"
+                )
+        elif isinstance(result, int):
+            endpoint = f"/api/v1/export/exports/{result}/download"
+        elif isinstance(result, str):
+            if (
+                result.startswith("http://")
+                or result.startswith("https://")
+                or result.startswith("/")
+            ):
+                endpoint = result
+            else:
+                endpoint = f"/api/v1/export/exports/{result}/download"
+        else:
+            raise ValueError(
+                f"Invalid result type: expected dict, int, or str, got {type(result).__name__}"
+            )
+
+        if resolved_format is None and path is not None:
+            ext = Path(path).suffix.lstrip(".").lower()
+            if ext:
+                resolved_format = ExportFormat.from_value(ext)
+
+        self._check_same_origin(endpoint)
+        return endpoint
+
+    def _check_same_origin(self, endpoint: str) -> None:
+        """Refuse absolute URLs on another host: the request carries the API key."""
+        if not endpoint.startswith(("http://", "https://")):
+            return
+        target = urlsplit(endpoint)
+        base = urlsplit(self.client.config.base_url)
+        if (target.scheme, target.netloc.lower()) != (base.scheme, base.netloc.lower()):
+            raise ValueError(
+                f"Refusing to download from {target.scheme}://{target.netloc}: it is not the "
+                f"configured base URL ({base.scheme}://{base.netloc}), and the request would "
+                "send your API key there"
+            )
+
+    def download(
+        self,
+        result: dict[str, Any] | int | str,
+        path: str | Path | None = None,
+        format: ExportFormat | str | None = None,
+    ) -> bytes:
+        """
+        Download a generated report file.
+
+        Fetches the report artifact from the platform with client authentication.
+
+        Args:
+            result: The result dict from generate(), an export ID (int/str), or download URL.
+            path: Optional local file path to write the downloaded bytes to.
+            format: Optional ExportFormat or format string ('pdf', 'html', 'docx') for validation.
+
+        Returns:
+            The raw file bytes.
+
+        Raises:
+            ValueError: If an unsupported format is specified or result cannot be parsed.
+            APIError: If the download fails on the server.
+        """
+        endpoint = self._resolve_download_endpoint_and_validate(result, path=path, format=format)
+        content = self.client.request_bytes("GET", endpoint)
+        if path is not None:
+            p = Path(path)
+            if p.parent:
+                p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(content)
+        return content
+
+    async def adownload(
+        self,
+        result: dict[str, Any] | int | str,
+        path: str | Path | None = None,
+        format: ExportFormat | str | None = None,
+    ) -> bytes:
+        """
+        Asynchronously download a generated report file.
+
+        Args:
+            result: The result dict from generate(), an export ID (int/str), or download URL.
+            path: Optional local file path to write the downloaded bytes to.
+            format: Optional ExportFormat or format string ('pdf', 'html', 'docx') for validation.
+
+        Returns:
+            The raw file bytes.
+
+        Raises:
+            ValueError: If an unsupported format is specified or result cannot be parsed.
+            APIError: If the download fails on the server.
+        """
+        endpoint = self._resolve_download_endpoint_and_validate(result, path=path, format=format)
+        content = await self.client.arequest_bytes("GET", endpoint)
+        if path is not None:
+            p = Path(path)
+            if p.parent:
+                p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_bytes(content)
+        return content
 
     def preview(
         self,
@@ -5455,11 +5728,11 @@ class ReportTypesResource(BaseResource):
 class PromptsResource(BaseResource):
     """Prompt lifecycle, deployment and drift governance API resource (backed by /api/v1/prompts)."""
 
-    def list_templates(self) -> List[dict[str, Any]]:
+    def list_templates(self) -> list[dict[str, Any]]:
         """List all prompt templates in the organization."""
         return self.client.request("GET", "/api/v1/prompts")
 
-    async def alist_templates(self) -> List[dict[str, Any]]:
+    async def alist_templates(self) -> list[dict[str, Any]]:
         """Async version of list_templates()."""
         return await self.client.arequest("GET", "/api/v1/prompts")
 
@@ -5499,11 +5772,11 @@ class PromptsResource(BaseResource):
             data["tags"] = tags
         return await self.client.arequest("POST", "/api/v1/prompts", data=data)
 
-    def list_versions(self, template_id: str) -> List[dict[str, Any]]:
+    def list_versions(self, template_id: str) -> list[dict[str, Any]]:
         """List all versions of a prompt template."""
         return self.client.request("GET", f"/api/v1/prompts/{template_id}/versions")
 
-    async def alist_versions(self, template_id: str) -> List[dict[str, Any]]:
+    async def alist_versions(self, template_id: str) -> list[dict[str, Any]]:
         """Async version of list_versions()."""
         return await self.client.arequest("GET", f"/api/v1/prompts/{template_id}/versions")
 
@@ -5701,14 +5974,14 @@ class PromptsResource(BaseResource):
             data=data,
         )
 
-    def list_drift_reports(self, template_id: str, version_id: str) -> List[dict[str, Any]]:
+    def list_drift_reports(self, template_id: str, version_id: str) -> list[dict[str, Any]]:
         """List historical drift reports for a prompt version."""
         return self.client.request(
             "GET",
             f"/api/v1/prompts/{template_id}/versions/{version_id}/drift-reports",
         )
 
-    async def alist_drift_reports(self, template_id: str, version_id: str) -> List[dict[str, Any]]:
+    async def alist_drift_reports(self, template_id: str, version_id: str) -> list[dict[str, Any]]:
         """Async version of list_drift_reports()."""
         return await self.client.arequest(
             "GET",

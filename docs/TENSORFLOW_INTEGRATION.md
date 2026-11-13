@@ -248,7 +248,7 @@ monitor = KerasMonitor(
     model=model,
     client=client,
     model_name="keras_binary_classifier",
-    model_type="classification"
+    model_type="neural_network"
 )
 monitor.set_baseline(X_train, y_train)
 
@@ -755,7 +755,7 @@ monitor = KerasMonitor(
     model=model,
     client=client,
     model_name="cifar10_cnn",
-    model_type="classification",
+    model_type="neural_network",
     classes=['airplane', 'automobile', 'bird', 'cat', 'deer',
              'dog', 'frog', 'horse', 'ship', 'truck']
 )

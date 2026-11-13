@@ -78,12 +78,43 @@ ends in a failed explanation.
 
 ```python
 client.reports.list() -> dict
-client.reports.generate(report_type_id: str, model_id: str = None, format: str = "pdf") -> dict
+client.reports.generate(
+    report_type_id: str,
+    model_id: str = None,
+    format: ExportFormat | str = ExportFormat.PDF,
+    brand_profile_id: int = None,
+    template_id: int = None,
+    settings: dict = None,
+) -> dict
+client.reports.download(result: dict | int | str, path: str | Path = None, format: ExportFormat | str = None) -> bytes
 client.reports.preview(report_type_id: str, model_id: str = None) -> dict
 ```
 
-`format` is `"pdf"`, `"html"` or `"docx"`. Every method has an async twin (`alist`, `agenerate`,
-`apreview`).
+`format` is an `ExportFormat` (`from whiteboxxai import ExportFormat`: `PDF`, `HTML`, `DOCX`) or
+the string `"pdf"`, `"html"` or `"docx"`; anything else raises `ValueError`. `settings` takes the
+report's `style`, `sections` and `intros`. `download()` takes the result of `generate()`, an
+export ID or a download URL, returns the file's bytes, and writes them to `path` if given. Every
+method has an async twin (`alist`, `agenerate`, `adownload`, `apreview`). `preview()` calls an
+endpoint the platform does not serve yet.
+
+#### LLM and RAG explainability
+
+```python
+client.llm_xai.rag_attribution(
+    query: str = None,
+    answer: str = None,
+    contexts: list[dict] = None,
+    retrieval_log_id: str = None,
+    llm_log_id: str = None,
+    model_id: str = None,
+    baseline_outputs_without_chunk: dict[int, str] = None,
+) -> dict
+client.llm_xai.get_unified_explanation(explanation_id: str) -> dict
+```
+
+`rag_attribution()` attributes a RAG answer to its retrieved chunks and flags ungrounded claims.
+`get_unified_explanation()` returns the standardized attribution payload for an explanation.
+Both have async twins (`arag_attribution`, `aget_unified_explanation`).
 
 #### Compliance
 
@@ -209,9 +240,10 @@ set_baseline(data: np.ndarray, labels: Optional[np.ndarray] = None)
 Set baseline data for drift detection.
 
 ```python
-detect_drift(data: np.ndarray) -> dict
+detect_drift(window_size: int = 1000, feature_names: Optional[List[str]] = None) -> dict
 ```
-Detect drift in current data.
+Detect drift over the model's most recently logged predictions (computed on the platform). The
+result is not persisted; use `client.drift.create_report()` to store a drift report.
 
 **Returns:** Drift detection report
 

@@ -321,15 +321,12 @@ class WhiteBoxXAI:
         except httpx.HTTPError as e:
             raise APIError(f"Request failed: {str(e)}") from e
 
-    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
+    def _raise_for_status(self, response: httpx.Response) -> None:
         """
-        Handle HTTP response and raise appropriate exceptions.
+        Check HTTP response status code and raise appropriate exceptions.
 
         Args:
             response: HTTP response
-
-        Returns:
-            Response data as dictionary
 
         Raises:
             AuthenticationError: For 401 status codes
@@ -396,10 +393,131 @@ class WhiteBoxXAI:
                 request_id=response.headers.get("X-Request-ID"),
             )
 
+    def _handle_response(self, response: httpx.Response) -> dict[str, Any]:
+        """
+        Handle HTTP response and raise appropriate exceptions.
+
+        Args:
+            response: HTTP response
+
+        Returns:
+            Response data as dictionary
+
+        Raises:
+            AuthenticationError: For 401 status codes
+            RateLimitError: For 429 status codes
+            ValidationError: For 422 status codes
+            ServerError: For 5xx status codes
+            APIError: For other error status codes
+        """
+        self._raise_for_status(response)
+
         try:
             return response.json()
         except Exception:
             return {"status": "success"}
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=_retry_wait,
+        retry=retry_if_exception(_should_retry),
+        reraise=True,
+    )
+    def request_bytes(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> bytes:
+        """
+        Make synchronous HTTP request returning raw response bytes.
+
+        Retries on transient failures (connection errors, 5xx, 429).
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint path or absolute URL
+            params: Query parameters
+            **kwargs: Additional request options
+
+        Returns:
+            Response content as bytes
+
+        Raises:
+            APIConnectionError: If the request never reached the server
+            ServerError: For 5xx responses
+            APIError: For other general API errors
+            AuthenticationError: For authentication failures
+            RateLimitError: For rate limit errors
+            ValidationError: For validation errors
+        """
+        url = urljoin(self.config.base_url, endpoint)
+
+        try:
+            response = self.sync_client.request(
+                method=method,
+                url=url,
+                params=params,
+                **with_run_header(kwargs),
+            )
+            self._raise_for_status(response)
+            return response.content
+        except httpx.TransportError as e:
+            raise APIConnectionError(f"Connection failed: {str(e)}") from e
+        except httpx.HTTPError as e:
+            raise APIError(f"Request failed: {str(e)}") from e
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=_retry_wait,
+        retry=retry_if_exception(_should_retry),
+        reraise=True,
+    )
+    async def arequest_bytes(
+        self,
+        method: str,
+        endpoint: str,
+        params: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> bytes:
+        """
+        Make asynchronous HTTP request returning raw response bytes.
+
+        Retries on transient failures (connection errors, 5xx, 429).
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            endpoint: API endpoint path or absolute URL
+            params: Query parameters
+            **kwargs: Additional request options
+
+        Returns:
+            Response content as bytes
+
+        Raises:
+            APIConnectionError: If the request never reached the server
+            ServerError: For 5xx responses
+            APIError: For other general API errors
+            AuthenticationError: For authentication failures
+            RateLimitError: For rate limit errors
+            ValidationError: For validation errors
+        """
+        url = urljoin(self.config.base_url, endpoint)
+
+        try:
+            response = await self.async_client.request(
+                method=method,
+                url=url,
+                params=params,
+                **with_run_header(kwargs),
+            )
+            self._raise_for_status(response)
+            return response.content
+        except httpx.TransportError as e:
+            raise APIConnectionError(f"Connection failed: {str(e)}") from e
+        except httpx.HTTPError as e:
+            raise APIError(f"Request failed: {str(e)}") from e
 
     # ------------------------------------------------------------------
     # Offline-queue replay targets.

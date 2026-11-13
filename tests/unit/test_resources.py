@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from whiteboxxai.client import WhiteBoxXAI
+from whiteboxxai.resources import ExportFormat
 
 SENTINEL = {"ok": True}
 
@@ -50,6 +51,31 @@ class TestModelsResource:
         # No git repo in the test sandbox -> detect_git_context() returns
         # None -> logs a warning and proceeds without git metadata.
         assert client.models.register("m", "classification", auto_detect_git=True)
+
+    def test_register_auto_detect_git_sends_only_persisted_fields(self, client):
+        # Issue #1080: the backend persists four github_* columns. Commit
+        # message/author have no column, so sending them just got them dropped.
+        from whiteboxxai.git_utils import GitContext
+
+        ctx = GitContext(
+            repository_url="https://github.com/org/repo",
+            commit_sha="a" * 40,
+            commit_message="msg",
+            commit_author="Jane <jane@example.com>",
+            branch="main",
+            tag="v1.0.0",
+        )
+        with patch("whiteboxxai.git_utils.detect_git_context", return_value=ctx):
+            body = client.models._build_register_data(
+                "m", "classification", None, "1.0.0", True, False, {}
+            )
+
+        assert {k: v for k, v in body.items() if k.startswith("github_")} == {
+            "github_repository_url": "https://github.com/org/repo",
+            "github_commit_hash": "a" * 40,
+            "github_branch": "main",
+            "github_tag": "v1.0.0",
+        }
 
     def test_get(self, client, mock_request):
         assert client.models.get("m1") == SENTINEL
@@ -1761,6 +1787,43 @@ class TestLLMXAIResource:
     async def test_abatch_analyze(self, client, mock_arequest):
         assert await client.llm_xai.abatch_analyze("l1") == SENTINEL
 
+    def test_rag_attribution(self, client, mock_request):
+        assert (
+            client.llm_xai.rag_attribution(
+                query="q",
+                contexts=[{"text": "c1", "chunk_index": 0}],
+                answer="a",
+                model_id="m1",
+            )
+            == SENTINEL
+        )
+        method, endpoint = mock_request.call_args[0][:2]
+        assert (method, endpoint) == ("POST", "/api/v1/llm-xai/rag-attribution")
+        data = mock_request.call_args.kwargs["data"]
+        assert data["query"] == "q"
+        assert data["contexts"] == [{"text": "c1", "chunk_index": 0}]
+        assert data["answer"] == "a"
+        assert data["model_id"] == "m1"
+
+    async def test_arag_attribution(self, client, mock_arequest):
+        assert (
+            await client.llm_xai.arag_attribution(
+                query="q",
+                contexts=[{"text": "c1", "chunk_index": 0}],
+                answer="a",
+            )
+            == SENTINEL
+        )
+        mock_arequest.assert_awaited_once()
+
+    def test_get_unified_explanation(self, client, mock_request):
+        assert client.llm_xai.get_unified_explanation("e1") == SENTINEL
+        mock_request.assert_called_once_with("GET", "/api/v1/llm-xai/explanations/e1/unified")
+
+    async def test_aget_unified_explanation(self, client, mock_arequest):
+        assert await client.llm_xai.aget_unified_explanation("e1") == SENTINEL
+        mock_arequest.assert_awaited_once_with("GET", "/api/v1/llm-xai/explanations/e1/unified")
+
 
 class TestAgentWorkflowsResource:
     def test_create_and_start(self, client, mock_request):
@@ -2119,6 +2182,23 @@ class TestRequestOrQueueFallback:
 class TestReportTypesResource:
     """Tests for ReportTypesResource."""
 
+    def test_export_format_enum(self):
+        """ExportFormat members, values, and from_value conversions."""
+        assert ExportFormat.PDF == "pdf"
+        assert ExportFormat.HTML == "html"
+        assert ExportFormat.DOCX == "docx"
+
+        assert ExportFormat.from_value(ExportFormat.PDF) == ExportFormat.PDF
+        assert ExportFormat.from_value("pdf") == ExportFormat.PDF
+        assert ExportFormat.from_value("HTML") == ExportFormat.HTML
+        assert ExportFormat.from_value("  Docx  ") == ExportFormat.DOCX
+
+        with pytest.raises(ValueError, match="Unsupported export format"):
+            ExportFormat.from_value("unsupported")
+
+        with pytest.raises(ValueError, match="Unsupported export format"):
+            ExportFormat.from_value("csv")
+
     def test_list(self, client, mock_request):
         assert client.reports.list() == {"ok": True}
         mock_request.assert_called_once_with("GET", "/api/v1/report-types")
@@ -2132,8 +2212,63 @@ class TestReportTypesResource:
         mock_request.assert_called_once_with(
             "POST",
             "/api/v1/report-types/model_card/generate",
-            data={"format": "pdf", "model_id": "m1"},
+            data=None,
+            params={"format": "pdf", "model_id": "m1"},
         )
+
+    def test_generate_with_export_format_enum(self, client, mock_request):
+        assert client.reports.generate("model_card", model_id="m1", format=ExportFormat.DOCX) == {
+            "ok": True
+        }
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/report-types/model_card/generate",
+            data=None,
+            params={"format": "docx", "model_id": "m1"},
+        )
+
+    def test_generate_passes_branding_template_and_settings(self, client, mock_request):
+        settings = {"sections": [{"key": "summary", "include": False}]}
+        client.reports.generate(
+            "evidence_pack",
+            format="PDF",
+            brand_profile_id=3,
+            template_id=7,
+            settings=settings,
+        )
+        mock_request.assert_called_once_with(
+            "POST",
+            "/api/v1/report-types/evidence_pack/generate",
+            data=settings,
+            params={"format": "pdf", "brand_profile_id": 3, "template_id": 7},
+        )
+
+    def test_generate_sends_format_and_model_id_in_query_string(self, client):
+        """The endpoint takes ``format`` and ``model_id`` as query parameters
+        (``format`` is required); sending them in the JSON body gets a 422."""
+        import httpx
+
+        seen = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen["path"] = request.url.path
+            seen["query"] = dict(request.url.params)
+            seen["body"] = request.content
+            return httpx.Response(200, json={"id": 42, "export_format": "docx"})
+
+        client._sync_client = httpx.Client(
+            base_url=client.config.base_url, transport=httpx.MockTransport(handler)
+        )
+        result = client.reports.generate("model_card", model_id="m1", format=ExportFormat.DOCX)
+
+        assert result == {"id": 42, "export_format": "docx"}
+        assert seen["path"] == "/api/v1/report-types/model_card/generate"
+        assert seen["query"] == {"format": "docx", "model_id": "m1"}
+        assert seen["body"] in (b"", b"null")
+
+    def test_generate_unsupported_format_raises(self, client):
+        with pytest.raises(ValueError, match="Unsupported export format: 'unknown'"):
+            client.reports.generate("model_card", format="unknown")
 
     async def test_agenerate(self, client, mock_arequest):
         assert await client.reports.agenerate("model_card", model_id="m1", format="docx") == {
@@ -2142,8 +2277,24 @@ class TestReportTypesResource:
         mock_arequest.assert_awaited_once_with(
             "POST",
             "/api/v1/report-types/model_card/generate",
-            data={"format": "docx", "model_id": "m1"},
+            data=None,
+            params={"format": "docx", "model_id": "m1"},
         )
+
+    async def test_agenerate_with_export_format_enum(self, client, mock_arequest):
+        assert await client.reports.agenerate(
+            "model_card", model_id="m1", format=ExportFormat.HTML
+        ) == {"ok": True}
+        mock_arequest.assert_awaited_once_with(
+            "POST",
+            "/api/v1/report-types/model_card/generate",
+            data=None,
+            params={"format": "html", "model_id": "m1"},
+        )
+
+    async def test_agenerate_unsupported_format_raises(self, client):
+        with pytest.raises(ValueError, match="Unsupported export format: 'exe'"):
+            await client.reports.agenerate("model_card", format="exe")
 
     def test_preview(self, client, mock_request):
         assert client.reports.preview("model_card", model_id="m1") == {"ok": True}
@@ -2160,6 +2311,109 @@ class TestReportTypesResource:
             "/api/v1/export/templates/preview",
             data={"report_type_id": "model_card", "model_id": "m1"},
         )
+
+    def test_download_with_dict_and_path(self, client, tmp_path):
+        """Download helper writes the right bytes and returns them."""
+        target_path = tmp_path / "sub" / "report.docx"
+        fake_bytes = b"PK\x03\x04 fake docx bytes"
+
+        with patch.object(client, "request_bytes", return_value=fake_bytes) as mock_rb:
+            result = {"id": 42, "export_format": "docx", "filename": "fairness.docx"}
+            out = client.reports.download(result, path=target_path)
+
+            assert out == fake_bytes
+            assert target_path.exists()
+            assert target_path.read_bytes() == fake_bytes
+            mock_rb.assert_called_once_with("GET", "/api/v1/export/exports/42/download")
+
+    @pytest.mark.parametrize(
+        ("fmt", "ext", "magic"),
+        [
+            ("pdf", "pdf", b"%PDF-1.4"),
+            ("html", "html", b"<!DOCTYPE html>"),
+            ("docx", "docx", b"PK\x03\x04"),
+        ],
+    )
+    def test_download_formats_pdf_html_docx(self, client, tmp_path, fmt, ext, magic):
+        """Helper works identically for PDF, HTML and DOCX."""
+        file_path = tmp_path / f"output.{ext}"
+        with patch.object(client, "request_bytes", return_value=magic) as mock_rb:
+            res = client.reports.download({"id": 7, "export_format": fmt}, path=file_path)
+            assert res == magic
+            assert file_path.read_bytes() == magic
+            mock_rb.assert_called_once_with("GET", "/api/v1/export/exports/7/download")
+
+    def test_download_with_id_or_url(self, client):
+        """Accepts int id, string id, or explicit download_url."""
+        with patch.object(client, "request_bytes", return_value=b"data") as mock_rb:
+            client.reports.download(123, format=ExportFormat.PDF)
+            mock_rb.assert_called_with("GET", "/api/v1/export/exports/123/download")
+
+            client.reports.download("456", format="docx")
+            mock_rb.assert_called_with("GET", "/api/v1/export/exports/456/download")
+
+            client.reports.download(
+                {"download_url": "/custom/path/download", "export_format": "html"}
+            )
+            mock_rb.assert_called_with("GET", "/custom/path/download")
+
+    def test_download_accepts_absolute_url_on_the_configured_host(self, client):
+        url = client.config.base_url.rstrip("/") + "/api/v1/export/exports/9/download"
+        with patch.object(client, "request_bytes", return_value=b"data") as mock_rb:
+            client.reports.download(url, format="pdf")
+        mock_rb.assert_called_once_with("GET", url)
+
+    @pytest.mark.parametrize(
+        "result",
+        [
+            "https://attacker.example/steal",
+            {"download_url": "https://storage.example.net/export.pdf"},
+        ],
+    )
+    def test_download_refuses_other_hosts_so_the_api_key_stays_put(self, client, result):
+        """The client sends ``Authorization: Bearer <api key>`` on every request,
+        so an absolute URL on another host would hand that host the key."""
+        with patch.object(client, "request_bytes") as mock_rb:
+            with pytest.raises(ValueError, match="Refusing to download"):
+                client.reports.download(result, format="pdf")
+        mock_rb.assert_not_called()
+
+    async def test_adownload_refuses_other_hosts(self, client):
+        with patch.object(client, "arequest_bytes") as mock_arb:
+            with pytest.raises(ValueError, match="Refusing to download"):
+                await client.reports.adownload("https://attacker.example/x.pdf")
+        mock_arb.assert_not_called()
+
+    def test_download_unsupported_format_raises(self, client, tmp_path):
+        """Raises a clear ValueError for unsupported formats."""
+        with pytest.raises(ValueError, match="Unsupported export format"):
+            client.reports.download({"id": 1, "export_format": "unsupported"})
+
+        with pytest.raises(ValueError, match="Unsupported export format"):
+            client.reports.download(1, format="invalid")
+
+        with pytest.raises(ValueError, match="Unsupported export format"):
+            client.reports.download(1, path=tmp_path / "out.unsupported_ext")
+
+    def test_download_invalid_result_raises(self, client):
+        """Raises ValueError if result dict has no id, export_id, or download_url."""
+        with pytest.raises(ValueError, match="Invalid export result"):
+            client.reports.download({})
+
+    async def test_adownload(self, client, tmp_path):
+        """Async twin fetches bytes and saves to disk."""
+        target_path = tmp_path / "async_report.pdf"
+        fake_bytes = b"%PDF async"
+
+        with patch.object(
+            client, "arequest_bytes", new_callable=AsyncMock, return_value=fake_bytes
+        ) as mock_arb:
+            res = await client.reports.adownload(
+                {"id": 88, "export_format": "pdf"}, path=target_path
+            )
+            assert res == fake_bytes
+            assert target_path.read_bytes() == fake_bytes
+            mock_arb.assert_awaited_once_with("GET", "/api/v1/export/exports/88/download")
 
 
 class TestComplianceResource:

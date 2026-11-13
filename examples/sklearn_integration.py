@@ -60,13 +60,9 @@ def main():
     probas = monitored_model.predict_proba(X_test[:5])
     print(f"Probabilities shape: {probas.shape}")
 
-    # Set baseline for drift detection
-    print("\nSetting baseline data...")
-    monitor.set_baseline(X_train)
-
-    # Detect drift on test data
-    print("Detecting drift...")
-    drift_result = monitor.detect_drift(X_test)
+    # Detect drift: computed on the platform over the predictions logged above
+    print("\nDetecting drift...")
+    drift_result = monitor.detect_drift(window_size=100)
     print(f"Drift detected: {drift_result}")
 
     # Close client
